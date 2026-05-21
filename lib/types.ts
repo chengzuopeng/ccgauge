@@ -235,7 +235,14 @@ export interface SessionSummary {
    *  source. Used by the All view to label rows in mixed lists. */
   source: ProviderId;
   cwd: string;
+  /** Plain basename of `cwd`. Always available, never worktree-aware. */
   projectName: string;
+  /** Worktree-aware display label — `"<main-repo> (<worktree-name>)"`
+   *  when `cwd` lives inside `.git/worktrees/...` or Claude Code's
+   *  `.claude/worktrees/...`; otherwise identical to `projectName`.
+   *  Same shape as `UsageTurnRow.projectLabel` so the sessions / usage
+   *  tables stay in sync for cross-worktree projects. */
+  projectLabel: string;
   startTime: string;
   endTime: string;
   durationMs: number;

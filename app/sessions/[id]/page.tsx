@@ -13,7 +13,6 @@ import {
   formatDateTime,
   formatDuration,
   shortHash,
-  projectNameFromCwd,
 } from '@/lib/utils';
 import { getServerT, getServerLocale } from '@/lib/i18n/server';
 import { resolveSource, filterBySource } from '@/lib/source';
@@ -90,7 +89,7 @@ export default async function SessionDetailPage({
           <span className="num-mono">{shortHash(sessionId, 16)}</span>
           {' · '}
           <Link href={`/projects/${encodeURIComponent(session.cwd)}?source=${requestedSource}`} className="hover:text-brand">
-            {projectNameFromCwd(session.cwd)}
+            {session.projectLabel}
           </Link>
         </>
       }

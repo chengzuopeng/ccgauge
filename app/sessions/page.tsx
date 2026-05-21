@@ -84,7 +84,7 @@ export default async function SessionsPage({
                     </Link>
                   </td>
                   <td className="px-3 py-2.5 text-text-secondary truncate max-w-[180px]" title={s.cwd}>
-                    {s.projectName}
+                    {s.projectLabel}
                   </td>
                   <td className="px-3 py-2.5 text-text-secondary text-xs">
                     {s.models.map(shortenFor(s)).join(', ')}

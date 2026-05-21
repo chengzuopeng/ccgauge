@@ -27,6 +27,7 @@ const ZERO_TOTALS_PUBLIC: FlatTotals = {
   cost_usd: 0,
   saved_usd: 0,
   requests: 0,
+  turns: 0,
 };
 
 /** ISO week start (Monday) for the given offset. 0=current week, -1=last, etc. */
@@ -102,12 +103,13 @@ export function registerActivityTools(server: McpServer): void {
     safeMcpHandler(async (args) => {
       const idx = await getMcpIndexerReady();
       const snap = idx.getSnapshot();
+      const ctx = { users: snap.userRecords, parentMap: snap.parentMap };
       const day = parseDayArg(args.date);
       const source = (args.source ?? 'all') as SourceArg;
 
-      const totals = totalsWithBySource(snap.records, source, day);
-      const sessions = sessionEntries(snap.records, snap.userRecords, source, day);
-      const models = modelEntries(snap.records, source, day);
+      const totals = totalsWithBySource(snap.records, source, day, ctx);
+      const sessions = sessionEntries(snap.records, snap.userRecords, source, day, ctx);
+      const models = modelEntries(snap.records, source, day, ctx);
       const tools = topToolUses(snap.records, day, source);
 
       return asTextResult({
@@ -147,11 +149,12 @@ export function registerActivityTools(server: McpServer): void {
     safeMcpHandler(async (args) => {
       const idx = await getMcpIndexerReady();
       const snap = idx.getSnapshot();
+      const ctx = { users: snap.userRecords, parentMap: snap.parentMap };
       const offset = args.week_offset ?? 0;
       const week = weekWindow(offset);
       const source = (args.source ?? 'all') as SourceArg;
 
-      const totals = totalsWithBySource(snap.records, source, week);
+      const totals = totalsWithBySource(snap.records, source, week, ctx);
 
       // Per-day cost trend (7 entries, including zero-fill days). One
       // `timeBuckets` call returns at most 7 daily buckets keyed by
@@ -162,7 +165,7 @@ export function registerActivityTools(server: McpServer): void {
       const dayBuckets = timeBuckets(snap.records, source, 'day', {
         from: week.from,
         to: week.to,
-      });
+      }, ctx);
       const byKey = new Map(dayBuckets.map((b) => [b.key, b]));
       const days: Array<{
         date: string;
@@ -189,14 +192,14 @@ export function registerActivityTools(server: McpServer): void {
         }
       }
 
-      const allSessions = sessionEntries(snap.records, snap.userRecords, source, week);
+      const allSessions = sessionEntries(snap.records, snap.userRecords, source, week, ctx);
       const topSessions = allSessions
         .slice()
         .sort((a, b) => b.cost_usd - a.cost_usd)
         .slice(0, args.top_session_limit ?? 10);
 
-      const projects = projectEntries(snap.records, source, week).slice(0, 10);
-      const models = modelEntries(snap.records, source, week);
+      const projects = projectEntries(snap.records, source, week, ctx).slice(0, 10);
+      const models = modelEntries(snap.records, source, week, ctx);
       const tools = topToolUses(snap.records, week, source);
 
       return asTextResult({
@@ -244,6 +247,7 @@ export function registerActivityTools(server: McpServer): void {
     safeMcpHandler(async (args) => {
       const idx = await getMcpIndexerReady();
       const snap = idx.getSnapshot();
+      const ctx = { users: snap.userRecords, parentMap: snap.parentMap };
       const source = (args.source ?? 'all') as SourceArg;
       const limit = args.limit ?? 10;
       const days = args.days ?? 30;
@@ -262,7 +266,7 @@ export function registerActivityTools(server: McpServer): void {
       const sessions = sessionEntries(snap.records, snap.userRecords, source, {
         from,
         to,
-      })
+      }, ctx)
         .slice()
         .sort((a, b) => b.end_time.localeCompare(a.end_time))
         .slice(0, limit);

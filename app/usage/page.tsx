@@ -1,5 +1,6 @@
 import { getCachedScan } from '@/lib/data-loader/scan';
 import { aggregateByTime, aggregateTotals, isGranularity } from '@/lib/aggregator';
+import { resolveCanonicalCwd } from '@/lib/project-label';
 import { Section, PageShell, EmptyState } from '@/components/section';
 import { TokenStackChart, type TokenStackDatum } from '@/components/charts/token-stack-chart';
 import { UsageTable } from '@/components/usage-table';
@@ -89,6 +90,17 @@ export default async function UsagePage({
   const dates = rangeToDates(range);
 
   const sources = expandSources(source);
+
+  // `projects` URL param holds **canonical** cwds (worktrees collapsed
+  // to their main-repo path), matching the /projects page's grouping.
+  // The aggregator's projects filter is exact-cwd, so we narrow records
+  // here instead of passing the filter down — a single record with a
+  // worktree cwd would otherwise miss a canonical-cwd selection.
+  const projectsSet = new Set(projects);
+  const projectFilteredRecords = projects.length
+    ? allSourceRecords.filter((r) => projectsSet.has(resolveCanonicalCwd(r.cwd)))
+    : allSourceRecords;
+
   // Run per-source then merge — `aggregateTotals` / `aggregateByTime`
   // require a concrete ProviderId, so the All view dispatches twice and
   // combines numeric results before they hit the KPI cards / chart.
@@ -96,13 +108,12 @@ export default async function UsagePage({
     from: dates.from,
     to: dates.to,
     models: models.length ? models : undefined,
-    projects: projects.length ? projects : undefined,
   };
   const totals = combineTotals(
-    sources.map((s) => aggregateTotals(allSourceRecords, { ...baseOpts, source: s })),
+    sources.map((s) => aggregateTotals(projectFilteredRecords, { ...baseOpts, source: s })),
   );
   const buckets = combineTimeBuckets(
-    sources.map((s) => aggregateByTime(allSourceRecords, gran, { ...baseOpts, source: s })),
+    sources.map((s) => aggregateByTime(projectFilteredRecords, gran, { ...baseOpts, source: s })),
   );
   const trend: TokenStackDatum[] = buckets.map((b) => ({
     label: b.label,
@@ -114,10 +125,9 @@ export default async function UsagePage({
     requests: b.requests,
   }));
 
-  const filteredRecords = allSourceRecords.filter((r) => {
+  const filteredRecords = projectFilteredRecords.filter((r) => {
     if (dates.from && r.timestamp < dates.from.toISOString()) return false;
     if (models.length && !models.includes(r.model)) return false;
-    if (projects.length && !projects.includes(r.cwd)) return false;
     return true;
   });
 
@@ -130,7 +140,15 @@ export default async function UsagePage({
   const pageSlice = sorted.slice(safePage * USAGE_PAGE_SIZE, (safePage + 1) * USAGE_PAGE_SIZE);
 
   const allModels = Array.from(new Set(allSourceRecords.map((r) => r.model))).sort();
-  const allProjects = Array.from(new Set(allSourceRecords.map((r) => r.cwd).filter(Boolean))).sort();
+  // The ProjectFilter dropdown shows canonical (main-repo) cwds only —
+  // worktrees collapse under their main project, just like /projects.
+  const allProjects = Array.from(
+    new Set(
+      allSourceRecords
+        .map((r) => resolveCanonicalCwd(r.cwd))
+        .filter(Boolean),
+    ),
+  ).sort();
 
   const cacheHit =
     totals.totalTokens > 0

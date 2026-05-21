@@ -5,13 +5,15 @@ import {
   aggregateBySession,
   aggregateByTime,
   aggregateTotals,
+  bucketKey,
   isGranularity,
   type AggregateOpts,
   type Granularity,
 } from '@/lib/aggregator';
 import { isUsageRange, rangeToDates } from '@/lib/range';
 import { ALL_PROVIDER_IDS, getProvider, isProviderId } from '@/lib/providers';
-import type { ProviderId, AssistantRecord } from '@/lib/types';
+import type { ProviderId, AssistantRecord, ScanResult } from '@/lib/types';
+import { summarizeTurns } from '@/lib/turns';
 import { formatTokensCompact, formatUSD, formatPct } from '@/lib/utils';
 
 export type Dim = 'model' | 'project' | 'session';
@@ -58,7 +60,7 @@ export async function runReport(opts: ReportOptions): Promise<string> {
   const sources: ProviderId[] =
     filled.source === 'all' ? ALL_PROVIDER_IDS : [filled.source];
 
-  const data = computeReportData(scan.records, sources, filled);
+  const data = computeReportData(scan, sources, filled);
   if (filled.json) return JSON.stringify(data, null, 2);
   return renderText(data, filled);
 }
@@ -121,12 +123,17 @@ interface ReportData {
     cost: number;
     saved: number;
     requests: number;
+    /** Distinct user prompts (= dashboard usage-table rows) the LLM
+     *  responded to in this window. One turn fans out to many `requests`
+     *  via tool-use loops, reasoning steps, and sub-agents. */
+    turns: number;
   };
-  trend: Array<{ label: string; cost: number; tokens: number }>;
+  trend: Array<{ label: string; cost: number; tokens: number; turns: number }>;
   breakdown: Array<{
     key: string;
     label: string;
     requests: number;
+    turns: number;
     tokens: number;
     cost: number;
     share: number;
@@ -135,16 +142,18 @@ interface ReportData {
 }
 
 function computeReportData(
-  allRecords: AssistantRecord[],
+  scan: ScanResult,
   sources: ProviderId[],
   o: ReportOptions,
 ): ReportData {
+  const allRecords = scan.records;
   const dates = resolveRange(o);
   const baseOpts: Omit<AggregateOpts, 'source'> = {
     from: dates.from ?? undefined,
     to: dates.until ?? undefined,
-    models: o.model ? undefined : undefined, // handled post-filter
-    projects: o.project ? undefined : undefined,
+    // `o.model` / `o.project` are substring patterns, not exact matches —
+    // they're applied per-record by `withinSrcAndFilters` below, so we
+    // deliberately leave the aggregator's exact-match filters unset.
   };
 
   // Collect per-source totals + per-bucket trend
@@ -158,9 +167,10 @@ function computeReportData(
     cost: 0,
     saved: 0,
     requests: 0,
+    turns: 0,
   };
 
-  const trendBuckets = new Map<string, { label: string; cost: number; tokens: number }>();
+  const trendBuckets = new Map<string, { label: string; cost: number; tokens: number; turns: number }>();
 
   for (const source of sources) {
     const opts: AggregateOpts = { ...baseOpts, source };
@@ -176,14 +186,30 @@ function computeReportData(
     totals.requests += t.requests;
     for (const r of sourceRecs) totals.reasoning += r.usage.reasoning_tokens ?? 0;
 
+    // Turn counts. `summarizeTurns` returns one entry per turn root —
+    // a turn never spans providers, so per-source then sum is correct
+    // (and matches the dashboard's overview chart convention).
+    const turnSummaries = summarizeTurns(sourceRecs, scan.userRecords, scan.parentMap);
+    totals.turns += turnSummaries.size;
+
+    // Per-bucket turn counts: attribute each turn to its earliest
+    // record's bucket key (same convention as dashboard / MCP).
+    const turnsByKey = new Map<string, number>();
+    for (const tn of turnSummaries.values()) {
+      const { key } = bucketKey(tn.firstTimestamp, o.gran);
+      turnsByKey.set(key, (turnsByKey.get(key) ?? 0) + 1);
+    }
+
     const buckets = aggregateByTime(sourceRecs, o.gran, opts);
     for (const b of buckets) {
       const ex = trendBuckets.get(b.key);
+      const tnCount = turnsByKey.get(b.key) ?? 0;
       if (ex) {
         ex.cost += b.cost;
         ex.tokens += b.totalTokens;
+        ex.turns += tnCount;
       } else {
-        trendBuckets.set(b.key, { label: b.label, cost: b.cost, tokens: b.totalTokens });
+        trendBuckets.set(b.key, { label: b.label, cost: b.cost, tokens: b.totalTokens, turns: tnCount });
       }
     }
   }
@@ -193,7 +219,7 @@ function computeReportData(
     .map(([, v]) => v);
 
   // Breakdown
-  const breakdown = buildBreakdown(allRecords, sources, baseOpts, o);
+  const breakdown = buildBreakdown(scan, sources, baseOpts, o);
 
   return {
     generatedAt: new Date().toISOString(),
@@ -210,11 +236,12 @@ function computeReportData(
 }
 
 function buildBreakdown(
-  allRecords: AssistantRecord[],
+  scan: ScanResult,
   sources: ProviderId[],
   base: Omit<AggregateOpts, 'source'>,
   o: ReportOptions,
 ): ReportData['breakdown'] {
+  const allRecords = scan.records;
   if (o.by === 'model') {
     const rows: ReportData['breakdown'] = [];
     for (const source of sources) {
@@ -222,11 +249,17 @@ function buildBreakdown(
       const filtered = allRecords.filter((r) => withinSrcAndFilters(r, opts, o));
       const models = aggregateByModel(filtered, opts);
       const provider = getProvider(source);
+      // Group turns by first-record model (one turn → one model attribution).
+      const turnsByModel = new Map<string, number>();
+      for (const tn of summarizeTurns(filtered, scan.userRecords, scan.parentMap).values()) {
+        turnsByModel.set(tn.firstModel, (turnsByModel.get(tn.firstModel) ?? 0) + 1);
+      }
       for (const m of models) {
         rows.push({
           key: `${source}::${m.model}`,
           label: provider.shortenModel(m.model),
           requests: m.requests,
+          turns: turnsByModel.get(m.model) ?? 0,
           tokens: m.totalTokens,
           cost: m.cost,
           share: 0, // filled after total
@@ -242,11 +275,17 @@ function buildBreakdown(
       const opts: AggregateOpts = { ...base, source };
       const filtered = allRecords.filter((r) => withinSrcAndFilters(r, opts, o));
       const projects = aggregateByProject(filtered, opts);
+      const turnsByCwd = new Map<string, number>();
+      for (const tn of summarizeTurns(filtered, scan.userRecords, scan.parentMap).values()) {
+        const key = tn.cwd || '(unknown)';
+        turnsByCwd.set(key, (turnsByCwd.get(key) ?? 0) + 1);
+      }
       for (const p of projects) {
         rows.push({
           key: `${source}::${p.cwd}`,
           label: p.projectName,
           requests: p.requests,
+          turns: turnsByCwd.get(p.cwd) ?? 0,
           tokens: p.totalTokens,
           cost: p.cost,
           share: 0,
@@ -262,15 +301,23 @@ function buildBreakdown(
     const opts: AggregateOpts = { ...base, source };
     const filtered = allRecords.filter((r) => withinSrcAndFilters(r, opts, o));
     const sessions = aggregateBySession(filtered, [], opts);
+    const turnsBySession = new Map<string, number>();
+    for (const tn of summarizeTurns(filtered, scan.userRecords, scan.parentMap).values()) {
+      turnsBySession.set(tn.sessionId, (turnsBySession.get(tn.sessionId) ?? 0) + 1);
+    }
     for (const s of sessions) {
       rows.push({
         key: `${source}::${s.sessionId}`,
         label: s.title ?? s.sessionId.slice(0, 8),
         requests: s.requests,
+        turns: turnsBySession.get(s.sessionId) ?? 0,
         tokens: s.totalTokens,
         cost: s.cost,
         share: 0,
-        sub: s.projectName,
+        // Worktree-aware so the breakdown reads
+        // `ai-self-web (playwright)` instead of just `playwright`,
+        // matching the dashboard's usage / sessions tables.
+        sub: s.projectLabel,
       });
     }
   }
@@ -401,21 +448,18 @@ function renderText(d: ReportData, o: ReportOptions): string {
     ],
   ];
   if (t.reasoning > 0) {
-    tokenRows.push([
-      'Reasoning',
-      c.dim(formatTokensCompact(t.reasoning)),
-      'Requests',
-      t.requests.toLocaleString(),
-    ]);
-    tokenRows.push(['Total', c.bold(formatTokensCompact(t.total)), '', '']);
-  } else {
-    tokenRows.push([
-      'Total',
-      c.bold(formatTokensCompact(t.total)),
-      'Requests',
-      t.requests.toLocaleString(),
-    ]);
+    tokenRows.push(['Reasoning', c.dim(formatTokensCompact(t.reasoning)), '', '']);
   }
+  tokenRows.push(['Total', c.bold(formatTokensCompact(t.total)), '', '']);
+  // Convos (= turns / user prompts) is the headline activity number;
+  // Requests (raw API calls) sits next to it for the LLM-savvy reader
+  // who wants to know how much tool-loop fan-out is happening.
+  tokenRows.push([
+    'Convos',
+    c.bold(t.turns.toLocaleString()),
+    'Requests',
+    t.requests.toLocaleString(),
+  ]);
   lines.push(renderPairedKv(tokenRows, c));
   lines.push('');
 
@@ -461,16 +505,17 @@ function renderText(d: ReportData, o: ReportOptions): string {
         ' ' +
         c.dim('(by cost)'),
     );
-    const headers = ['#', dimLabel, 'Reqs', 'Tokens', 'Cost', 'Share'];
+    const headers = ['#', dimLabel, 'Convos', 'Reqs', 'Tokens', 'Cost', 'Share'];
     const rows = d.breakdown.map((r, i) => [
       String(i + 1),
       truncate(r.label, 28),
+      r.turns.toLocaleString(),
       r.requests.toLocaleString(),
       formatTokensCompact(r.tokens),
       formatUSD(r.cost),
       formatPct(r.share, 1),
     ]);
-    lines.push(renderTable(headers, rows, c, [false, false, true, true, true, true]));
+    lines.push(renderTable(headers, rows, c, [false, false, true, true, true, true, true]));
     lines.push('');
   }
 

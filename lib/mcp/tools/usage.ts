@@ -35,12 +35,13 @@ export function registerUsageTools(server: McpServer): void {
     safeMcpHandler(async (args) => {
       const idx = await getMcpIndexerReady();
       const snap = idx.getSnapshot();
+      const ctx = { users: snap.userRecords, parentMap: snap.parentMap };
       const range = parseDateRange(args);
       const source = (args.source ?? 'all') as SourceArg;
       const result = totalsWithBySource(snap.records, source, {
         from: range.from,
         to: range.to,
-      });
+      }, ctx);
       return asTextResult({
         range_label: range.label,
         from: range.from?.toISOString(),
@@ -67,13 +68,14 @@ export function registerUsageTools(server: McpServer): void {
     safeMcpHandler(async (args) => {
       const idx = await getMcpIndexerReady();
       const snap = idx.getSnapshot();
+      const ctx = { users: snap.userRecords, parentMap: snap.parentMap };
       const range = parseDateRange(args);
       const source = (args.source ?? 'all') as SourceArg;
       const granularity = args.granularity ?? 'day';
       const buckets = timeBuckets(snap.records, source, granularity, {
         from: range.from,
         to: range.to,
-      });
+      }, ctx);
       return asTextResult({
         range_label: range.label,
         from: range.from?.toISOString(),
@@ -108,13 +110,14 @@ export function registerUsageTools(server: McpServer): void {
     safeMcpHandler(async (args) => {
       const idx = await getMcpIndexerReady();
       const snap = idx.getSnapshot();
+      const ctx = { users: snap.userRecords, parentMap: snap.parentMap };
       const range = parseDateRange(args);
       const source = (args.source ?? 'all') as SourceArg;
       const limit = args.limit ?? 20;
       let entries = modelEntries(snap.records, source, {
         from: range.from,
         to: range.to,
-      });
+      }, ctx);
       entries = entries.slice(0, limit);
       return asTextResult({
         range_label: range.label,
@@ -147,13 +150,14 @@ export function registerUsageTools(server: McpServer): void {
     safeMcpHandler(async (args) => {
       const idx = await getMcpIndexerReady();
       const snap = idx.getSnapshot();
+      const ctx = { users: snap.userRecords, parentMap: snap.parentMap };
       const range = parseDateRange(args);
       const source = (args.source ?? 'all') as SourceArg;
       const limit = args.limit ?? 20;
       let entries = projectEntries(snap.records, source, {
         from: range.from,
         to: range.to,
-      });
+      }, ctx);
       entries = entries.slice(0, limit);
       return asTextResult({
         range_label: range.label,
@@ -190,6 +194,7 @@ export function registerUsageTools(server: McpServer): void {
     safeMcpHandler(async (args) => {
       const idx = await getMcpIndexerReady();
       const snap = idx.getSnapshot();
+      const ctx = { users: snap.userRecords, parentMap: snap.parentMap };
       const range = parseDateRange(args);
       const source = (args.source ?? 'all') as SourceArg;
       const sort = args.sort ?? 'recent';
@@ -197,7 +202,7 @@ export function registerUsageTools(server: McpServer): void {
       let entries = sessionEntries(snap.records, snap.userRecords, source, {
         from: range.from,
         to: range.to,
-      });
+      }, ctx);
       switch (sort) {
         case 'cost':
           entries.sort((a, b) => b.cost_usd - a.cost_usd);

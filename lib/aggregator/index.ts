@@ -10,6 +10,7 @@ import type {
 import { costOfRecord } from '../pricing/calculate';
 import { getProvider } from '../providers';
 import { projectNameFromCwd } from '../utils';
+import { resolveProjectLabel } from '../project-label';
 
 export const GRANULARITIES = ['hour', 'day', 'week', 'month'] as const;
 export type Granularity = (typeof GRANULARITIES)[number];
@@ -251,6 +252,12 @@ export function aggregateBySession(
         source: rec.source,
         cwd: rec.cwd,
         projectName: projectNameFromCwd(rec.cwd),
+        // Worktree-aware label so the sessions table shows the same
+        // identifier the usage table does for the same record (e.g.
+        // `ai-self-web (playwright)` instead of just `playwright`).
+        // `resolveProjectLabel` caches per-cwd, so this is one fs.stat
+        // per unique cwd across the whole aggregation.
+        projectLabel: resolveProjectLabel(rec.cwd),
         startTime: rec.timestamp,
         endTime: rec.timestamp,
         durationMs: 0,
