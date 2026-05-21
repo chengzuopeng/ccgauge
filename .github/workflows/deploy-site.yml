@@ -1,0 +1,87 @@
+# Build and deploy the marketing site (under `site/`) to GitHub Pages.
+#
+# Triggers:
+#   - any push to `main` that touches `site/**`, the workflow itself,
+#     `package.json`, or `pnpm-lock.yaml`
+#   - manual dispatch from the Actions tab
+#
+# Output: served at https://<owner>.github.io/<repo>/ once
+#         Settings → Pages → Source is set to "GitHub Actions".
+#
+# To switch to a custom domain (e.g. ccgauge.dev), see the header
+# comment in `site/astro.config.mjs` for the three-step checklist.
+
+name: Deploy site to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - '.github/workflows/deploy-site.yml'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+  workflow_dispatch:
+
+# Required for the Pages deployment + the OIDC token used by
+# `actions/deploy-pages`.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Don't run two Pages deployments at once — but never cancel an
+# already-running one mid-deploy (Pages doesn't roll back gracefully).
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        # `--frozen-lockfile` matches `pnpm publish`'s preflight so any
+        # lockfile drift fails the build instead of silently re-resolving.
+        run: pnpm install --frozen-lockfile
+
+      - name: Build site
+        env:
+          # Triggers `site/astro.config.mjs`'s GH_PAGES branch:
+          #   site:  https://<owner>.github.io
+          #   base:  /<repo>
+          GH_PAGES: '1'
+          GH_PAGES_USER: ${{ github.repository_owner }}
+          GH_PAGES_REPO: ${{ github.event.repository.name }}
+        run: pnpm site:build
+
+      - name: Upload Pages artifact
+        # Bundles `site/dist` into the tarball Pages expects.
+        # Automatically writes `.nojekyll` so Astro's `_astro/` asset
+        # paths aren't stripped by the Jekyll preprocessor.
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

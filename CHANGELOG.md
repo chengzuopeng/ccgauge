@@ -5,6 +5,227 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] — 2026-05-19
+
+CLI ergonomics overhaul + a brand-new `turns` / `conversations`
+metric exposed in MCP and CLI report. Plus one P1 fix that resurrected
+`ccgauge mcp` (silently exiting since 1.0.3's in-process refactor).
+
+### Highlights
+
+- **`turns` / "Conversations" metric** added to MCP responses and CLI
+  report. A turn is one user prompt — the same unit the dashboard's
+  usage table rows, and `usage trend → Conversations` toggle, already
+  count. A single turn typically fans out to 10–20× more `requests`
+  via tool loops, reasoning steps, and sub-agents, so `turns` is the
+  better signal for "how often did I actually talk to the model".
+  All three surfaces now share `lib/turns.ts → summarizeTurns()`.
+- **15+ CLI fixes + UX polish** — `ccgauge -r 7d` now produces a
+  helpful root error instead of `start: unknown option`; bare
+  `ccgauge` is the documented shortcut for `ccgauge start` again;
+  `ccgauge status` returns systemd-style exit 3 when not running;
+  `ccgauge stop` no longer kills unrelated processes after a reboot
+  (PID identity is verified); `ccgauge logs -f` no longer
+  duplicates lines under heavy write rates; foreground server starts
+  via `spawn` (matches background path); and a dozen smaller things.
+- **New `ccgauge doctor` command** — one-screen diagnostic dumping
+  version, environment, build artifacts, background-service state,
+  and per-provider scan stats. The recommended first step for any
+  bug report.
+- **P1 fix: `ccgauge mcp` now stays alive.** 1.0.3 refactored the
+  subcommand to run in-process via `await import()`, but a stray
+  `process.exit(0)` after `runStdioServer()` killed the process right
+  after the JSON-RPC transport opened, before any LLM client could
+  finish `initialize`. The smoke test now drives `node bin/cli.mjs
+  mcp` directly so this CLI-wrapper layer can never regress silently
+  again.
+
+### Added
+
+- **`ccgauge doctor`** — single-shot diagnostic command. Prints
+  ccgauge version + node / platform, ccgauge-relevant env vars
+  (`CCGAUGE_*`, `CLAUDE_CONFIG_DIR`, `CODEX_HOME`, `NO_COLOR`,
+  `FORCE_COLOR`), build-artifact presence, background-service state,
+  and the indexer probe from `ccgauge mcp --check`. Plain text so
+  it pastes into a GitHub issue cleanly.
+- **MCP `turns` field** in every analytical tool's response shape:
+  - `usage_summary` — `totals.turns`, `bySource.{claude,codex}.turns`.
+  - `usage_by_time` — `buckets[i].totals.turns` and per-source
+    breakdown; turns attribute to the bucket of their **earliest**
+    record (same convention as the dashboard's overview chart).
+  - `usage_by_model` — `models[i].turns` (turn is counted under
+    the model of its first record; sums across models equal the
+    scope's `totals.turns`).
+  - `usage_by_project` — `projects[i].turns` (by turn's first cwd).
+  - `usage_by_session` — `sessions[i].turns` (one session can hold
+    many turns; CLI users / LLMs comparing "long session vs many
+    short sessions" finally have the right number).
+  - `daily_summary`, `weekly_summary`, `recent_activity` — same
+    fields flow through their nested totals / per_day / sessions.
+  - `cost_estimator` is unchanged (pure pricing, no turn concept).
+- **CLI report `Convos` field** in `ccgauge report` output:
+  - **Tokens section** gets a new `Convos / Requests` line, so the
+    two activity counts read side-by-side.
+  - **Top-N breakdown table** (model / project / session) gets a
+    new `Convos` column between the dimension label and `Reqs`.
+  - JSON output (`--json`) carries `totals.turns`, `trend[i].turns`,
+    `breakdown[i].turns`.
+- **`lib/turns.ts → summarizeTurns()`** helper — given a (filtered)
+  record slice plus the full user / parent context, returns one
+  `TurnSummary` per distinct turn root with its `firstTimestamp`,
+  `firstModel`, `cwd`, `sessionId`, `source`. The single source of
+  truth shared by dashboard / MCP / CLI report.
+- **`SessionSummary.projectLabel`** — worktree-aware display label
+  (`"ai-self-web (playwright)"` instead of bare `"playwright"`),
+  matching the usage table. Drives the `/sessions` page, the
+  session-detail header, and CLI report's session breakdown.
+
+### Changed
+
+- **`ccgauge` (no subcommand)** is the documented shortcut for
+  `ccgauge start` again. A regression in 1.0.4's `normalizeArgv`
+  refactor made bare `ccgauge` print root help and exit 1.
+- **`ccgauge status` exit code** is now systemd-style 3 when no
+  background service is running, so shell scripts can `if ccgauge
+  status; then …`. **`--json` mode** intentionally still exits 0
+  (the consumer is a script that should read `payload.running`),
+  so `ccgauge status --json | jq` under `set -e` keeps working.
+- **`ccgauge mcp` runs in-process via `await import()` + the bundle
+  exports `runStdioServer` / `printCheck`.** Saves ~80–150 ms vs
+  the old spawn-a-child design and removes a brittle signal-
+  forwarding shim. (1.0.3 introduced this; 1.0.5 fixes the
+  `process.exit(0)` regression that broke it for real users.)
+- **`ccgauge mcp --check`** — verifies the bundle, boots the
+  indexer, prints one line per provider with scanned dirs + record
+  counts, and exits. Lets users debug "Claude Desktop doesn't see
+  ccgauge tools" without spinning up an MCP client.
+- **`--color` / `--no-color` / `FORCE_COLOR` / `NO_COLOR`** all
+  resolve through a single `shouldUseColor()` helper now, with the
+  documented precedence (`--no-color` highest, then env vars, then
+  `isTTY`). Previously the report's color flag was hard-AND'd with
+  `isTTY`, so `FORCE_COLOR=1 ccgauge report | tee log` lost colour.
+- **`ccgauge start` foreground** uses `spawn` instead of `fork`.
+  Next.js standalone doesn't use IPC; `fork` was opening an unused
+  channel and the parent's `process.exit(0)` was racing the child's
+  teardown on Ctrl+C. Now matches the background path's `spawn` +
+  exit-code forwarding.
+- **`--quiet`** silences Next.js's stderr too. Previously only stdout
+  was ignored, so warnings still leaked. (Background mode is
+  unaffected — it has always logged to a file.)
+- **`ccgauge restart --dir ""`** clears the inherited override
+  instead of silently re-reading the previous run's `dataDir` from
+  `state.json`. Uses commander's `getOptionValueSource('dir') ===
+  'cli'` instead of `!opts.dir` truthy check.
+- **Background-start failure messages** now include the last 5
+  lines of `~/.ccgauge/ccgauge.log`, so users don't have to discover
+  `ccgauge logs` to learn that EADDRINUSE / their override path
+  doesn't exist / etc. caused the silent timeout.
+- **"Build artifact not found"** errors from `start` / `report` /
+  `mcp` are unified into one `missingArtifactError(...)` helper.
+  Includes `node --version` / `ccgauge --version` / `platform` so
+  bug reports don't lose those.
+- **`[ccgauge] error:`** prefix is now consistent on stderr
+  diagnostics (was a mix of `[ccgauge]`, `[ccgauge-mcp]`, and bare
+  prose). stdout user-facing messages stay unprefixed.
+- **`/sessions` project column** uses `projectLabel` (worktree-aware)
+  so rows for `…/.claude/worktrees/playwright` read
+  `ai-self-web (playwright)` — matching the usage table.
+- **CLI report's session breakdown** (`--by session`) `sub` text
+  also uses `projectLabel`, for the same reason.
+- **README / README.zh-CN** Commands table gains `ccgauge doctor`;
+  Troubleshooting gains a "anything unexpected → ccgauge doctor"
+  lead; MCP troubleshooting points at `ccgauge mcp --check`.
+
+### Fixed
+
+- **`ccgauge mcp` exited immediately after the JSON-RPC handshake**
+  (P1 regression from 1.0.3): the in-process CLI wrapper called
+  `process.exit(0)` after `await runStdioServer()`, but
+  `runStdioServer` returns as soon as `server.connect(transport)`
+  finishes the handshake — the long-running stdin readline is what
+  holds the process alive. Removed the exit; documented with a
+  `CRITICAL:` comment so it can't come back. Smoke test now runs
+  through `node bin/cli.mjs mcp` so the CLI wrapper is on the
+  covered path.
+- **`ccgauge -r 7d -s codex` reported `start: unknown option '-r'`**
+  instead of "did you mean `report`?". `normalizeArgv` now only
+  injects `start` when every flag belongs to `start`'s own option
+  set; otherwise it leaves argv alone and lets commander surface
+  its own root-level error (which lists subcommands).
+- **`ccgauge logs -f` duplicated lines under heavy write rates.**
+  The follow loop used `stat().size` as the read cursor but didn't
+  cap the `createReadStream`'s upper bound, so a chunk written
+  between `stat` and the read could appear in both ticks. Now
+  pins `end: s.size - 1`.
+- **`ccgauge stop` could kill unrelated processes after a reboot.**
+  `process.kill(pid, 0)` only checks PID liveness, and PID space
+  recycles aggressively across boots. `state.json` now records a
+  `bootId` (~ system uptime) and a `cmdMarker` (`"next-server"`),
+  and `isProcessRunning` verifies both — falling back to the bare
+  kill(0) on Windows where `ps` isn't available.
+- **`test-mcp-server.mjs` flake** caused by top-N truncation: a
+  tool that's in claude-only top-10 can land #11 in the merged
+  all top-10 once codex contributes more competitors. The
+  per-tool count comparison now skips tools that didn't survive
+  the merged truncation (the broader "source filter is a no-op"
+  check below catches the real bug it was originally meant to).
+- **`/usage` project filter listed worktree leaves** as if they
+  were independent projects (`affectionate-sammet-00dc35`,
+  `agitated-diffie-5c15fe`, …), out of sync with `/projects`
+  which already collapses worktrees under their canonical repo
+  root. The dropdown now lists canonical cwds only; the
+  `projects` URL param semantics changed from exact-cwd to
+  canonical-cwd matching, and the aggregator's `projects` filter
+  is bypassed in favour of a canonical-aware pre-filter so a
+  single record under `…/.claude/worktrees/X` still counts when
+  the user picks its main repo.
+
+### Performance
+
+- **Aggregator hot loop** — `withinRange` predicate used to call
+  `Date#toISOString()` + `Array.includes()` once per record. Each
+  entry-point function now hoists those into a `prepareOpts` step:
+  ISO strings computed once, `models` / `projects` materialized as
+  `Set` for O(1) membership. Measurable on the MCP `weekly_summary`
+  / `usage_by_*` paths over year-scale histories; invisible for the
+  single-pass dashboard aggregators.
+- **MCP indexer's 30 s polling fallback** is now **off by default**.
+  fs.watch's `recursive: true` handles changes reliably on modern
+  macOS / Linux / Windows; the polling fallback was originally
+  there for flaky network mounts and FUSE setups. The web
+  dashboard's indexer **keeps polling ON** (user expects fresh
+  data when they alt-tab back). Override either default with
+  `CCGAUGE_POLL_FALLBACK={0,1}`.
+- **`get-port` / `open` are lazy-imported** — only loaded by `start`
+  / `restart` / `open`. Short-lived commands like `mcp`, `status`,
+  `logs`, `report`, `--version` shave ~20–30 ms cold-start each.
+  Matters most for `ccgauge mcp`, which LLM clients spawn per
+  conversation.
+
+### Internal
+
+- **`summarizeTurns()`** in `lib/turns.ts` is the single source of
+  truth for turn-level metadata; dashboard, MCP, and CLI report all
+  consume it. Same parent-chain walk + synthetic-user skip as
+  `buildTurnIndex` (which it builds on top of).
+- **`TurnsContext`** in `lib/mcp/formatters.ts` packages
+  `{ users, parentMap }` so per-source aggregator helpers can
+  re-derive turn boundaries without re-plumbing args through every
+  call site.
+- **`SessionSummary` carries `projectLabel`** (worktree-aware) in
+  addition to `projectName` (plain basename). Populated once by
+  `aggregateBySession` via `resolveProjectLabel` (per-cwd cache).
+- **`bootId()` helper** in `bin/cli.mjs` (`Date.now() - os.uptime()
+  * 1000`, rounded) — a coarse system-boot timestamp used to tell
+  pre-reboot PIDs from post-reboot ones.
+- **`shouldUseColor()` + `ansiPalette()`** in `bin/cli.mjs` — used
+  by `printReady` so the startup banner respects `NO_COLOR` and
+  doesn't leave `^[[1m...` mojibake when piped to `tee` / CI.
+- **Smoke test runs through the CLI wrapper.** `scripts/test-mcp-
+  server.mjs` now spawns `node bin/cli.mjs mcp` instead of `node
+  dist/mcp/server.mjs`, so any regression in the CLI wrapper
+  (signal handling, lifecycle, exit-code shaping) is caught here.
+
 ## [1.0.4] — 2026-05-18
 
 Correctness fixes + much stronger test coverage, plus a brand refresh
@@ -742,6 +963,8 @@ of HTML to the browser.
 - Initial public release as `ccgauge`: local Next.js dashboard for
   Claude Code token usage, cost, and 5-hour block tracking.
 
+[1.0.5]: https://github.com/chengzuopeng/ccgauge/compare/v1.0.4...v1.0.5
+[1.0.4]: https://github.com/chengzuopeng/ccgauge/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/chengzuopeng/ccgauge/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/chengzuopeng/ccgauge/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/chengzuopeng/ccgauge/compare/v1.0.0...v1.0.1
