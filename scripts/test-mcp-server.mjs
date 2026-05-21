@@ -1,6 +1,11 @@
 #!/usr/bin/env node
-// Smoke test: spawn the bundled MCP server, run an init handshake +
-// tools/list + a few tools/call round-trips, assert the basics.
+// Smoke test: spawn the **CLI entry** (`node bin/cli.mjs mcp`) and drive
+// it through an init handshake + tools/list + a few tools/call
+// round-trips. We deliberately go through the CLI rather than running
+// `dist/mcp/server.mjs` directly so any regression in the CLI's
+// in-process wrapper layer (signal handling, exit-code shaping, or —
+// historically — accidentally `process.exit(0)`-ing right after the
+// handshake) is caught here too.
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -10,13 +15,14 @@ import assert from 'node:assert/strict';
 const __filename = fileURLToPath(import.meta.url);
 const root = dirname(dirname(__filename));
 const bundle = resolve(root, 'dist/mcp/server.mjs');
+const cli = resolve(root, 'bin/cli.mjs');
 
 if (!existsSync(bundle)) {
   console.error(`bundle missing: ${bundle}\nrun: pnpm build:mcp`);
   process.exit(1);
 }
 
-const child = spawn(process.execPath, [bundle], {
+const child = spawn(process.execPath, [cli, 'mcp'], {
   stdio: ['pipe', 'pipe', 'pipe'],
   env: { ...process.env },
 });
@@ -199,9 +205,19 @@ try {
   const allPayload = JSON.parse(dayAll.content[0].text);
   const allTools = allPayload.top_tools;
   const allCounts = new Map(allTools.map((t) => [t.tool, t.count]));
+  // `top_tools` is truncated to the top-N most-used tools, so the union
+  // of (codex top-N + claude top-N) is generally NOT a subset of (all
+  // top-N): a tool that's #8 in claude-only can land #11 in the merged
+  // view and disappear. That's a fact of truncation, not a sign the
+  // source filter is broken. We only assert the invariant — `all`
+  // count ≥ single-source count — for tools that appear in BOTH the
+  // per-source top-N and the all top-N. The (separate) bothSourcesEqualAll
+  // check below catches the case the source filter actually was a no-op.
   for (const t of [...codexTools, ...claudeTools]) {
+    const allCount = allCounts.get(t.tool);
+    if (allCount === undefined) continue;
     assert.ok(
-      (allCounts.get(t.tool) ?? 0) >= t.count,
+      allCount >= t.count,
       `all top_tools count for ${t.tool} should be >= source-specific count`,
     );
   }

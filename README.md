@@ -138,11 +138,12 @@ Background mode persists state under `~/.ccgauge/`:
 | `ccgauge start --background` | Start a detached background service. |
 | `ccgauge stop [--force]` | Stop the background service. |
 | `ccgauge restart [options]` | Stop and re-start with new options. |
-| `ccgauge status [--json]` | Inspect the background service. |
+| `ccgauge status [--json]` | Inspect the background service. Plain-text mode exits **3** (systemd "not running") when nothing is up so shell can `if ccgauge status; then …`; `--json` always exits 0 — read `payload.running` instead. |
 | `ccgauge open` | Open the running dashboard in your browser. |
 | `ccgauge logs [-f] [-n <lines>]` | Print background-service log file (the server's stdout). |
 | `ccgauge report [options]` | Print a formatted **usage report** to stdout (one-shot, no server). |
 | `ccgauge mcp` | Start the MCP server on stdio so LLMs can query usage. |
+| `ccgauge doctor` | One-screen diagnostic: version, env, build artifacts, state, indexer + per-provider scan. Paste into bug reports. |
 
 ### Report
 
@@ -384,7 +385,7 @@ debug "why did it answer X".
 
 | Symptom | Try |
 | --- | --- |
-| Client doesn't see ccgauge tools | Restart the client after editing the config; check `npx -y ccgauge mcp` runs in your shell |
+| Client doesn't see ccgauge tools | Restart the client after editing the config; run `ccgauge mcp --check` (or `ccgauge doctor`) to verify the bundle, indexer, and detected providers without an MCP client |
 | First call is slow | First call after a cold start indexes all JSONL files (~1–3 s for 100 files); subsequent calls are O(1) |
 | "no providers detected" in the resource | The MCP process can't see `~/.claude/projects` / `~/.codex/sessions`; pass `CLAUDE_CONFIG_DIR` / `CCGAUGE_CODEX_DIR` via `env` in the MCP config |
 | Want to see what the server is logging | Watch the client's MCP log; ccgauge writes to **stderr** (stdout is reserved for JSON-RPC) |
@@ -475,8 +476,11 @@ pnpm publish --access public  # runs `pnpm build` first via prepublishOnly
 
 ## Troubleshooting
 
+> **First stop for any "why doesn't this work" question:** run `ccgauge doctor`. It prints version, env vars, build artifacts, background-service state, and the indexer's per-provider scan in one screen — perfect for pasting into a bug report.
+
 | Symptom | Try |
 | --- | --- |
+| Anything unexpected | `ccgauge doctor` — one-screen diagnostic for everything below |
 | Port keeps drifting | `ccgauge --strict-port --port 3737` |
 | Stale background service | `ccgauge status`, then `ccgauge stop --force` |
 | Background didn't start | `ccgauge logs` reads `~/.ccgauge/ccgauge.log` |

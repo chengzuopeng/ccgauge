@@ -138,11 +138,12 @@ ccgauge stop
 | `ccgauge start --background` | 启动后台服务。 |
 | `ccgauge stop [--force]` | 停止后台服务。 |
 | `ccgauge restart [options]` | 停止再用新参数启动。 |
-| `ccgauge status [--json]` | 查看后台状态。 |
+| `ccgauge status [--json]` | 查看后台状态。纯文本模式后台未运行时退出码 **3**（systemd 约定），shell 可用 `if ccgauge status; then …`；`--json` 始终退 0，请改读 `payload.running`。 |
 | `ccgauge open` | 在浏览器打开正在运行的看板。 |
 | `ccgauge logs [-f] [-n <lines>]` | 查看后台服务的日志（server stdout）。 |
 | `ccgauge report [options]` | 命令行**用量报告**，直接打到终端（一次性，不起服务）。 |
 | `ccgauge mcp` | 起 MCP 服务（stdio），让 LLM 查你的用量。 |
+| `ccgauge doctor` | 一屏诊断：版本、env、构建产物、后台状态、indexer + 每个 provider 的扫描计数。报 issue 时直接粘。 |
 
 ### 命令行报告（report）
 
@@ -378,7 +379,7 @@ LLM 大概率会调的工具——方便你"为什么会这样回答"反查。
 
 | 现象 | 建议 |
 | --- | --- |
-| 客户端看不到 ccgauge 工具 | 改完配置重启客户端；终端里手动跑 `npx -y ccgauge mcp` 看是否能起 |
+| 客户端看不到 ccgauge 工具 | 改完配置重启客户端；不连 MCP 客户端就能验证 bundle / indexer / providers 的话直接跑 `ccgauge mcp --check`（或 `ccgauge doctor`）|
 | 第一次调用比较慢 | 冷启动后第一次会全量索引（100 文件 ~1–3s）；之后都是 O(1) |
 | Resource 显示 "no providers detected" | MCP 进程看不到 `~/.claude/projects` / `~/.codex/sessions`；通过 MCP 配置的 `env` 传 `CLAUDE_CONFIG_DIR` / `CCGAUGE_CODEX_DIR` |
 | 想看 server 在打什么日志 | 看客户端的 MCP 日志；ccgauge 把日志写到 **stderr**（stdout 被 JSON-RPC 占用）|
@@ -468,8 +469,11 @@ pnpm publish --access public  # 会自动先跑 pnpm build（prepublishOnly）
 
 ## 排障
 
+> **任何"为啥不工作"的问题先跑一下：** `ccgauge doctor`。一屏列出版本、env、构建产物、后台状态、indexer 扫描计数，报 issue 直接粘过去就行。
+
 | 现象 | 建议命令 |
 | --- | --- |
+| 任何异常想先一屏看清 | `ccgauge doctor` — 下面所有项都在它的诊断里 |
 | 端口被自动换掉 | `ccgauge --strict-port --port 3737` |
 | 后台服务状态不对 | 先 `ccgauge status`，PID 仍存活但不响应再 `ccgauge stop --force` |
 | 后台启动失败 | `ccgauge logs` 查看 `~/.ccgauge/ccgauge.log` |
