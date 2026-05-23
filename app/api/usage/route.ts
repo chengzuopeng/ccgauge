@@ -7,7 +7,7 @@ import {
   aggregateTotals,
   isGranularity,
 } from '@/lib/aggregator';
-import { isUsageRange, rangeToDates } from '@/lib/range';
+import { isUsageRange, rangeToDates, parseCustomRange } from '@/lib/range';
 import { resolveSource, filterBySource, expandSources } from '@/lib/source';
 import { combineTimeBuckets, combineTotals } from '@/lib/source-merge';
 import { badRequest, withApiErrorHandling } from '@/lib/api/error-handler';
@@ -32,7 +32,24 @@ export const GET = withApiErrorHandling(async (req: Request) => {
   const projects = url.searchParams.get('projects')?.split(',').filter(Boolean) ?? undefined;
   const view = url.searchParams.get('view') || 'time';
 
-  const dates = rangeToDates(range);
+  // Custom range pulls bounds from explicit ?from / ?to ISO dates.
+  // We require at least `from` to be valid for `range=custom`; an empty
+  // pair would silently degrade to "no filter" which is almost never
+  // what a custom-range request meant.
+  let dates: { from?: Date; to?: Date };
+  if (range === 'custom') {
+    const fromParam = url.searchParams.get('from');
+    const toParam = url.searchParams.get('to');
+    dates = parseCustomRange(fromParam, toParam);
+    if (!dates.from) {
+      return badRequest(
+        'range=custom requires a valid `from` (YYYY-MM-DD)',
+        'invalid_custom_range',
+      );
+    }
+  } else {
+    dates = rangeToDates(range);
+  }
   const baseOpts = { from: dates.from, to: dates.to, models, projects };
 
   const scan = await getCachedScan();

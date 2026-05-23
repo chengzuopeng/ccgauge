@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 const __filename = fileURLToPath(import.meta.url);
 const root = dirname(dirname(__filename));
 
-const { isUsageRange, normalizeUsageRange, rangeToDates, USAGE_RANGES } = await import(
+const { isUsageRange, normalizeUsageRange, rangeToDates, parseCustomRange, USAGE_RANGES } = await import(
   join(root, 'lib/range.ts')
 );
 
@@ -26,7 +26,7 @@ const { isUsageRange, normalizeUsageRange, rangeToDates, USAGE_RANGES } = await 
 {
   assert.deepEqual(
     [...USAGE_RANGES],
-    ['1d', '7d', '30d', '90d', 'all'],
+    ['1d', '7d', '30d', '90d', 'all', 'custom'],
     'USAGE_RANGES enumerates the dashboard URL options',
   );
   console.log('✓ USAGE_RANGES literal is fixed');
@@ -38,6 +38,7 @@ const { isUsageRange, normalizeUsageRange, rangeToDates, USAGE_RANGES } = await 
   assert.equal(isUsageRange('30d'), true);
   assert.equal(isUsageRange('all'), true);
   assert.equal(isUsageRange('1d'), true);
+  assert.equal(isUsageRange('custom'), true, 'custom is a valid range');
   assert.equal(isUsageRange('14d'), false, '14d is NOT in USAGE_RANGES');
   assert.equal(isUsageRange(''), false);
   assert.equal(isUsageRange(null), false);
@@ -112,6 +113,57 @@ const { isUsageRange, normalizeUsageRange, rangeToDates, USAGE_RANGES } = await 
   assert.equal(r30.to, undefined);
   assert.equal(r90.to, undefined);
   console.log('✓ rangeToDates(30d / 90d): rolling N-day windows');
+}
+
+// ── rangeToDates('custom') → no bounds, caller resolves via parseCustomRange ─
+{
+  const r = rangeToDates('custom');
+  assert.equal(r.from, undefined, '`custom` from rangeToDates has no `from`');
+  assert.equal(r.to, undefined, '`custom` from rangeToDates has no `to`');
+  console.log('✓ rangeToDates(custom): no bounds — bounds come from parseCustomRange');
+}
+
+// ── parseCustomRange: happy path (both bounds) ────────────────────────
+{
+  const r = parseCustomRange('2025-05-01', '2025-05-22');
+  assert.ok(r.from instanceof Date, '`from` is a Date');
+  assert.ok(r.to instanceof Date, '`to` is a Date');
+  // from at local midnight
+  assert.equal(r.from.getHours(), 0);
+  assert.equal(r.from.getMinutes(), 0);
+  // to advanced to end-of-day so the boundary day is inclusive
+  assert.equal(r.to.getHours(), 23);
+  assert.equal(r.to.getMinutes(), 59);
+  assert.equal(r.to.getSeconds(), 59);
+  console.log('✓ parseCustomRange(from, to): from = 00:00, to = 23:59:59 (inclusive)');
+}
+
+// ── parseCustomRange: from-only (open-ended) ──────────────────────────
+{
+  const r = parseCustomRange('2025-05-01', null);
+  assert.ok(r.from instanceof Date);
+  assert.equal(r.to, undefined, '`to` missing means open-ended');
+  console.log('✓ parseCustomRange(from-only): to is undefined');
+}
+
+// ── parseCustomRange: malformed input → undefined ─────────────────────
+{
+  assert.equal(parseCustomRange('').from, undefined, 'empty string → undefined');
+  assert.equal(parseCustomRange('yesterday').from, undefined, 'natural language → undefined');
+  assert.equal(parseCustomRange('2025-13-01').from, undefined, 'invalid month → undefined');
+  assert.equal(parseCustomRange('2025/05/01').from, undefined, 'wrong separator → undefined');
+  assert.equal(parseCustomRange('25-05-01').from, undefined, '2-digit year → undefined');
+  assert.equal(parseCustomRange(null, undefined).from, undefined, 'null → undefined');
+  // Calendar overflow: JS would silently normalise 2025-02-30 → 2025-03-02
+  // via `new Date('2025-02-30T00:00:00')`. parseLocalDateOnly round-trips
+  // the components and rejects this so a typo can't surface as off-month
+  // data labelled as the typed month.
+  assert.equal(parseCustomRange('2025-02-30').from, undefined, 'Feb 30 → undefined (calendar overflow)');
+  assert.equal(parseCustomRange('2025-04-31').from, undefined, 'Apr 31 → undefined (calendar overflow)');
+  assert.equal(parseCustomRange('2025-02-29').from, undefined, 'non-leap Feb 29 → undefined');
+  // Sanity: leap-year Feb 29 IS valid.
+  assert.ok(parseCustomRange('2024-02-29').from instanceof Date, 'leap-year Feb 29 → valid Date');
+  console.log('✓ parseCustomRange: strict ISO date pattern, rejects everything else (incl. calendar overflow)');
 }
 
 console.log('\nAll range assertions passed.');

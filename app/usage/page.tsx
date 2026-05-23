@@ -5,8 +5,9 @@ import { Section, PageShell, EmptyState } from '@/components/section';
 import { TokenStackChart, type TokenStackDatum } from '@/components/charts/token-stack-chart';
 import { UsageTable } from '@/components/usage-table';
 import { recordsToTurnRows, type UsageTurnRow } from '@/lib/serialize';
+import { redirect } from 'next/navigation';
 import { RangePicker } from '@/components/range-picker';
-import { normalizeUsageRange, rangeToDates } from '@/lib/range';
+import { normalizeUsageRange, rangeToDates, parseCustomRange } from '@/lib/range';
 import { GranularityPicker } from '@/components/granularity-picker';
 import { ModelFilter } from '@/components/model-filter';
 import { ProjectFilter } from '@/components/project-filter';
@@ -62,6 +63,8 @@ export default async function UsagePage({
   searchParams: Promise<{
     source?: string;
     range?: string;
+    from?: string;
+    to?: string;
     gran?: string;
     models?: string;
     projects?: string;
@@ -72,8 +75,38 @@ export default async function UsagePage({
   }>;
 }) {
   const sp = await searchParams;
-  const source = await resolveSource(sp.source);
   const range = normalizeUsageRange(sp.range, '7d');
+
+  // Bail BEFORE any other server work if `range=custom` is missing or
+  // has an invalid `from` — otherwise `parseCustomRange` would return
+  // `{}` (no bounds) and the page would silently render all-time data
+  // while the URL still says "custom". /api/usage and /api/export/usage
+  // both 400 on the same shape, so we mirror that strictness on the
+  // RSC side by canonicalising the URL back to the default range and
+  // stripping the dangling from/to params.
+  //
+  // We must call `redirect()` before any other `await`s that begin
+  // streaming server work; otherwise React would have already started
+  // rendering and Next falls back to a `<meta http-equiv="refresh">`,
+  // which the user can briefly see flicker as all-time data on screen.
+  // Doing it here yields a clean HTTP 307 with no flash.
+  if (range === 'custom' && !parseCustomRange(sp.from, sp.to).from) {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(sp)) {
+      if (v == null) continue;
+      if (k === 'range' || k === 'from' || k === 'to') continue;
+      qs.set(k, String(v));
+    }
+    qs.set('range', '7d');
+    redirect(`/usage?${qs.toString()}`);
+  }
+
+  const source = await resolveSource(sp.source);
+  // Default granularity is `day`, but `1d` (a single calendar day)
+  // looks empty on a daily chart so we drop to `hour`. For custom
+  // ranges we keep `day` — picking a tight 1-day custom range and
+  // wanting hour-granularity is rare enough that the explicit
+  // granularity picker covers it.
   const gran = isGranularity(sp.gran) ? sp.gran : range === '1d' ? 'hour' : 'day';
   const models = sp.models ? sp.models.split(',').filter(Boolean) : [];
   const projects = sp.projects ? sp.projects.split(',').filter(Boolean) : [];
@@ -87,7 +120,8 @@ export default async function UsagePage({
   const scan = await getCachedScan();
   const allSourceRecords = filterBySource(scan.records, source);
   const allSourceUsers = filterBySource(scan.userRecords, source);
-  const dates = rangeToDates(range);
+  const dates =
+    range === 'custom' ? parseCustomRange(sp.from, sp.to) : rangeToDates(range);
 
   const sources = expandSources(source);
 
@@ -127,6 +161,10 @@ export default async function UsagePage({
 
   const filteredRecords = projectFilteredRecords.filter((r) => {
     if (dates.from && r.timestamp < dates.from.toISOString()) return false;
+    // Aggregator paths already get `to` via `baseOpts`; the turn-row
+    // pipeline filters records here, so we mirror the upper bound or
+    // the table can show rows past the custom `to` date.
+    if (dates.to && r.timestamp > dates.to.toISOString()) return false;
     if (models.length && !models.includes(r.model)) return false;
     return true;
   });

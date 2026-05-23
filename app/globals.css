@@ -1,3 +1,14 @@
+/* react-day-picker stock stylesheet — must come first because CSS
+   `@import` rules are only valid at the top of a file. We import
+   it here (NOT in the date-range-picker component) so our `--rdp-*`
+   overrides at the bottom of this file load AFTER the library's
+   defaults, ensuring the override always wins at equal specificity.
+   Without this ordering, the library's `.rdp-root { --rdp-*: ... }`
+   block would beat ours and we'd see default circular day buttons
+   in our brand colors. PostCSS (via Next's default config) inlines
+   the import at build time. */
+@import 'react-day-picker/style.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -270,4 +281,178 @@ body {
    constant, so keep these in sync if you ever rename them. */
 html[data-usage-overview='hidden'] .usage-overview-block {
   display: none;
+}
+
+/* react-day-picker (Usage → Custom range picker) ----------------------
+   The library's stock stylesheet (imported in components/date-range-picker.tsx)
+   ships with a self-contained "rdp" theme that doesn't know about our
+   dashboard. We rebind its `--rdp-*` variables to the existing brand /
+   surface / text tokens so the calendar:
+     1. Follows the light/dark theme switch automatically (the tokens
+        themselves swap under `.theme-light` / `.theme-dark`).
+     2. Matches the dashboard's brand color, radii, and typography.
+     3. Doesn't need extra props or per-render classNames in the React
+        component — the styling is a pure data layer.
+   All overrides are scoped to `.rdp-root` so they can't leak. */
+.rdp-root {
+  /* Selected day fill + range edges. `accent` is the solid filled
+     end-of-range / selected fill; `accent-background` is the soft
+     tint that spans the middle of the range. */
+  --rdp-accent-color: rgb(var(--brand-strong));
+  --rdp-accent-background-color: rgb(var(--brand) / 0.14);
+
+  /* Today indicator — a calm brand-tinted dot under the number (see
+     `.rdp-today .rdp-day_button` below). The library exposes a color
+     var that styles the number text itself; we keep that as a backup
+     so today is still legible if the dot fails to render. */
+  --rdp-today-color: rgb(var(--brand));
+
+  /* Day cell sizing. 36×36 gives day numbers room to breathe at
+     14px — at 32×32 the larger glyphs (e.g. "30") used to touch the
+     selected-pill edges. The button radius matches the dashboard's
+     `rounded-button` (8px) so selected days slot naturally next to
+     the picker's footer buttons. */
+  --rdp-day-height: 2.25rem;
+  --rdp-day-width: 2.25rem;
+  --rdp-day_button-height: 2.25rem;
+  --rdp-day_button-width: 2.25rem;
+  --rdp-day_button-border-radius: 8px;
+  --rdp-day_button-border: 1px solid transparent;
+
+  /* Nav chevron buttons sit in the caption row at 28px to match the
+     visual weight of a `.btn-ghost` row icon — smaller and the
+     hit area starts feeling cramped on touchpads. */
+  --rdp-nav_button-height: 1.75rem;
+  --rdp-nav_button-width: 1.75rem;
+
+  /* Calmer disabled/outside opacities than the library defaults so
+     past-month days still register as "real" but recede behind the
+     active month. */
+  --rdp-disabled-opacity: 0.32;
+  --rdp-outside-opacity: 0.32;
+
+  /* No border ring around selected — we already telegraph selection
+     with the solid fill + range gradient. */
+  --rdp-selected-border: none;
+
+  --rdp-weekday-opacity: 1;
+  --rdp-months-gap: 0.75rem;
+  color: rgb(var(--text-primary));
+}
+
+/* Caption (Month Year) — site uses 13-14px semibold for section
+   headings (`.num-mid` is 24px, this is one tier below). The library
+   default bumps to 1.25em which felt outsized against our compact
+   popover. */
+.rdp-caption_label {
+  font-weight: 600;
+  font-size: 0.875rem;          /* 14px */
+  color: rgb(var(--text-primary));
+  letter-spacing: -0.005em;
+}
+
+/* Weekday header — same DNA as `.label` (11px uppercase, brand-neutral
+   tertiary) but a touch tighter tracking since the calendar grid
+   already provides visual rhythm. */
+.rdp-weekday {
+  color: rgb(var(--text-tertiary));
+  font-weight: 600;
+  font-size: 0.6875rem;         /* 11px */
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding-bottom: 0.25rem;
+}
+
+/* Day button — base interactive cell. Slightly larger glyph (14px)
+   and tabular-nums so two-digit days line-align with single-digit
+   days down the column. The transition mirrors the dashboard's
+   150ms ease used in `.btn`. */
+.rdp-day_button {
+  font-weight: 500;
+  font-size: 0.8125rem;         /* 13px */
+  font-variant-numeric: tabular-nums;
+  color: rgb(var(--text-primary));
+  transition:
+    background-color 150ms,
+    color 150ms,
+    box-shadow 150ms;
+}
+.rdp-day_button:hover:not([disabled]):not(.rdp-selected .rdp-day_button) {
+  background-color: rgb(var(--bg-surface-hi));
+  color: rgb(var(--text-primary));
+}
+.rdp-day_button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(var(--brand) / 0.4);
+  z-index: 1;
+}
+.rdp-selected .rdp-day_button {
+  font-weight: 600;
+}
+
+/* Today: an underline-style dot below the number. Doesn't fight with
+   the selected/range styling — when today IS the selected day, the
+   dot turns white so it stays visible on the brand-strong fill. */
+.rdp-today:not(.rdp-selected) .rdp-day_button {
+  color: rgb(var(--brand));
+}
+.rdp-today .rdp-day_button {
+  position: relative;
+}
+.rdp-today .rdp-day_button::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 3px;
+  width: 3px;
+  height: 3px;
+  margin-left: -1.5px;
+  border-radius: 999px;
+  background: rgb(var(--brand));
+}
+.rdp-today.rdp-selected .rdp-day_button::after {
+  background: rgb(255 255 255 / 0.85);
+}
+
+/* Nav chevron buttons — adopt our ghost-button language (muted by
+   default, lift to primary on hover) so the calendar's top bar lives
+   in the same visual register as other section headers. */
+.rdp-button_previous,
+.rdp-button_next {
+  color: rgb(var(--text-tertiary));
+  border-radius: 8px;
+  transition:
+    background-color 150ms,
+    color 150ms;
+}
+.rdp-button_previous:hover:not([disabled]),
+.rdp-button_next:hover:not([disabled]) {
+  color: rgb(var(--text-primary));
+  background-color: rgb(var(--bg-surface-hi));
+}
+.rdp-button_previous:focus-visible,
+.rdp-button_next:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(var(--brand) / 0.4);
+}
+.rdp-button_previous:disabled,
+.rdp-button_next:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Range middle background uses a subtler tint (0.14 vs the default
+   0.25) so 5+ day ranges don't dominate the calendar visually. The
+   button itself stays transparent so today's brand dot still shows
+   through. */
+.rdp-range_middle .rdp-day_button {
+  background-color: transparent;
+  color: rgb(var(--text-primary));
+  font-weight: 500;
+}
+
+/* Caption row — give the month label a touch more bottom padding so
+   the weekday header doesn't crowd it. */
+.rdp-month_caption {
+  padding: 0 0 0.5rem;
 }

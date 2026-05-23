@@ -1,6 +1,6 @@
 import { getCachedScan } from '@/lib/data-loader/scan';
 import { recordsToTurnRows } from '@/lib/serialize';
-import { isUsageRange, rangeToDates } from '@/lib/range';
+import { isUsageRange, rangeToDates, parseCustomRange } from '@/lib/range';
 import { resolveSource, filterBySource } from '@/lib/source';
 import type { UsageTableRow, UsageTurnRow } from '@/lib/serialize';
 import { isSortKey, type SortKey } from '@/lib/usage-query';
@@ -187,7 +187,28 @@ export const GET = withApiErrorHandling(async (req: Request) => {
   const scan = await getCachedScan();
   const sourceRecords = filterBySource(scan.records, source);
   const sourceUsers = filterBySource(scan.userRecords, source);
-  const dates = rangeToDates(range);
+  // Custom range pulls bounds from ?from / ?to (YYYY-MM-DD). Same
+  // contract as the /api/usage route — require `from` to be valid so
+  // export never silently dumps an unbounded dataset.
+  let dates: { from?: Date; to?: Date };
+  // Keep the raw URL strings around — the filename label uses them
+  // (not `dates.from`) so non-UTC machines don't shift the day by one
+  // via `toISOString()`.
+  let customFromParam: string | null = null;
+  let customToParam: string | null = null;
+  if (range === 'custom') {
+    customFromParam = url.searchParams.get('from');
+    customToParam = url.searchParams.get('to');
+    dates = parseCustomRange(customFromParam, customToParam);
+    if (!dates.from) {
+      return badRequest(
+        'range=custom requires a valid `from` (YYYY-MM-DD)',
+        'invalid_custom_range',
+      );
+    }
+  } else {
+    dates = rangeToDates(range);
+  }
 
   const filteredRecords = sourceRecords.filter((r) => {
     if (dates.from && r.timestamp < dates.from.toISOString()) return false;
@@ -203,13 +224,32 @@ export const GET = withApiErrorHandling(async (req: Request) => {
   const totalRows = sorted.reduce((s, t) => s + t.callCount, 0);
 
   const headers = level === 'turn' ? TURN_COLUMNS : CALL_COLUMNS;
-  const today = new Date().toISOString().slice(0, 10);
+  // `today` for the filename suffix: local YYYY-MM-DD, so the filename
+  // matches the day the user clicked Export regardless of timezone.
+  // (Plain `toISOString().slice(0, 10)` would render the next/previous
+  // day for anyone east/west of UTC near midnight.)
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   // Filename: `ccgauge-usage-{source}-{range}-{level}-{date}.csv`
   // Range is included only when not 'all' to keep the common case short.
+  // For `range=custom` we substitute the literal `from`..`to` the user
+  // sent over the URL. We deliberately do NOT re-derive these from
+  // `dates.from` / `dates.to` — those are local-midnight Date objects
+  // that, when round-tripped through `toISOString()`, shift the day by
+  // ±1 anywhere outside UTC (e.g. Asia/Shanghai's 2026-05-22 00:00
+  // serialises as `2026-05-21T16:00:00.000Z`). Echoing the raw params
+  // also makes the filename match what the user typed in the picker.
+  let rangeLabel: string | null;
+  if (range === 'all') rangeLabel = null;
+  else if (range === 'custom') {
+    const fromLabel = customFromParam ?? '';
+    const toLabel = customToParam ?? today;
+    rangeLabel = `${fromLabel}_${toLabel}`;
+  } else rangeLabel = range;
   const filenameParts = [
     'ccgauge-usage',
     source,
-    range !== 'all' ? range : null,
+    rangeLabel,
     level !== 'call' ? level : null,
     today,
   ].filter(Boolean);

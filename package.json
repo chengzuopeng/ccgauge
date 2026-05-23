@@ -102,6 +102,7 @@
     "playwright": "^1.59.1",
     "postcss": "^8.5.0",
     "react": "^19.0.0",
+    "react-day-picker": "^10.0.1",
     "react-dom": "^19.0.0",
     "recharts": "^2.15.0",
     "tailwind-merge": "^2.6.0",

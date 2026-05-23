@@ -70,6 +70,11 @@ const en: Dict = {
   'range.30d': '30d',
   'range.90d': '90d',
   'range.all': 'All',
+  'range.custom': 'Custom',
+  'range.customApply': 'Apply',
+  'range.from': 'From',
+  'range.to': 'To',
+  'range.cancel': 'Cancel',
 
   // granularity
   'gran.label': 'Granularity',
@@ -398,6 +403,11 @@ const zh: Dict = {
   'range.30d': '30 天',
   'range.90d': '90 天',
   'range.all': '全部',
+  'range.custom': '自定义',
+  'range.customApply': '应用',
+  'range.from': '开始',
+  'range.to': '结束',
+  'range.cancel': '取消',
 
   'gran.label': '粒度',
   'gran.hour': '小时',

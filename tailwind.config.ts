@@ -14,6 +14,12 @@ const config: Config = {
           DEFAULT: 'rgb(var(--bg-base) / <alpha-value>)',
           surface: 'rgb(var(--bg-surface) / <alpha-value>)',
           'surface-hi': 'rgb(var(--bg-surface-hi) / <alpha-value>)',
+          // One tier above `surface` for floating overlays (popovers,
+          // dropdowns). The `--bg-elevated` CSS var already exists in
+          // globals.css and `.card-elevated` consumes it via raw CSS;
+          // exposing it as a Tailwind utility lets popover components
+          // compose it inline like any other surface token.
+          elevated: 'rgb(var(--bg-elevated) / <alpha-value>)',
         },
         border: {
           DEFAULT: 'rgb(var(--border) / <alpha-value>)',
