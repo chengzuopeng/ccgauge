@@ -1,5 +1,6 @@
 ---
 import type { Locale } from '../consts';
+import { assetUrl } from '../i18n/utils';
 
 interface Props {
   /** Screenshot basename without locale/theme suffix, e.g. "overview". */
@@ -21,7 +22,7 @@ const {
   imgClass = 'w-full h-full object-cover',
 } = Astro.props;
 
-const base = `/images/screenshots/${name}-${locale}`;
+const base = assetUrl(`images/screenshots/${name}-${locale}`);
 const darkSrc = `${base}-dark.png`;
 const lightSrc = `${base}-light.png`;
 ---

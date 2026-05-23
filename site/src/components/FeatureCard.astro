@@ -1,6 +1,7 @@
 ---
 import type { Locale } from '../consts';
 import ThemedScreenshot from './ThemedScreenshot.astro';
+import { assetUrl } from '../i18n/utils';
 
 interface Props {
   /** Optional icon emoji or single character; falls back to a brand dot. */
@@ -30,7 +31,7 @@ const hasMedia = Boolean(screenshotName || imageSrc);
         <ThemedScreenshot name={screenshotName} locale={screenshotLocale} alt={imageAlt ?? ''} />
       ) : (
         <img
-          src={`/images/${imageSrc}`}
+          src={assetUrl(`images/${imageSrc}`)}
           alt={imageAlt ?? ''}
           loading="lazy"
           decoding="async"

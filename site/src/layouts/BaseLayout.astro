@@ -6,6 +6,7 @@ import '../styles/global.css';
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
 import { SITE_TITLE, SITE_URL, THEME_STORAGE_KEY, type Locale } from '../consts';
+import { assetUrl, switchLocaleUrl } from '../i18n/utils';
 
 interface Props {
   /** Page title shown in <title> and og:title; the site name is appended automatically. */
@@ -24,9 +25,24 @@ interface Props {
 
 const { title, description, locale, ogImage = 'og-default.png' } = Astro.props;
 const fullTitle = title === SITE_TITLE ? title : `${title} · ${SITE_TITLE}`;
-const canonical = new URL(Astro.url.pathname, SITE_URL).toString();
-const ogImageUrl = new URL(`/images/${ogImage}`, SITE_URL).toString();
+// Prefer `Astro.site` (resolved from `astro.config.mjs`) so canonical /
+// OG / hreflang URLs use the actual deploy host — `chengzuopeng.github.io`
+// under GH Pages, `ccgauge.dev` once the custom domain is wired. The
+// hardcoded `SITE_URL` in `consts.ts` is the dev-time fallback for the
+// rare case `Astro.site` is undefined.
+const siteOrigin = (Astro.site ?? new URL(SITE_URL)).toString().replace(/\/+$/, '');
+// `Astro.url.pathname` already includes the deploy base on GH Pages
+// (e.g. `/ccgauge/cli/`), so the canonical URL just needs to be absolutized.
+const canonical = new URL(Astro.url.pathname, siteOrigin).toString();
+// `assetUrl` handles the base prefix; `new URL(..., siteOrigin)` then
+// makes it absolute for OG / Twitter crawlers.
+const ogImageUrl = new URL(assetUrl(`images/${ogImage}`), siteOrigin).toString();
 const htmlLang = locale === 'zh' ? 'zh-CN' : 'en';
+// `switchLocaleUrl` is base-aware: it strips both the deploy base and
+// the locale segment, then re-attaches the target locale plus the base.
+// Absolute URLs needed for hreflang per the spec.
+const hreflangEnUrl = new URL(switchLocaleUrl(Astro.url.pathname, 'en'), siteOrigin).toString();
+const hreflangZhUrl = new URL(switchLocaleUrl(Astro.url.pathname, 'zh'), siteOrigin).toString();
 ---
 
 <!doctype html>
@@ -39,7 +55,7 @@ const htmlLang = locale === 'zh' ? 'zh-CN' : 'en';
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical} />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/svg+xml" href={assetUrl('favicon.svg')} />
 
     <!-- Open Graph -->
     <meta property="og:type" content="website" />
@@ -55,17 +71,14 @@ const htmlLang = locale === 'zh' ? 'zh-CN' : 'en';
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImageUrl} />
 
-    <!-- hreflang for the matching alternate locale -->
-    <link
-      rel="alternate"
-      hreflang="en"
-      href={new URL(Astro.url.pathname.replace(/^\/zh\//, '/en/'), SITE_URL).toString()}
-    />
-    <link
-      rel="alternate"
-      hreflang="zh"
-      href={new URL(Astro.url.pathname.replace(/^\/en\//, '/zh/'), SITE_URL).toString()}
-    />
+    <!--
+      hreflang for the matching alternate locale. English is the default
+      and serves un-prefixed under the deploy base (`/`, `/cli/`, … or
+      `/ccgauge/`, `/ccgauge/cli/`, …); Chinese lives at `<base>/zh/...`.
+      `switchLocaleUrl` handles both the base prefix and the locale swap.
+    -->
+    <link rel="alternate" hreflang="en" href={hreflangEnUrl} />
+    <link rel="alternate" hreflang="zh" href={hreflangZhUrl} />
 
     <!--
       No-flash theme script. Runs synchronously before any paint so users

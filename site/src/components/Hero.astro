@@ -1,6 +1,7 @@
 ---
 import type { Locale } from '../consts';
 import ThemedScreenshot from './ThemedScreenshot.astro';
+import { assetUrl } from '../i18n/utils';
 
 interface Props {
   eyebrow?: string;
@@ -62,7 +63,7 @@ const hasMedia = Boolean(screenshotName || imageSrc);
               />
             ) : (
               <img
-                src={`/images/${imageSrc}`}
+                src={assetUrl(`images/${imageSrc}`)}
                 alt={imageAlt ?? ''}
                 loading="eager"
                 decoding="async"

@@ -58,21 +58,25 @@ site/
    │  └─ BaseLayout.astro      # <head> + nav + footer + no-flash theme script
    ├─ components/              # Nav / Footer / LangSwitch / ThemeToggle / …
    └─ pages/
-      ├─ index.astro           # 302 → /en/
-      ├─ en/                   # 5 pages: home, features, cli, mcp, privacy
-      └─ zh/                   # mirror
+      ├─ index.astro           # English home (default locale, un-prefixed)
+      ├─ features.astro        # 4 more English pages at the root
+      ├─ cli.astro
+      ├─ mcp.astro
+      ├─ privacy.astro
+      └─ zh/                   # 5-page Chinese mirror under /zh/...
 ```
 
 ## Internationalisation
 
 - `astro.config.mjs` uses Astro's built-in i18n with
-  `defaultLocale: 'en'`, `prefixDefaultLocale: true`. The root `/`
-  redirects to `/en/`.
+  `defaultLocale: 'en'`, `prefixDefaultLocale: false`. English renders
+  un-prefixed at the root (`/`, `/cli/`, …); Chinese lives under
+  `/zh/...`.
 - Short reusable strings live in `src/i18n/ui.ts` (English + 中文).
 - Long-form page copy is **inline** per `.astro` file — easier to scan
   one document than to grep across a translation table.
 - The `<LangSwitch>` component preserves the current path segment when
-  flipping between locales (`/en/cli/` ↔ `/zh/cli/`).
+  flipping between locales (`/cli/` ↔ `/zh/cli/`).
 
 ## Theming
 

@@ -28,6 +28,19 @@ const ghRepo = process.env.GH_PAGES_REPO ?? 'ccgauge';
 const siteUrl = isGhPages ? `https://${ghOwner}.github.io` : 'https://ccgauge.dev';
 const basePath = isGhPages ? `/${ghRepo}` : undefined;
 
+// Astro 4's `redirects` map doesn't auto-prefix destinations with the
+// configured `base`, so we have to bake it in ourselves. In dev /
+// custom-domain mode `basePath` is undefined and the prefix collapses
+// to ''; under GH_PAGES it becomes '/ccgauge'.
+const basePrefix = basePath ?? '';
+const legacyEnRedirects = {
+  '/en/': `${basePrefix}/`,
+  '/en/cli/': `${basePrefix}/cli/`,
+  '/en/features/': `${basePrefix}/features/`,
+  '/en/mcp/': `${basePrefix}/mcp/`,
+  '/en/privacy/': `${basePrefix}/privacy/`,
+};
+
 // https://astro.build/config
 export default defineConfig({
   // Used for:
@@ -39,6 +52,16 @@ export default defineConfig({
   base: basePath,
   trailingSlash: 'always',
   devToolbar: { enabled: false },
+  // Legacy URL compatibility. Before we switched to `prefixDefaultLocale: false`
+  // the English pages lived at `/en/cli/`, `/en/features/`, etc. Anything
+  // out in the wild (bookmarks, social shares, search index entries) will
+  // 404 if we just delete those paths. Astro renders these as static
+  // HTML files containing a `<meta http-equiv="refresh">` redirect, which
+  // works on GH Pages' plain static hosting (no server-side rewrites
+  // needed) and is honored by search engines as a 301-equivalent.
+  // Destinations are pre-prefixed with `basePath` (see top of file)
+  // because Astro 4's redirects API doesn't auto-prefix.
+  redirects: legacyEnRedirects,
   integrations: [
     tailwind({ applyBaseStyles: false }),
     // NOTE: @astrojs/sitemap was deliberately omitted. Its 3.7+ releases
@@ -52,8 +75,10 @@ export default defineConfig({
     defaultLocale: 'en',
     locales: ['en', 'zh'],
     routing: {
-      prefixDefaultLocale: true,
-      redirectToDefaultLocale: true,
+      // English serves un-prefixed at the root (`/`, `/cli/`, …). Chinese
+      // lives under `/zh/...`. `redirectToDefaultLocale` only applies when
+      // the default locale is prefixed, so it's omitted here.
+      prefixDefaultLocale: false,
     },
     fallback: { zh: 'en' },
   },
