@@ -5,6 +5,146 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] — 2026-05-23
+
+Two new user-facing features and a marketing-site routing overhaul.
+
+The **Usage** page learns a custom date range — a real `react-day-picker`
+calendar replacing the original native `<input type="date">`, with proper
+brand theming and locale (en / zh-CN) tracking. The **CLI** learns a rich
+TUI dashboard (`ccgauge report --dashboard` / `-d`) that fans the existing
+JSON report shape into KPI tiles, a stacked vertical-bar trend chart, a
+two-column breakdown, and a 7×24 activity heatmap — useful in a terminal
+when the dashboard's web UI isn't an option. The **marketing site** drops
+the `/en/...` prefix so canonical URLs sit at the root (with 301-style
+static redirects from every old path so existing bookmarks / search
+results still resolve).
+
+### Highlights
+
+- **Custom date range on `/usage`** — `?range=custom&from=YYYY-MM-DD&to=YYYY-MM-DD`
+  URL contract, click-pick via `react-day-picker` (mode=range) with a
+  themed popover that follows the existing light/dark theme + EN/ZH
+  language toggle, edge middleware redirects malformed URLs to the
+  default range with a clean HTTP 307 (no skeleton-flash from a
+  Server-Component-level redirect).
+- **`ccgauge report --dashboard` / `-d`** — one-screen TUI rendering of
+  the existing report data. KPI tiles (Total tokens / Cost / Cache saved
+  / Cache hit / Conversations / Active 5h block), a stacked vertical bar
+  trend chart with 1/8-cell precision, a two-column breakdown, a 7×24
+  day×hour heatmap, plus a footer with the active filter scope. Falls
+  back to the standard text layout when stdout is below 80 columns. The
+  plain `report` output is unchanged.
+- **Marketing site at root URLs** — English pages move from `/en/cli/`,
+  `/en/features/`, etc. to plain `/cli/`, `/features/`, etc. Every old
+  `/en/...` path keeps working via static meta-refresh redirects (works
+  on GH Pages' static hosting; honored by search engines as a 301).
+
+### Added
+
+- **`react-day-picker`** (devDependency) — themed via existing brand
+  tokens, no extra theme prop needed. Light/dark theme + EN/ZH locale
+  both follow the dashboard's own switches automatically.
+- **`bg.elevated` Tailwind utility** mapping the pre-existing
+  `--bg-elevated` CSS var, so popovers / dropdowns can share the same
+  one-tier-above-surface fill via a normal Tailwind class.
+- **`middleware.ts`** at repo root — Edge runtime, scoped to `/usage`.
+  Rewrites `?range=custom` with missing or invalid `from` (incl.
+  calendar-overflow shapes like `2025-02-30`) back to `?range=7d`
+  with a clean HTTP 307. Other query params (models, projects, sort,
+  …) are preserved.
+- **`lib/range.ts` exports** — `parseCustomRange(from, to)` with
+  round-trip calendar validation; `'custom'` added to `USAGE_RANGES`.
+- **`scripts/test-range.mjs` fixtures** — 9 new assertions covering
+  `parseCustomRange` happy path, from-only open-ended, malformed
+  ISO, calendar overflow (Feb 30 / Apr 31 / non-leap Feb 29), leap
+  year (2024-02-29).
+- **`bin/cli.mjs` `report` flags** — `-d, --dashboard`, `--width <n>`
+  (override `process.stdout.columns`), `--no-banner`, `--compact`
+  (skip the trend chart to save vertical space).
+- **`lib/cli-report/ansi.ts`** — shared TUI primitives (24-bit
+  truecolor palette aligned with the web dashboard's `--chart-*` CSS
+  vars; Unicode box / bar / sparkline / vertical-stacked-column /
+  two-column helpers, with ANSI-aware visible-length math).
+- **`lib/cli-report/dash.ts`** — the new dashboard renderer entry
+  (banner / 6 KPI tiles / stacked trend / double-column breakdown /
+  day×hour heatmap / footer).
+- **`/en/*` legacy URL redirects** in `site/astro.config.mjs` — 5
+  paths (`/en/`, `/en/cli/`, `/en/features/`, `/en/mcp/`,
+  `/en/privacy/`) emit static meta-refresh HTML pointing at the
+  new canonical root URL. Destinations are pre-prefixed with
+  `basePath` so GH Pages project builds get the full
+  `https://chengzuopeng.github.io/ccgauge/...` target.
+
+### Changed
+
+- **`/usage` Range picker** — gains a Custom button after the
+  segmented preset chips. When the active range is `custom`, the
+  button shows the picked date range (`May 19 – May 21` / `5月19日 –
+  5月21日`) and is highlighted with the brand fill. Switching to any
+  preset auto-strips `from` / `to` from the URL.
+- **Marketing site i18n routing** — `prefixDefaultLocale: true` →
+  `false`. English pages now live at `/`, `/cli/`, `/features/`,
+  `/mcp/`, `/privacy/`. Chinese pages still under `/zh/...`.
+  `BaseLayout`'s hreflang / canonical use the new path shape.
+- **`/api/usage` and `/api/export/usage`** — accept `range=custom`;
+  reject missing/invalid `from` with `400 invalid_custom_range` so
+  the contract matches the page redirect.
+- **`/api/export/usage` filename** — when `range=custom`, the
+  filename embeds the literal `from_to` dates the user typed
+  (instead of `dates.from.toISOString().slice(0, 10)` which drifted
+  by ±1 day for non-UTC machines).
+- **`globals.css` imports `react-day-picker/style.css`** at the top
+  (CSS `@import` must be first), with ~10 `--rdp-*` variable
+  overrides + a few `.rdp-*` selectors scoped to `.rdp-root` so the
+  calendar matches the dashboard's brand colors, radii, today
+  indicator, and weekday header treatment without per-render
+  classNames.
+
+### Fixed
+
+- **`parseCustomRange` calendar overflow** — `2025-02-30` /
+  `2025-04-31` / non-leap `2025-02-29` used to silently normalise
+  to the next valid date via `new Date(...)`. We now round-trip the
+  parsed Y-M-D back through the constructed Date and reject any
+  shift, so a typo can't surface as off-month data labelled with
+  the typed month.
+- **Custom range CSV export filename — TZ drift** —
+  `dates.from.toISOString().slice(0, 10)` shifted from-date by one
+  day for non-UTC machines (Asia/Shanghai's `2026-05-22 00:00`
+  serialises as `2026-05-21T16:00:00.000Z`). Filename now echoes
+  the raw URL params instead.
+- **`/usage?range=custom` with no valid `from`** — used to silently
+  degrade to no-bounds (= all-time data) on the page render while
+  the URL still said "custom". The new Edge middleware short-circuits
+  to a real 307 BEFORE any RSC streaming starts (a server-component
+  `redirect()` only produces a 1-second meta-refresh in Next 15's
+  streaming context).
+- **Dashboard heatmap + footer scope** — `renderHeatmap` and
+  `renderFooter` previously read raw `scan.records`, so a
+  `--range 7d --source codex` run still claimed 20k+ "records in
+  scope" from the full scan. Both now use the same filtered record
+  set the KPI tiles / trend / breakdown are computed from.
+- **Dashboard Active 5h block respects `--source`** — used to
+  always probe Claude first and fall back to Codex, so
+  `report -d --source codex` could surface a Claude window the user
+  explicitly excluded. `pickActiveBlock` now branches on
+  `data.source`: `claude` / `codex` show only that provider's
+  window; `all` keeps the prefer-Claude-fall-back-to-Codex order.
+
+### Internal
+
+- **`filterRecordsForReport(scan, sources, opts)`** exported from
+  `lib/cli-report/index.ts` — applies the same source / range /
+  model / project filter that `computeReportData` uses internally,
+  but returns the records instead of aggregated totals. Used by the
+  dashboard renderer so its heatmap and footer scope stay
+  consistent with the KPI tiles / trend / breakdown.
+- **`computeActivityStats(records, { source: 'all' })`** — when
+  records are already pre-filtered upstream, passing `'all'` skips
+  a redundant per-record source filter. The dashboard heatmap
+  switched to this pattern.
+
 ## [1.0.5] — 2026-05-19
 
 CLI ergonomics overhaul + a brand-new `turns` / `conversations`
