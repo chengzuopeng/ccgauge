@@ -215,7 +215,11 @@ function addReportOptions(cmd) {
     .option('-j, --json', 'output JSON instead of formatted text')
     .option('--no-color', 'disable ANSI colors')
     .option('--no-trend', 'skip the trend chart')
-    .option('--no-breakdown', 'skip the breakdown table');
+    .option('--no-breakdown', 'skip the breakdown table')
+    .option('-d, --dashboard', 'rich one-screen TUI layout (KPI tiles, stacked trend, double-column breakdown, heatmap)')
+    .option('--width <n>', 'force output width (chars); default reads process.stdout.columns')
+    .option('--no-banner', 'dashboard: skip the top banner row')
+    .option('--compact', 'dashboard: skip the trend chart to save vertical space');
 }
 
 addReportOptions(program.command('report').description('print a formatted usage report to stdout'))
@@ -534,6 +538,7 @@ async function report(opts) {
     });
   }
   const limit = parseInt(String(opts.limit ?? '10'), 10);
+  const width = opts.width ? parseInt(String(opts.width), 10) : undefined;
   const reportOpts = {
     range: String(opts.range ?? '7d'),
     source: String(opts.source ?? 'all'),
@@ -548,6 +553,10 @@ async function report(opts) {
     showBreakdown: opts.breakdown !== false,
     model: opts.model ? String(opts.model) : undefined,
     project: opts.project ? String(opts.project) : undefined,
+    dashboard: Boolean(opts.dashboard),
+    width: Number.isFinite(width) && width > 0 ? width : undefined,
+    banner: opts.banner !== false,
+    compact: Boolean(opts.compact),
   };
   let payload;
   try {

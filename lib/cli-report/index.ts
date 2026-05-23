@@ -15,6 +15,7 @@ import { ALL_PROVIDER_IDS, getProvider, isProviderId } from '@/lib/providers';
 import type { ProviderId, AssistantRecord, ScanResult } from '@/lib/types';
 import { summarizeTurns } from '@/lib/turns';
 import { formatTokensCompact, formatUSD, formatPct } from '@/lib/utils';
+import { renderDash } from './dash';
 
 export type Dim = 'model' | 'project' | 'session';
 export type SourceArg = ProviderId | 'all';
@@ -38,6 +39,18 @@ export interface ReportOptions {
   showBreakdown?: boolean;
   model?: string;
   project?: string;
+  /** Render as a rich one-screen TUI dashboard instead of the
+   *  CI-friendly text layout. Falls back to the text layout when the
+   *  terminal is narrower than 80 columns. JSON mode (`json: true`)
+   *  is unaffected — it always outputs the same `ReportData`. */
+  dashboard?: boolean;
+  /** Force output width (otherwise read `process.stdout.columns`).
+   *  Useful for screenshots / fixture tests. */
+  width?: number;
+  /** Dashboard-only: skip the trend chart to save vertical space. */
+  compact?: boolean;
+  /** Dashboard-only: skip the top banner. */
+  banner?: boolean;
 }
 
 export const DEFAULT_REPORT: ReportOptions = {
@@ -50,6 +63,9 @@ export const DEFAULT_REPORT: ReportOptions = {
   color: true,
   showTrend: true,
   showBreakdown: true,
+  dashboard: false,
+  compact: false,
+  banner: true,
 };
 
 // ---------- public entry ----------
@@ -62,7 +78,46 @@ export async function runReport(opts: ReportOptions): Promise<string> {
 
   const data = computeReportData(scan, sources, filled);
   if (filled.json) return JSON.stringify(data, null, 2);
+  if (filled.dashboard) {
+    // The dashboard needs the same filtered record set the totals /
+    // trend / breakdown are built from — heatmap and footer scope both
+    // read from records directly, so passing the raw `scan.records`
+    // would silently leak rows from outside the selected
+    // range/source/model/project window. Compute once here and hand
+    // it through.
+    const filteredRecords = filterRecordsForReport(scan, sources, filled);
+    return renderDash(scan, data, filled, filteredRecords);
+  }
   return renderText(data, filled);
+}
+
+/** Apply the same range/source/model/project filter that
+ *  `computeReportData` uses internally, but return the records instead
+ *  of aggregated totals. Used by the dashboard renderer so its heatmap
+ *  and footer scope stay consistent with the KPI tiles / trend chart. */
+export function filterRecordsForReport(
+  scan: ScanResult,
+  sources: ProviderId[],
+  o: ReportOptions,
+): AssistantRecord[] {
+  const dates = resolveRange(o);
+  const fromIso = dates.from?.toISOString();
+  const toIso = dates.until?.toISOString();
+  const sourceSet = new Set(sources);
+  const modelNeedle = o.model?.toLowerCase();
+  const projectNeedle = o.project?.toLowerCase();
+  return scan.records.filter((r) => {
+    if (!sourceSet.has(r.source)) return false;
+    if (fromIso && r.timestamp < fromIso) return false;
+    if (toIso && r.timestamp > toIso) return false;
+    if (modelNeedle && !r.model.toLowerCase().includes(modelNeedle)) return false;
+    if (projectNeedle) {
+      const cwd = (r.cwd || '').toLowerCase();
+      const leaf = cwd.split(/[/\\]+/).pop() ?? '';
+      if (!cwd.includes(projectNeedle) && !leaf.includes(projectNeedle)) return false;
+    }
+    return true;
+  });
 }
 
 function normalizeReportOptions(opts: ReportOptions): ReportOptions {
@@ -105,7 +160,7 @@ function invalidOptionMessage(name: string, value: unknown, expected: readonly s
 
 // ---------- data shaping ----------
 
-interface ReportData {
+export interface ReportData {
   generatedAt: string;
   range: string;
   source: SourceArg;
@@ -128,7 +183,18 @@ interface ReportData {
      *  via tool-use loops, reasoning steps, and sub-agents. */
     turns: number;
   };
-  trend: Array<{ label: string; cost: number; tokens: number; turns: number }>;
+  trend: Array<{
+    label: string;
+    cost: number;
+    tokens: number;
+    turns: number;
+    /** Per-bucket token-type split. Added for `--dashboard`'s stacked
+     *  vertical bars; the plain `--text` renderer ignores these. */
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+  }>;
   breakdown: Array<{
     key: string;
     label: string;
@@ -170,7 +236,16 @@ function computeReportData(
     turns: 0,
   };
 
-  const trendBuckets = new Map<string, { label: string; cost: number; tokens: number; turns: number }>();
+  const trendBuckets = new Map<string, {
+    label: string;
+    cost: number;
+    tokens: number;
+    turns: number;
+    input: number;
+    output: number;
+    cacheRead: number;
+    cacheWrite: number;
+  }>();
 
   for (const source of sources) {
     const opts: AggregateOpts = { ...baseOpts, source };
@@ -208,8 +283,21 @@ function computeReportData(
         ex.cost += b.cost;
         ex.tokens += b.totalTokens;
         ex.turns += tnCount;
+        ex.input += b.inputTokens;
+        ex.output += b.outputTokens;
+        ex.cacheRead += b.cacheReadTokens;
+        ex.cacheWrite += b.cacheCreationTokens;
       } else {
-        trendBuckets.set(b.key, { label: b.label, cost: b.cost, tokens: b.totalTokens, turns: tnCount });
+        trendBuckets.set(b.key, {
+          label: b.label,
+          cost: b.cost,
+          tokens: b.totalTokens,
+          turns: tnCount,
+          input: b.inputTokens,
+          output: b.outputTokens,
+          cacheRead: b.cacheReadTokens,
+          cacheWrite: b.cacheCreationTokens,
+        });
       }
     }
   }
@@ -414,7 +502,7 @@ function makeColors(enabled: boolean) {
   };
 }
 
-function renderText(d: ReportData, o: ReportOptions): string {
+export function renderText(d: ReportData, o: ReportOptions): string {
   const c = makeColors(o.color !== false);
   const lines: string[] = [];
 
