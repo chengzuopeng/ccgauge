@@ -85,8 +85,9 @@ const hreflangZhUrl = new URL(switchLocaleUrl(Astro.url.pathname, 'zh'), siteOri
       who picked light/dark previously don't see a flash. Mirrors the
       strategy used in the main dashboard's `components/no-flash-script.tsx`.
 
-      Default = dark. Returning users keep their explicit choice. The
-      `data-theme` attribute is convenient for CSS / dev tooling.
+      Default = `system` (tracks `prefers-color-scheme`). Returning users
+      keep their explicit choice. The `data-theme` attribute is convenient
+      for CSS / dev tooling.
     -->
     <script is:inline define:vars={{ key: THEME_STORAGE_KEY }}>
       (function () {
@@ -97,7 +98,7 @@ const hreflangZhUrl = new URL(switchLocaleUrl(Astro.url.pathname, 'zh'), siteOri
           } catch (_) {
             /* localStorage may be disabled */
           }
-          if (t !== 'light' && t !== 'dark' && t !== 'system') t = 'dark';
+          if (t !== 'light' && t !== 'dark' && t !== 'system') t = 'system';
           var resolved = t;
           if (t === 'system') {
             resolved =

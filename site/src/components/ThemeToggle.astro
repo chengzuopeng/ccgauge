@@ -53,7 +53,9 @@ const t = useTranslations(locale);
       } catch {
         /* ignore */
       }
-      return 'dark';
+      // Must match the no-flash script default in BaseLayout — keep these
+      // two strings in sync, or first-paint and toggle init disagree.
+      return 'system';
     }
 
     function resolve(theme: Theme): 'light' | 'dark' {

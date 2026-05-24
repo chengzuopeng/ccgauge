@@ -28,6 +28,7 @@
   --brand: 129 140 248;
   --brand-hover: 165 180 252;
   --brand-strong: 99 102 241;
+  --danger: 248 113 113;
   --shadow-card: 0 1px 0 0 rgb(255 255 255 / 0.02), 0 4px 12px -4px rgb(0 0 0 / 0.4);
   --shadow-popover: 0 4px 12px -2px rgb(0 0 0 / 0.4), 0 16px 48px -8px rgb(0 0 0 / 0.6);
   --ring-focus: 129 140 248;
@@ -47,6 +48,7 @@
   --brand: 79 70 229;
   --brand-hover: 67 56 202;
   --brand-strong: 79 70 229;
+  --danger: 220 38 38;
   --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.04);
   --shadow-popover: 0 8px 24px -4px rgb(15 23 42 / 0.08), 0 16px 48px -8px rgb(15 23 42 / 0.08);
   --ring-focus: 79 70 229;

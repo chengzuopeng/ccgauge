@@ -25,6 +25,7 @@ module.exports = {
           hover: 'rgb(var(--brand-hover) / <alpha-value>)',
           strong: 'rgb(var(--brand-strong) / <alpha-value>)',
         },
+        danger: 'rgb(var(--danger) / <alpha-value>)',
       },
       fontFamily: {
         sans: ['"Geist Variable"', '"Geist"', 'Inter', 'system-ui', 'sans-serif'],

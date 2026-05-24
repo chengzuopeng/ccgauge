@@ -80,11 +80,14 @@ site/
 
 ## Theming
 
-- Three-state theme cycler: dark → light → system. Persisted to
-  `localStorage` under `ccgauge.site.theme` (prefix `.site.` so it
-  doesn't collide with the dashboard's `ccgauge.theme`).
+- Three-state theme cycler in `ThemeToggle.astro`: `system → dark → light → system`.
+  First-time visitors default to **system** (tracking `prefers-color-scheme`);
+  the choice is persisted to `localStorage` under `ccgauge.site.theme`
+  (prefix `.site.` so it doesn't collide with the dashboard's
+  `ccgauge.theme`).
 - An inline no-flash `<script>` in `BaseLayout.astro` applies the
-  matching `<html class>` before paint.
+  matching `<html class>` before paint. The default value in both the
+  no-flash script and `ThemeToggle` must stay in sync.
 - CSS variables in `src/styles/global.css` mirror the main dashboard's
   Indigo palette so transitioning between marketing site and product
   feels seamless.

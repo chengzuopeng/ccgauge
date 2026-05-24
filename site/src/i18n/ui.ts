@@ -32,6 +32,7 @@ export const ui = {
 
     'common.copy': 'Copy',
     'common.copied': 'Copied!',
+    'common.copyFailed': 'Copy failed',
     'common.openInNewTab': 'Open in new tab',
 
     'footer.tagline': 'Local usage dashboard for Claude Code & Codex CLI.',
@@ -64,6 +65,7 @@ export const ui = {
 
     'common.copy': '复制',
     'common.copied': '已复制！',
+    'common.copyFailed': '复制失败',
     'common.openInNewTab': '新标签页打开',
 
     'footer.tagline': 'Claude Code 与 Codex CLI 的本地用量看板。',

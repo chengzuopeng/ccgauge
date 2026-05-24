@@ -17,9 +17,18 @@ interface Props {
   copyLabel?: string;
   /** Label shown after a successful copy. */
   copiedLabel?: string;
+  /** Label shown briefly after a copy attempt fails (permission denied,
+   *  insecure context, etc.). Without this, callers used to see silence. */
+  failedLabel?: string;
 }
 
-const { code, lang, copyLabel = 'Copy', copiedLabel = 'Copied!' } = Astro.props;
+const {
+  code,
+  lang,
+  copyLabel = 'Copy',
+  copiedLabel = 'Copied!',
+  failedLabel = 'Copy failed',
+} = Astro.props;
 ---
 
 <div
@@ -39,6 +48,7 @@ const { code, lang, copyLabel = 'Copy', copiedLabel = 'Copied!' } = Astro.props;
     data-copy-payload={code}
     data-copy-label={copyLabel}
     data-copied-label={copiedLabel}
+    data-failed-label={failedLabel}
     class="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-button text-[11px] font-medium text-text-tertiary hover:text-text-primary hover:bg-bg-surface-hi border border-transparent hover:border-border transition-colors"
     aria-label={copyLabel}
   >
@@ -52,23 +62,43 @@ const { code, lang, copyLabel = 'Copy', copiedLabel = 'Copied!' } = Astro.props;
 </div>
 
 <script>
+  // Color classes we toggle on the button to signal copy state. Kept
+  // outside the listener so the constants don't get reallocated per click.
+  const SUCCESS_CLASS = 'text-brand';
+  const FAILURE_CLASS = 'text-danger';
+  const STATE_RESET_MS = 1500;
+
   document.querySelectorAll<HTMLButtonElement>('[data-copy-btn]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const payload = btn.dataset.copyPayload ?? '';
       const label = btn.dataset.copyLabel ?? 'Copy';
       const copied = btn.dataset.copiedLabel ?? 'Copied!';
+      const failed = btn.dataset.failedLabel ?? 'Copy failed';
       const textEl = btn.querySelector('[data-copy-text]');
+
+      const flash = (text: string, klass: string) => {
+        if (textEl) textEl.textContent = text;
+        btn.classList.remove(SUCCESS_CLASS, FAILURE_CLASS);
+        btn.classList.add(klass);
+        window.setTimeout(() => {
+          if (textEl) textEl.textContent = label;
+          btn.classList.remove(klass);
+        }, STATE_RESET_MS);
+      };
+
+      // `navigator.clipboard` is undefined on insecure (non-https,
+      // non-localhost) origins; `writeText` itself can also reject when
+      // the user denies clipboard permission. Cover both by gating on
+      // the API's existence and try/catching the call.
+      if (!navigator.clipboard?.writeText) {
+        flash(failed, FAILURE_CLASS);
+        return;
+      }
       try {
         await navigator.clipboard.writeText(payload);
-        if (textEl) textEl.textContent = copied;
-        btn.classList.add('text-brand');
-        setTimeout(() => {
-          if (textEl) textEl.textContent = label;
-          btn.classList.remove('text-brand');
-        }, 1500);
+        flash(copied, SUCCESS_CLASS);
       } catch {
-        // Permission denied or insecure context. Fail silently — user can
-        // select the text manually.
+        flash(failed, FAILURE_CLASS);
       }
     });
   });
