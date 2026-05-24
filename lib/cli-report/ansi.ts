@@ -1,19 +1,23 @@
-// Shared ANSI / Unicode primitives for the dashboard renderer.
+// Shared TUI primitives for the dashboard renderer.
 //
-// The plain `report` text layout uses its own private `makeColors()` —
+// The simpler `report` text layout has its own private color helper —
 // we don't share with that one because it's tuned for a narrower
-// palette (just brand + 3 accent colors). Dashboard needs a wider set
-// (the 4 token-type colors, plus dim / bold / sparkline accents) and
-// helper functions that the simple report doesn't.
+// palette (just brand + 3 accents). Dashboard needs a wider palette
+// (the 4 token-type colors + dim / bold / sparkline accents).
 //
-// Box-drawing and bar characters used here:
-//   ┌ ─ ┐ │ └ ┘  — light single-line box
-//   █ ▇ ▆ ▅ ▄ ▃ ▂ ▁  — descending bar segments (1/8 → 8/8)
-//   ▎▍▌▋▊▉█  — horizontal bar segments (1/8 → 8/8)
-//   ▁▂▃▄▅▆▇█  — sparkline / heatmap density levels
+// What lives here vs in libraries:
+//   - Palette (chalk-backed)                ← here, so token-type colors are one import
+//   - hbar / sparkline / stackedColumn      ← here, no lib equivalent for our needs
+//   - Width / padding / truncate            → string-width + cli-truncate (call directly at use site)
+//   - Boxes / tables                        → boxen + cli-table3 (call directly at use site)
 //
-// All "visible length" math goes through `visibleLen()` so padding
-// stays correct when colour is on (ANSI escapes contribute 0 width).
+// Bar / sparkline characters used here:
+//   █ ▇ ▆ ▅ ▄ ▃ ▂ ▁  — descending vertical bar segments (1/8 → 8/8)
+//   ▎▍▌▋▊▉█           — horizontal bar segments (1/8 → 8/8)
+//   ▁▂▃▄▅▆▇█           — sparkline density levels
+
+import chalk, { Chalk, type ChalkInstance } from 'chalk';
+import stringWidth from 'string-width';
 
 export interface Palette {
   reset: string;
@@ -32,8 +36,7 @@ export interface Palette {
   output: (s: string) => string;
 }
 
-// 24-bit truecolor codes mirroring the dashboard's chart palette
-// (rgb(var(--chart-*))).
+// 24-bit truecolor codes mirroring the dashboard's chart palette.
 const RGB = {
   brand: [129, 140, 248] as const, // indigo-400
   green: [34, 197, 94] as const,
@@ -46,66 +49,71 @@ const RGB = {
   output: [251, 146, 60] as const, // orange-400
 };
 
-function fg(rgb: readonly [number, number, number], useColor: boolean): (s: string) => string {
-  if (!useColor) return (s) => s;
-  const prefix = `\x1b[38;2;${rgb[0]};${rgb[1]};${rgb[2]}m`;
-  return (s) => `${prefix}${s}\x1b[39m`;
-}
-
-function wrap(open: string, close: string, useColor: boolean): (s: string) => string {
-  if (!useColor) return (s) => s;
-  return (s) => `${open}${s}${close}`;
-}
-
+/**
+ * Build a chalk-backed palette honoring the caller's color preference.
+ *
+ * We always pin the instance to chalk level 3 (truecolor) when colour
+ * is on. Why force, not auto-detect?
+ *  - Every entry in `RGB` above is a 24-bit colour designed to match the
+ *    web dashboard's `--chart-*` CSS vars. If chalk auto-detects only
+ *    16-colour support (which it does in many bundled / non-TTY
+ *    parents — Claude Code shells, CI matrices, …), it crushes our
+ *    palette down to bright-cyan / bright-white / etc., which look
+ *    nothing like the intended brand colours.
+ *  - boxen / cli-table3 also use chalk under the hood — pinning level
+ *    here makes their borders honour our gray hex too.
+ *  - The pre-refactor version hardcoded `\x1b[38;2;...m` truecolor
+ *    escapes regardless of terminal, so this restores that behaviour
+ *    in the rare 16-colour terminal at the cost of a few wasted
+ *    escape bytes.
+ *
+ * When `useColor` is false we still construct a chalk Instance, but
+ * with level 0 — every helper then returns plain strings, which keeps
+ * CI / `--no-color` output grep-friendly.
+ */
 export function makePalette(useColor: boolean): Palette {
+  const k: ChalkInstance = new Chalk({ level: useColor ? 3 : 0 });
+  const fg = (rgb: readonly [number, number, number]) =>
+    useColor ? (s: string) => k.rgb(rgb[0], rgb[1], rgb[2])(s) : (s: string) => s;
   return {
     reset: useColor ? '\x1b[0m' : '',
-    bold: wrap('\x1b[1m', '\x1b[22m', useColor),
-    dim: wrap('\x1b[2m', '\x1b[22m', useColor),
-    brand: fg(RGB.brand, useColor),
-    green: fg(RGB.green, useColor),
-    red: fg(RGB.red, useColor),
-    yellow: fg(RGB.yellow, useColor),
-    cyan: fg(RGB.cyan, useColor),
-    input: fg(RGB.input, useColor),
-    cacheWrite: fg(RGB.cacheWrite, useColor),
-    cacheRead: fg(RGB.cacheRead, useColor),
-    output: fg(RGB.output, useColor),
+    bold: (s) => k.bold(s),
+    dim: (s) => k.dim(s),
+    brand: fg(RGB.brand),
+    green: fg(RGB.green),
+    red: fg(RGB.red),
+    yellow: fg(RGB.yellow),
+    cyan: fg(RGB.cyan),
+    input: fg(RGB.input),
+    cacheWrite: fg(RGB.cacheWrite),
+    cacheRead: fg(RGB.cacheRead),
+    output: fg(RGB.output),
   };
 }
 
-// ── width / padding ──────────────────────────────────────────────────
+// ── width / padding (string-width backed) ────────────────────────────
 
-const ANSI_RE = /\x1b\[[0-9;]*m/g;
-
+/** Visual width in cells. Handles ANSI escapes, emoji, CJK. */
 export function visibleLen(s: string): number {
-  return s.replace(ANSI_RE, '').length;
+  return stringWidth(s);
 }
 
 export function padEnd(s: string, w: number, fill: string = ' '): string {
-  const need = w - visibleLen(s);
+  const need = w - stringWidth(s);
   return need > 0 ? s + fill.repeat(need) : s;
 }
 
 export function padStart(s: string, w: number, fill: string = ' '): string {
-  const need = w - visibleLen(s);
+  const need = w - stringWidth(s);
   return need > 0 ? fill.repeat(need) + s : s;
 }
 
 export function center(s: string, w: number, fill: string = ' '): string {
-  const need = w - visibleLen(s);
+  const need = w - stringWidth(s);
   if (need <= 0) return s;
   const l = Math.floor(need / 2);
   const r = need - l;
   return fill.repeat(l) + s + fill.repeat(r);
-}
-
-/** Truncate to a visible-width cap, appending an ellipsis if cut. */
-export function truncate(s: string, w: number): string {
-  if (visibleLen(s) <= w) return s;
-  // We don't strip ANSI here because dashboard call sites only pass
-  // already-plain strings; if that assumption breaks, refactor.
-  return s.slice(0, Math.max(0, w - 1)) + '…';
 }
 
 // ── horizontal bar / sparkline ───────────────────────────────────────
@@ -137,8 +145,6 @@ export function sparkline(values: number[], width: number, color?: (s: string) =
   if (width <= 0) return '';
   if (values.length === 0) return color ? color('─'.repeat(width)) : '─'.repeat(width);
   const sampled: number[] = [];
-  // Bucket-average down to `width` cells when input is longer; pad-end
-  // when shorter so the latest values land flush right.
   if (values.length === width) {
     sampled.push(...values);
   } else if (values.length > width) {
@@ -175,16 +181,8 @@ const VBAR_CHARS = ['', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
  *  given coloured segments. Returns an array of `height` strings,
  *  ordered TOP TO BOTTOM (so callers can `.join('\n')` rows directly).
  *
- *  `segments` are stacked bottom-to-top in array order. Each segment
- *  reserves its proportional share of cells; remaining sub-cell
- *  fraction is rendered as a partial top character on the boundary.
- *
- *  Sub-cell precision: 1/8. We use the 1/8-step block characters
- *  (`▁▂…█`). A segment that takes 2.6 cells renders as `[█, █, ▅]`
- *  bottom-to-top in its colour.
- *
- *  Width is always **1 column** — callers compose multiple columns
- *  with their preferred gap by interleaving lines. */
+ *  Sub-cell precision: 1/8. A segment that takes 2.6 cells renders as
+ *  `[█, █, ▅]` bottom-to-top in its colour. */
 export function stackedColumn(
   segments: Array<{ value: number; color?: (s: string) => string }>,
   height: number,
@@ -194,46 +192,34 @@ export function stackedColumn(
   if (height <= 0 || maxValue <= 0) return lines;
   const total = segments.reduce((s, x) => s + Math.max(0, x.value), 0);
   if (total <= 0) return lines;
-  // Each segment's cell count (in 1/8-cell units) — clamp to total
-  // cells avail = height * 8 so we don't overflow the column.
   const totalUnits = (total / maxValue) * height * 8;
   const cap = height * 8;
   const used = Math.min(totalUnits, cap);
   let remaining = used;
-  let cursorUnits = 0; // 0..cap, counted from bottom
+  let cursorUnits = 0;
 
   for (const seg of segments) {
     if (seg.value <= 0 || remaining <= 0) continue;
     const segUnits = Math.min(remaining, (seg.value / total) * used);
     const startUnits = cursorUnits;
     const endUnits = cursorUnits + segUnits;
-    // Paint each row this segment touches.
     const startRow = Math.floor(startUnits / 8);
     const endRow = Math.min(height - 1, Math.floor((endUnits - 0.0001) / 8));
     for (let row = startRow; row <= endRow; row += 1) {
       const rowBottom = row * 8;
-      const rowTop = (row + 1) * 8;
       const fillBottom = Math.max(0, startUnits - rowBottom);
       const fillTop = Math.min(8, endUnits - rowBottom);
-      // We render the cell as a single character; if the segment
-      // covers part of a row that an earlier segment also touched,
-      // the later (upper) segment wins for now (good enough for
-      // 4-segment stacks; the boundary cells are visually noisy
-      // either way).
       let ch: string;
       if (fillTop >= 8) {
-        // Cell completely inside this segment from bottom up.
         ch = '█';
       } else if (fillBottom <= 0) {
-        // Cell starts at this segment's bottom — partial fill from
-        // the bottom, height = fillTop in 1/8 units.
         const idx = Math.max(1, Math.round(fillTop));
         ch = VBAR_CHARS[Math.min(8, idx)] || '▁';
       } else {
-        // Segment is sandwiched in the middle of this cell — we
-        // can't draw a hollow stripe with block chars, so render
-        // a full block; the colour switch on adjacent cells still
-        // communicates the boundary.
+        // Segment is sandwiched in the middle of this cell — block chars
+        // can't draw a hollow stripe so we render a full block; the
+        // colour switch on adjacent cells still communicates the
+        // boundary.
         ch = '█';
       }
       lines[height - 1 - row] = seg.color ? seg.color(ch) : ch;
@@ -242,45 +228,4 @@ export function stackedColumn(
     cursorUnits = endUnits;
   }
   return lines;
-}
-
-// ── box (light single-line) ──────────────────────────────────────────
-
-/** Draw a box around `contentLines` of inner width `innerWidth`. The
- *  title is centred in the top border between `┌─` and `─┐`. Returns
- *  a string with `\n`. */
-export function box(
-  title: string,
-  contentLines: string[],
-  innerWidth: number,
-  c: Palette,
-): string {
-  const titleStr = title ? ` ${title} ` : '';
-  const tLen = visibleLen(titleStr);
-  // Centre title within the top border.
-  const beforeLen = Math.max(1, Math.floor((innerWidth - tLen) / 2));
-  const afterLen = Math.max(1, innerWidth - tLen - beforeLen);
-  const top = c.dim('┌' + '─'.repeat(beforeLen)) + (title ? c.bold(titleStr) : '─'.repeat(tLen)) + c.dim('─'.repeat(afterLen) + '┐');
-  const bot = c.dim('└' + '─'.repeat(innerWidth) + '┘');
-  const body = contentLines.map((line) => c.dim('│') + ' ' + padEnd(line, innerWidth - 2) + ' ' + c.dim('│')).join('\n');
-  return [top, body, bot].join('\n');
-}
-
-// ── two-column horizontal layout ─────────────────────────────────────
-
-/** Stack `left` and `right` blocks side-by-side, padding the shorter
- *  to the max height. `gap` columns of blank space between them. */
-export function twoColumns(left: string, right: string, gap: number = 2): string {
-  const ls = left.split('\n');
-  const rs = right.split('\n');
-  const h = Math.max(ls.length, rs.length);
-  const lw = Math.max(0, ...ls.map(visibleLen));
-  const sep = ' '.repeat(Math.max(1, gap));
-  const out: string[] = [];
-  for (let i = 0; i < h; i += 1) {
-    const L = padEnd(ls[i] ?? '', lw);
-    const R = rs[i] ?? '';
-    out.push(L + sep + R);
-  }
-  return out.join('\n');
 }
