@@ -2,11 +2,14 @@
 
 # ccgauge
 
-**本地、隐私优先的 AI 编程 CLI 用量看板。** 把 **Claude Code** 与 **OpenAI Codex CLI** 的 token、花费、缓存节省统统聚合到同一个浏览器页面 —— 数据全程不离开你的电脑。
+**Claude Code + Codex CLI 的 Token、花费、缓存节省看板。**
+一行命令、零安装、全程不出本机。
 
-[![npm version](https://img.shields.io/npm/v/ccgauge?color=4F46E5&style=flat-square)](https://www.npmjs.com/package/ccgauge)
+[![npm](https://img.shields.io/npm/v/ccgauge?color=4F46E5&style=flat-square)](https://www.npmjs.com/package/ccgauge)
 [![license](https://img.shields.io/npm/l/ccgauge?color=4F46E5&style=flat-square)](https://github.com/chengzuopeng/ccgauge/blob/main/LICENSE)
 [![node](https://img.shields.io/node/v/ccgauge?color=4F46E5&style=flat-square)](#)
+
+**🌐 官网：[chengzuopeng.github.io/ccgauge](https://chengzuopeng.github.io/ccgauge)**
 
 [English](https://github.com/chengzuopeng/ccgauge/blob/main/README.md) · [简体中文](https://github.com/chengzuopeng/ccgauge/blob/main/README.zh-CN.md)
 
@@ -16,236 +19,144 @@
 npx ccgauge
 ```
 
-一行命令。ccgauge 自动读 Claude Code 和 Codex CLI 在本地写下的 JSONL 会话文件，按 天 / 项目 / 模型 / 会话 计算 token 用量与**美元等值花费**，在浏览器里打开统一看板，顶部一键切换数据源。**无登录、无遥测、无任何外网调用。**
+ccgauge 读取 Claude Code 和 Codex CLI 本地已经写下的 JSONL 会话文件，按天 / 项目 / 模型 / 会话统计 token 用量与**美元等值花费**，在浏览器里打开统一看板，顶部一键切换数据源。也能让大模型通过内置的 MCP 服务直接查你的用量。不想开浏览器？`ccgauge report -d` 在终端里就有同款看板。
+
+**无登录、无遥测、无任何外网调用。**
 
 ![概览 — 中文 / Light](https://raw.githubusercontent.com/chengzuopeng/ccgauge/main/docs/screenshots/overview-zh-light.png)
 
 ---
 
-## 为什么用 ccgauge
+## 为什么选 ccgauge
 
-如果你按 token 计费用 API，或者在用 Claude Pro / Max / Team / Codex Plus 订阅，你大概关心过这些问题：
+- 🪟 **两个 CLI，一个看板。** Claude Code 与 OpenAI Codex CLI 并排展示 —— 顶部一键切换，或用 All 视图合并查看。同时覆盖两者的看板，目前就这一个。
+- 💰 **缓存节省单独成卡。** 直接看本周 Anthropic prompt caching 帮你省了多少美元 —— 不是脚注，是 KPI 大卡。
+- ⏱️ **5 小时窗口实时进度。** 倒计时、进度条、预计总花费 —— 在被限速前就知道窗口什么时候重置。
+- 🤖 **MCP 原生支持。** 连上 Claude Desktop / Cursor / Cline，直接问*「我昨天都做了啥，按项目分一下？」* —— 真实数字、不截图、不复制粘贴。
+- 🔒 **100% 本地、隐私优先。** 只读你已有的 JSONL 文件，零外网调用，MIT 开源，对话内容全程不出本机。
+- 🪜 **Worktree 感知。** 同一个 repo 的所有 worktree 自动合并到同一个项目行 —— 跟你的思维模型一致。
 
-- *"Claude Code 这个月按 API 算下来要花多少钱？"*
-- *"Prompt caching 到底帮我省了多少钱？"*
-- *"哪个项目 / 会话 / 模型最吃 token？"*
-- *"5 小时窗口还剩多久才重置？"*
+## v1.1.0 新特性
 
-终端工具 [ccusage](https://github.com/ryoppippi/ccusage) 给出的是一墙数字。ccgauge 给你**同样的数据加上图表、按维度下钻、5h 实时进度，并且是同时覆盖 Claude Code 与 OpenAI Codex CLI 的统一看板**。
+- **`ccgauge report --dashboard` / `-d`** —— 一屏富 TUI 终端看板：KPI tile、堆叠柱状趋势图、breakdown 表格、7×24 活跃热力图。SSH / tmux / 快速看一眼时不用切浏览器。窗口宽度 < 80 自动 fallback 到纯文本。
+- **`/usage` 自定义日期范围** —— 真正的日历选择器（react-day-picker），跟随主题与语言切换，URL 契约 `?range=custom&from=...&to=...`。
+- **官网根路径** —— 英文页迁到 `/cli/` / `/features/` / `/mcp/`，中文页 `/zh/...`。旧的 `/en/*` 路径还能通过静态 redirect 跳转，不会 404。
 
-整个看板是个本地 Next.js 应用，对话内容全程不出本机。
+完整 release notes 见 [CHANGELOG.md](https://github.com/chengzuopeng/ccgauge/blob/main/CHANGELOG.md)。
 
-## 亮点
+## 功能一览
 
-### 多 CLI 数据源
-- 一份看板覆盖 **Claude Code** 与 **OpenAI Codex CLI**，并提供 **All 视图**把两者合并查看
-- 顶部三档切换（Claude · Codex · All），每个按钮都带真品牌 logo；URL 用 `?source=` 持久化，cookie 记忆上次选择
-- **Worktree 感知的 Projects 合并** —— 同一个 repo 的所有 worktree 自动并到同一个项目行
-- 内置 **Provider 适配层**（`lib/providers/`）—— 增加第三个 CLI（Gemini CLI / Cursor / Aider …）只需一个新文件加注册表一行
+### 浏览器看板
+- **概览** —— 6 张 KPI 卡（今日 token / 今日花费 / 缓存命中 / 主力模型 / 今日活跃会话 / 实时 5h block），每张都带日环比。
+- **用量** —— 按对话轮次分组的明细表，可展开看每次工具调用，支持 CSV 导出；趋势图支持 **Token / 对话数** 切换。完整筛选：时间范围（含**自定义日期**）、粒度、模型 / 项目 multi-select。
+- **会话** —— 每场对话的列表（模型 / token / 花费 / 时长），点进去看消息级时间线。
+- **项目** —— 按 `cwd` 聚合的卡片，含趋势条与花费占比；worktree 自动合并到主仓库。
+- **模型** —— 各模型并排：成本占比、token 占比、缓存命中、官方 per-1M 单价。
+- **亮色 / 暗色 / 跟随系统** 三档主题，首屏无闪烁；**英 / 中** 双语，cookie + localStorage 双向同步。
 
-### KPI 一眼看完
-- 今日 token、今日花费、本月累计、缓存命中率、主力模型、今日活跃会话
-- 每张卡都显示日环比 (`vs yesterday`)
-- **5 小时 block 实时进度** —— 倒计时、进度条、每分钟 token 烧速、预计总花费
+### 命令行报告
+- `ccgauge report` —— ~0.2 秒打出彩色对齐的终端报告，适合 CI。
+- `ccgauge report -d` —— 富 TUI 看板：KPI tile、堆叠柱状趋势图、双列 breakdown 表、7×24 活跃热力图。
+- 滤波：`--range / --source / --by / --since / --until / --model / --project`。
+- `--json` 给脚本；`--no-color` 走管道时自动开启。
 
-### 全维度下钻
-- **会话页** —— 每场对话单独成行（模型 / token / 花费 / 时长），点进去看消息级时间线
-- **项目页** —— 按 `cwd` 聚合成卡片网格，含趋势条与花费占比
-- **模型页** —— 各模型并排对比：成本占比、token 占比、缓存命中、官方单价
-- **用量页** —— 按对话轮次分组的明细表，可展开看每次工具调用，支持 CSV 导出。趋势图支持 **Token / 对话数** 切换，让条形图行数和用量表 1:1 对齐
+### MCP 服务
+- `ccgauge mcp` —— stdio JSON-RPC 服务，接进 Claude Desktop / Cursor / Cline / 自建 agent。
+- **9 个 tool**：usage summary、time-series、按模型 / 项目 / 会话拆分、daily / weekly summary、recent activity、假设请求成本估算。
+- 模型有 reasoning token 时单独折算。
+- 独立缓存（`index-mcp-v2.json`），MCP 进程和看板永远不抢同一份磁盘索引。
 
 ### 成本透明
-- **缓存节省** 单独成卡 —— 量化 Anthropic prompt caching 实际帮你节省了多少美元
-- Codex 的成本标注为 **OpenAI API 单价折算估值**，方便订阅用户对比"按 API 计 vs 订阅价"
-- 内置价格表：12 个 Claude 模型 + gpt-5 系列 + o 系列；未知模型自动回退到同 family 最新一档
-
-### 精致的本地 UI
-- **亮色 / 暗色 / 跟随系统** 三档主题，首屏无闪烁
-- **English / 中文** 双语，cookie + localStorage 双向同步
-- 完整筛选：时间区间（今天 / 7 天 / 30 天 / 90 天 / 全部）、粒度（小时 / 天 / 周 / 月）、模型 / 项目 multi-select
-
-### 命令行报告（无 server）
-- `ccgauge report` 读取同一份 JSONL，在 ~0.2 秒内打出彩色对齐的终端报告
-- `--range / --source / --by / --since / --until / --model / --project` 滤波参数
-- `--json` 输出给脚本；`--no-color` 走管道时自动开启 —— 可以直接塞进 shell 和 CI
-
-### MCP 服务（给 LLM 用）
-- `ccgauge mcp` 起一个 stdio JSON-RPC 服务，让 **Claude Desktop / Cursor / Cline** 等 MCP 客户端直接查你本地的 ccgauge 历史
-- 9 个 MCP tool：`usage_summary`、`usage_by_time`、`usage_by_model`、`usage_by_project`、`usage_by_session`、`daily_summary`、`weekly_summary`、`recent_activity`、`cost_estimator`
-- 支持模型有 reasoning token 时单独折算
-- 独立命名缓存（`index-mcp-v2.json`），MCP 进程不会和仪表盘抢同一份磁盘索引
+- **缓存节省** 单独成卡，量化 Anthropic prompt caching 节省的美元。
+- Codex 成本标注为 **OpenAI API 单价折算估值**，方便订阅用户对比 PAYG。
+- 内置价格表：12 个 Claude 模型 + gpt-5 系列 + o 系列；未知模型自动回退到同 family 最新单价。
 
 ### 隐私优先
-- 100 % 本地：只读访问已有 JSONL 文件，零外网调用
-- 开源，MIT 协议
-- 后台常驻模式，配套 `start / stop / restart / status / open / logs` 完整生命周期命令
+- 100% 本地：只读 JSONL 文件，零外网调用。
+- 开源，MIT。
+- 后台常驻模式，配套 `start / stop / restart / status / open / logs` 完整生命周期。
 
 ## 快速开始
 
-零安装一行运行：
-
 ```bash
-npx ccgauge
+npx ccgauge                              # 零安装一行运行
+npm i -g ccgauge && ccgauge              # 或全局安装
 ```
 
-或者全局安装：
+看板默认开在 [http://localhost:3737](http://localhost:3737)。端口被占用会自动顺延到下一个可用端口，`Ctrl+C` 停止。
 
-```bash
-npm  i -g ccgauge && ccgauge          # npm
-pnpm i -g ccgauge && ccgauge          # pnpm
-yarn global add ccgauge && ccgauge    # yarn
-```
-
-看板会在 [http://localhost:3737](http://localhost:3737) 打开。如果 3737 被占用，会自动顺延到下一个可用端口；按 `Ctrl+C` 停止。
-
-**环境要求：** Node.js 20+（`pnpm test` 推荐 Node 22+）。已在 macOS / Linux / Windows 上验证。
+**环境要求：** Node.js 20+。macOS / Linux / Windows 均可。
 
 ## 命令行用法
-
-`ccgauge` 是 `ccgauge start` 的简写，参数可以放在任一边。
-
-### 前台模式（默认）
-
-```bash
-ccgauge
-ccgauge --port 4000 --no-open
-ccgauge start --host 0.0.0.0 --port 4000
-```
-
-### 后台服务模式
-
-```bash
-ccgauge start --background
-
-ccgauge status
-ccgauge open
-ccgauge logs           # 最近 80 行
-ccgauge logs --follow  # 实时跟随
-ccgauge restart --port 4000
-ccgauge stop
-```
-
-后台状态默认写在 `~/.ccgauge/`：
-- `state.json` —— 进程 PID、URL、启动时间、日志路径
-- `ccgauge.log` —— 服务输出（`ccgauge logs` 会读它）
-- 设置 `CCGAUGE_STATE_DIR=/path/to/dir` 可隔离不同 profile（适合测试）
 
 ### 命令一览
 
 | 命令 | 用途 |
 | --- | --- |
-| `ccgauge`, `ccgauge start` | 前台启动。`Ctrl+C` 停止。 |
+| `ccgauge`, `ccgauge start` | 前台启动看板服务。`Ctrl+C` 停止。 |
 | `ccgauge start --background` | 启动后台服务。 |
 | `ccgauge stop [--force]` | 停止后台服务。 |
-| `ccgauge restart [options]` | 停止再用新参数启动。 |
-| `ccgauge status [--json]` | 查看后台状态。纯文本模式后台未运行时退出码 **3**（systemd 约定），shell 可用 `if ccgauge status; then …`；`--json` 始终退 0，请改读 `payload.running`。 |
+| `ccgauge restart [options]` | 停止后用新参数重启。 |
+| `ccgauge status [--json]` | 查看后台状态。纯文本模式后台未运行时退出码 **3**（systemd 约定）。 |
 | `ccgauge open` | 在浏览器打开正在运行的看板。 |
-| `ccgauge logs [-f] [-n <lines>]` | 查看后台服务的日志（server stdout）。 |
-| `ccgauge report [options]` | 命令行**用量报告**，直接打到终端（一次性，不起服务）。 |
-| `ccgauge mcp` | 起 MCP 服务（stdio），让 LLM 查你的用量。 |
-| `ccgauge doctor` | 一屏诊断：版本、env、构建产物、后台状态、indexer + 每个 provider 的扫描计数。报 issue 时直接粘。 |
+| `ccgauge logs [-f] [-n N]` | 查看后台服务日志。 |
+| `ccgauge report [options]` | 一次性命令行报告（文本 or TUI，不起服务）。 |
+| `ccgauge mcp` | 起 MCP 服务让 LLM 查你的用量。 |
+| `ccgauge doctor` | 一屏诊断 —— 报 issue 直接粘。 |
 
-### 命令行报告（report）
+### 启动参数
 
-不需要起 server，直接读 JSONL，在终端打印漂亮的彩色对齐报告：
+| 参数 | 默认 | 用途 |
+| --- | --- | --- |
+| `-p, --port <port>` | `3737` | 首选端口。被占用自动顺延，除非加 `--strict-port`。 |
+| `-H, --host <host>` | `127.0.0.1` | 绑定地址。 |
+| `--no-open` | — | 前台模式不自动打开浏览器。 |
+| `-b, --background` | — | 以后台服务方式启动。 |
+| `-q, --quiet` | — | 静默 Next.js 输出。 |
+| `--dir <path>` | — | 把 `<path>/projects` 加入 Claude 数据源。 |
+| `--strict-port` | — | 端口不可用时直接失败。 |
+
+### 后台模式
 
 ```bash
-ccgauge report                       # 默认：近 7 天 / 所有数据源 / 前 10 个模型
-ccgauge report -r 30d -b project     # 30 天，按项目分组
-ccgauge report -s codex -m gpt-5.5   # 只看 codex 的 gpt-5.5*
-ccgauge report --json                # 输出 JSON 给脚本用
-ccgauge report --since 2026-05-01 --until 2026-05-08
+ccgauge start -b                  # 后台服务，状态写在 ~/.ccgauge/
+ccgauge status                    # PID / URL / 启动时间
+ccgauge logs --follow             # 实时跟随日志
+ccgauge stop                      # 优雅停止（或 --force）
 ```
 
-report 参数：
+`~/.ccgauge/` 下放 `state.json`（PID、URL、启动时间、日志路径）和 `ccgauge.log`。设置 `CCGAUGE_STATE_DIR=/tmp/profile` 可隔离 profile（适合测试）。
+
+### `ccgauge report`
+
+```bash
+ccgauge report                       # 默认：近 7 天 / 所有数据源 / 文本
+ccgauge report -d                    # 富 TUI 看板
+ccgauge report -r 30d -b project     # 30 天，按项目分组
+ccgauge report -s codex -m gpt-5     # 只看 Codex 的 gpt-5* 模型
+ccgauge report --json                # 输出 JSON 给脚本
+```
 
 | 参数 | 默认 | 作用 |
 | --- | --- | --- |
 | `-r, --range <range>` | `7d` | `today` / `1d` / `7d` / `30d` / `90d` / `all` |
 | `-s, --source <provider>` | `all` | `claude` / `codex` / `all` |
 | `-b, --by <dim>` | `model` | 分组维度：`model` / `project` / `session` |
-| `-g, --gran <granularity>` | `day` | 趋势粒度：`hour` / `day` / `week` / `month` |
-| `-n, --limit <n>` | `10` | 分组表显示行数 |
-| `--since <date>` | — | 自定义起始日期（覆盖 `--range`，支持 `YYYY-MM-DD`） |
-| `--until <date>` | — | 自定义截止日期 |
-| `-m, --model <pat>` | — | 按模型名子串过滤 |
-| `--project <pat>` | — | 按项目名 / cwd 子串过滤 |
-| `-j, --json` | off | 输出 JSON 而不是格式化文本 |
-| `--no-color` | — | 关掉 ANSI 颜色（管道里会自动关） |
-| `--no-trend` | — | 不画趋势条 |
-| `--no-breakdown` | — | 不打分组表 |
+| `-g, --gran <gran>` | `day` | 趋势粒度：`hour` / `day` / `week` / `month` |
+| `-n, --limit <n>` | `10` | breakdown 表显示行数 |
+| `--since` / `--until` | — | 自定义日期范围（`YYYY-MM-DD`，按本地自然日） |
+| `-m, --model <pat>` | — | 模型名子串过滤 |
+| `--project <pat>` | — | 项目名 / cwd 子串过滤 |
+| `-d, --dashboard` | — | 一屏富 TUI 布局（KPI tile + 堆叠趋势 + breakdown + 热力图） |
+| `--width <n>` | 终端宽 | 强制输出宽度 —— 截图 / CI 时用 |
+| `--no-banner / --compact` | — | dashboard 精简（不画 banner / 不画趋势图） |
+| `-j, --json` | — | JSON 输出 |
+| `--no-color` | 自动 | 关闭 ANSI 颜色（管道里自动关） |
+| `--no-trend / --no-breakdown` | — | 跳过分块（仅文本模式） |
 
-只写日期的 `--since/--until` 会按本地自然日边界处理，所以
-`--until 2026-05-08` 会包含 5 月 8 日整天。
+## MCP 服务 —— 让大模型直接查你的用量
 
-> 用 `report` 而不是 `logs` 是为了避免和 `ccgauge logs`（tail 后台 server 的 stdout）混淆。
-
-### 启动参数
-
-| 参数 | 适用命令 | 用途 |
-| --- | --- | --- |
-| `-p, --port <port>` | start, restart, 根命令 | 首选端口。默认 `3737`。 |
-| `-H, --host <host>` | start, restart, 根命令 | 绑定地址。默认 `127.0.0.1`。 |
-| `--no-open` | start, 根命令 | 前台不自动打开浏览器。后台模式本来就不自动打开，需要时用 `ccgauge open`。 |
-| `--dir <path>` | start, restart, 根命令 | 把 `<path>/projects` 加入 Claude 数据源。 |
-| `-q, --quiet` | start, restart, 根命令 | 静默 Next.js 输出。 |
-| `-b, --background` | start, 根命令 | 以后台服务方式启动。 |
-| `--strict-port` | start, restart, 根命令 | 端口不可用时直接失败。 |
-| `--log <path>` | start --background, restart | 后台日志文件。 |
-
-## MCP 服务（让大模型直接查你的用量）
-
-ccgauge 内置了一个 [Model Context Protocol](https://modelcontextprotocol.io/) 服务，
-任何 MCP 客户端（Claude Desktop / Cursor / Cline / Codex CLI / 自建 agent）都能
-通过结构化 tool 调用，直接问大模型关于你本机 Claude Code + Codex CLI 历史的问题——
-不用复制粘贴、不用截图看板。
-
-### 你能问什么
-
-配好之后，可以这样问：
-
-- *"我这周在 AI 编程上花了多少？分别看下 Claude 和 Codex。"*
-- *"我昨天都在做什么？"*
-- *"列一下本月最贵的 10 个会话。"*
-- *"过去 30 天哪个项目最吃 token？"*
-- *"prompt caching 帮我省了多少钱？"*
-- *"如果我在 Opus 4.7 上再跑 100K input + 20K output，要多少钱？"*
-- *"上周 Codex 的 reasoning 开销有多大？"*
-- *"给我一份本周完成事项的 standup bullet list。"*
-
-LLM 会自动选合适的 tool、本地调用、用大白话给你带真实数字的答案。
-
-### 工具一览
-
-| Tool | 回答什么 |
-| --- | --- |
-| `usage_summary` | 一段时间内总 tokens / 花费 / 缓存节省。永远同时返回合并总数 + 按 source 拆分。 |
-| `usage_by_time` | 时间序列（小时/天/周/月），用于趋势 / "什么时候开销爆了"。 |
-| `usage_by_model` | 按模型的成本占比，每条带 source。 |
-| `usage_by_project` | 按项目（cwd）的成本占比 + 会话数 + 最近活跃时间。 |
-| `usage_by_session` | 会话列表，含标题（首条用户消息）/ 模型 / 时长 / 花费。可按 recent / cost / tokens / duration 排序。 |
-| `daily_summary` | "今天 / 昨天 / 周一 / YYYY-MM-DD 我都干了啥？" 按项目分组的会话 + 模型 + top 工具调用。 |
-| `weekly_summary` | 7 天 roll-up：每日花费趋势 + top 会话 + top 项目 + 模型分布。`week_offset=-1` 看上周。 |
-| `recent_activity` | 最近 N 条活跃会话（默认最近 30 天，可显式给 `from`/`to`）。 |
-| `cost_estimator` | 计算"假设我用 X 模型发 N 个 token 要花多少钱"。直接读内置 per-1M-token 单价表，不查历史。常用于额度规划 / what-if。 |
-
-| Resource URI | 内容 |
-| --- | --- |
-| `ccgauge://providers` | 检测到的 provider、数据目录、文件 / 记录数、indexer 状态。 |
-
-**公共参数**（每个分析类工具都接）：
-
-- `source`：`"claude"` | `"codex"` | `"all"`（默认 `"all"`）。当 `"all"` 时，响应同时带合并总数 **和** `bySource: { claude, codex }` 拆分，让 LLM 一次调用就能回答 "总共多少" 和 "分别多少" 两类问题。
-- 时间范围：传 `range`（`today` / `yesterday` / `this_week` / `last_week` / `this_month` / `last_month` / `7d` / `30d` / `90d` / `all`），**或**显式 `from` / `to`（ISO 日期或完整时间戳）。
-
-### 在 MCP 客户端里配置
-
-不同客户端的配置文件位置不同，但 snippet 形状一样。
-
-#### Claude Desktop
-
-`~/Library/Application Support/Claude/claude_desktop_config.json`（macOS）/
-`%APPDATA%\Claude\claude_desktop_config.json`（Windows）：
+配一次，之后就能用大白话问问题。各客户端（Claude Desktop / Cursor / Cline / Continue）的 snippet 形状一致：
 
 ```json
 {
@@ -258,135 +169,50 @@ LLM 会自动选合适的 tool、本地调用、用大白话给你带真实数�
 }
 ```
 
-如果已经全局装了 ccgauge（`npm i -g ccgauge`），可以省掉 `npx`：
+重启客户端。可以试试：*「你有哪些 ccgauge 工具？跑一下 usage_summary 看最近 7 天。」*
 
-```json
-{
-  "mcpServers": {
-    "ccgauge": {
-      "command": "ccgauge",
-      "args": ["mcp"]
-    }
-  }
-}
-```
+已全局安装 ccgauge 的话可以省掉 `npx`，`"command": "ccgauge"` 即可。要覆盖扫描路径，通过 `env` 字段传 `CLAUDE_CONFIG_DIR` / `CCGAUGE_CODEX_DIR`。
 
-重启 Claude Desktop，工具选择器里就能看到 ccgauge 的 8 个工具。
+### 工具一览
 
-#### Cursor
+| Tool | 回答什么 |
+| --- | --- |
+| `usage_summary` | 一段时间内的总 tokens / 花费 / 缓存节省。永远同时返回合并总数 + 按 source 拆分。 |
+| `usage_by_time` | 时间序列（小时 / 天 / 周 / 月）用于趋势问题。 |
+| `usage_by_model` | 按模型的成本占比，每条带 source。 |
+| `usage_by_project` | 按项目（`cwd`）的成本占比 + 会话数 + 最近活跃。 |
+| `usage_by_session` | 会话列表，按 recent / cost / tokens / duration 排序。 |
+| `daily_summary` | *「今天 / 昨天 / YYYY-MM-DD 我都干了啥？」* —— 按项目分组的会话 + top 工具调用。 |
+| `weekly_summary` | 7 天 roll-up：每日花费趋势、top 会话 / 项目、模型分布。`week_offset=-1` 看上周。 |
+| `recent_activity` | 最近 N 条活跃会话（跨 provider）。 |
+| `cost_estimator` | 假设请求的美元成本。读内置价格表，不查历史。 |
 
-`~/.cursor/mcp.json`（项目级：`<project>/.cursor/mcp.json`）：
+每个分析类工具都接 `source`（`claude` / `codex` / `all`）和时间范围参数（`range`：`today` / `7d` / `30d` / `this_week` / `last_week` / `this_month` / `last_month` / `all`，或显式 `from` / `to`）。`all` 模式响应同时返回合并总数和 `bySource: { claude, codex }` 拆分 —— 一次调用回答两个层次的问题。
 
-```json
-{
-  "mcpServers": {
-    "ccgauge": {
-      "command": "ccgauge",
-      "args": ["mcp"]
-    }
-  }
-}
-```
+### Prompt 示例
 
-#### Cline / Continue / 通用 MCP 客户端
+- *「我这周用 AI 编程花了多少钱？分开看 Claude 和 Codex。」*
+- *「画一下最近 30 天的每日花费趋势。」*
+- *「本月最贵的 5 个会话是哪些？」*
+- *「我昨天做了什么？按项目分一下。」*
+- *「给我一份本周完成事项的 standup bullet list。」*
+- *「按当前消耗速度本月预计花多少？如果今天再在 Opus 4.7 上跑 200K input + 50K output 要加多少？」*
 
-任何遵循标准 `{ command, args, env? }` 格式的客户端都能用。`npx -y ccgauge mcp`
-（无需全局装）或 `ccgauge mcp`（已全局装）任选其一。要覆盖扫描路径，通过 `env` 传：
+### 隐私与排障
 
-```json
-{
-  "mcpServers": {
-    "ccgauge": {
-      "command": "ccgauge",
-      "args": ["mcp"],
-      "env": {
-        "CCGAUGE_CODEX_DIR": "/custom/codex/path",
-        "CLAUDE_CONFIG_DIR": "/custom/claude/path",
-        "CCGAUGE_STATE_DIR": "/custom/cache/path"
-      }
-    }
-  }
-}
-```
-
-#### 验证是否生效
-
-在 Claude Desktop 新开一个对话，问：
-
-> *"你有哪些 ccgauge 工具？跑一下 usage_summary 看最近 7 天数据。"*
-
-如果配置成功，Claude 会调 `usage_summary`，返回带 `totals` + `bySource` 的 JSON，
-然后用大白话总结成带真实数字的回答。
-
-### Prompt 示例集
-
-直接复制丢进 Claude Desktop / Cursor / Cline 即可。每个 prompt 后面斜体注的是
-LLM 大概率会调的工具——方便你"为什么会这样回答"反查。
-
-#### 用量与花费
-
-- *"我这周用 AI 编程花了多少钱？分开看 Claude 和 Codex。"*
-  → `usage_summary({ range: "7d" })`
-- *"本月 AI 编程花了多少？跟上个月比怎么样？"*
-  → `usage_summary({ range: "this_month" })` + `usage_summary({ range: "last_month" })`
-- *"画一下最近 30 天的每日花费趋势。"*
-  → `usage_by_time({ range: "30d", granularity: "day" })`
-- *"本月用的最多的 Claude 模型是哪个？花了多少？"*
-  → `usage_by_model({ range: "this_month", source: "claude" })`
-- *"本月最贵的 5 个会话是哪些？"*
-  → `usage_by_session({ range: "this_month", sort: "cost", limit: 5 })`
-
-#### 工作内容回顾 / standup
-
-- *"我昨天都做了什么？按项目分一下。"*
-  → `daily_summary({ date: "yesterday" })`
-- *"给我一份周一 standup 用的 bullet list，列我上周完成的事。"*
-  → `weekly_summary({ week_offset: -1 })`
-- *"过去两周我接触最多的 3 个项目是什么？"*
-  → `usage_by_project({ from: "2026-05-01", to: "2026-05-15", limit: 3 })`——非 `7d` / `30d` / `90d` / `this_week` / `last_week` 等命名窗口时，传显式 `from` / `to`。
-- *"我最近一次的编码会话是关于什么的？"*
-  → `recent_activity({ limit: 1 })`
-
-#### 缓存 / 效率
-
-- *"本月 Anthropic prompt caching 帮我省了多少 tokens？"*
-  → `usage_summary({ range: "this_month", source: "claude" })`——返回里有 `saved_usd`。
-- *"本周 Codex 的 output 里有多少比例是 reasoning tokens？"*
-  → `usage_summary({ range: "7d", source: "codex" })`——返回里 `reasoning_tokens` 紧挨着 `output_tokens`。
-
-#### 预算 / 规划
-
-- *"按当前消耗速度，本月预计花多少？"*
-  → `usage_summary({ range: "this_month" })` + `usage_by_time({ range: "this_month", granularity: "day" })`——LLM 自己外推。
-- *"如果我今天再在 Opus 4.7 上跑 200K input + 50K output，本月累计要多少？"*
-  → `cost_estimator({ source: "claude", model: "claude-opus-4-7", input_tokens: 200000, output_tokens: 50000 })` + `usage_summary({ range: "this_month" })`——estimator 直接按内置单价表返回这笔假设请求的美元成本，不查历史。
-
-#### 跨数据源对比
-
-- *"本月 Claude 和 Codex 哪个性价比更高（按每美元 tokens）？"*
-  → `usage_summary({ range: "this_month" })`——两边数字都在 `bySource` 里。
-- *"上周每个 provider 的最吃 token 项目分别是哪个？"*
-  → `usage_by_project({ range: "last_week" })`（每条 entry 自带 `source`）。
-
-### 隐私边界
-
-- v1 **仅 stdio**——不开网络端口，不能远程访问
-- 只读本机已有的 JSONL 文件，零上游 API 调用
-- 错误信息里的绝对路径会脱敏（`$HOME` → `~`）
-- MCP 用独立的持久化缓存文件（`~/.ccgauge/cache/index-mcp-v2.json`），永远不会和看板抢同一份磁盘状态
-
-### 排障
+- v1 **仅 stdio** —— 不开网络端口。
+- 只读本地 JSONL；错误信息里的绝对路径已脱敏（`$HOME` → `~`）。
 
 | 现象 | 建议 |
 | --- | --- |
-| 客户端看不到 ccgauge 工具 | 改完配置重启客户端；不连 MCP 客户端就能验证 bundle / indexer / providers 的话直接跑 `ccgauge mcp --check`（或 `ccgauge doctor`）|
-| 第一次调用比较慢 | 冷启动后第一次会全量索引（100 文件 ~1–3s）；之后都是 O(1) |
-| Resource 显示 "no providers detected" | MCP 进程看不到 `~/.claude/projects` / `~/.codex/sessions`；通过 MCP 配置的 `env` 传 `CLAUDE_CONFIG_DIR` / `CCGAUGE_CODEX_DIR` |
-| 想看 server 在打什么日志 | 看客户端的 MCP 日志；ccgauge 把日志写到 **stderr**（stdout 被 JSON-RPC 占用）|
+| 客户端看不到工具 | 改完配置重启客户端；不连客户端验证可跑 `ccgauge mcp --check` 或 `ccgauge doctor` |
+| 第一次调用慢 | 冷启动会全量索引（100 文件约 1–3s），之后 O(1) |
+| Resource 显示 "no providers detected" | 通过 MCP `env` 传 `CLAUDE_CONFIG_DIR` / `CCGAUGE_CODEX_DIR` |
+| 想看 server 日志 | 看客户端的 MCP 日志 —— ccgauge 写到 **stderr**（stdout 被 JSON-RPC 占用） |
 
 ## 配置
 
-ccgauge 会自动识别标准路径：
+ccgauge 自动识别标准路径：
 
 | Provider | 默认数据源 |
 | --- | --- |
@@ -397,132 +223,54 @@ ccgauge 会自动识别标准路径：
 
 | 变量 | 作用 |
 | --- | --- |
-| `CCGAUGE_CONFIG_DIR` | 把 `<dir>/projects` 也加入 Claude 数据源 |
-| `CLAUDE_CONFIG_DIR` | 同上（兼容 Claude Code 1.0.30+） |
+| `CLAUDE_CONFIG_DIR` | 把 `<dir>/projects` 加入 Claude 数据源 |
+| `CCGAUGE_CONFIG_DIR` | 同上（ccgauge 旧名字，兼容） |
 | `CCGAUGE_CODEX_DIR` | 额外的 Codex 会话目录 |
 | `CODEX_HOME` | 把 `<dir>/sessions` 与 `<dir>/archived_sessions` 一并加入 |
 | `CCGAUGE_STATE_DIR` | 覆盖后台服务的状态 / 日志目录 |
 
-## 架构
-
-```
-~/.claude/projects/**/*.jsonl  ──┐
-                                 ├─►  ProviderAdapter 注册表
-~/.codex/sessions/**/*.jsonl  ───┘    │
-                                      ▼
-                              scanAll() ─► 去重 ─► 按 时间/模型/项目/会话/5h block 聚合
-                                                ▼
-                                  Next.js RSC 页面 + 客户端图表
-```
-
-1. **CLI**（`bin/cli.mjs`）归一化命令，校验 standalone 产物，用 [`get-port`](https://github.com/sindresorhus/get-port) 选端口。
-2. **前台模式** 用 `fork()`，进程绑在终端上；**后台模式** 用 detached `spawn()`，状态写到 `~/.ccgauge/`。
-3. **Provider 适配层**（`lib/providers/<name>/index.ts`）负责数据目录、JSONL 解析器、价格表、模型名格式化。注册表驱动 —— 加新 provider 就是一个新文件 + 注册表一行。
-4. **Claude 解析器** 按行抽取 assistant 消息的 `usage`。
-5. **Codex 解析器** 用一个轮状态机走事件流，对每个 `event_msg.token_count` 发射一条记录，**只用 `last_token_usage`**（避免累计字段重复计费）；`cached_input_tokens` 进 cache_read，`reasoning_output_tokens` 并入 output。
-6. **价格** 走内置快照：Claude 用 Anthropic 官价（12 个模型），Codex 用 OpenAI 公开 API 单价（gpt-5 系列 + o 系列）。Codex 的成本标注为"API 单价折算估值"——订阅计划（Plus / Pro）实际计费方式不同。
-7. **i18n + 主题**：cookie 驱动 SSR + `localStorage` 镜像 + `<head>` 注入同步执行的 no-flash 脚本。
-
-## 增加新 Provider
-
-```
-lib/providers/<name>/
-  index.ts             ProviderAdapter 实现
-  parse-<name>.ts      JSONL → AssistantRecord[]
-  pricing.ts           model → Pricing
-  shorten-model.ts     模型名美化
-```
-
-然后在 `lib/providers/index.ts` 注册一行、在 `ProviderId` 联合里加一项。`scan.ts`、aggregator、价格、所有页面都不用动。
-
 ## 本地开发
-
-仓库本身就是一个能跑的 Next.js 工程，可以一边改代码一边看实时数据。
 
 ```bash
 git clone https://github.com/chengzuopeng/ccgauge.git
 cd ccgauge
 pnpm install
 pnpm dev               # http://localhost:3738
-```
-
-常用脚本：
-
-```bash
 pnpm typecheck         # tsc --noEmit
-pnpm lint              # eslint .
-pnpm test              # codex parser 烟测（Node 22+）
-pnpm build             # next build + 把 static 拷进 .next/standalone
-pnpm start             # 用 bin/cli.mjs 跑 standalone 产物
-pnpm screenshots       # 重新生成 docs/screenshots/*.png
-pnpm site:dev          # 产品官网开发服务，http://localhost:4321
-pnpm site:build        # 只构建 site/ 产品官网
-pnpm clean             # rm -rf .next node_modules
+pnpm test              # 解析器烟测（Node 22+）
+pnpm build             # next build + 打包 MCP + 打包 CLI report
 ```
 
-发布：
+仓库本身就是一个能跑的 Next.js 工程，可以一边改代码一边对实时数据热重载。增加第三个 provider（Gemini CLI、Cursor、Aider…）只需在 [`lib/providers/<name>/`](https://github.com/chengzuopeng/ccgauge/tree/main/lib/providers) 下加一个新目录 + 在注册表加一行 —— `scan.ts` / aggregator / 价格模块 / 所有页面都不用动。
 
-```bash
-pnpm pack              # 预览要发布的 tarball
-pnpm publish --access public  # 会自动先跑 pnpm build（prepublishOnly）
-```
+产品官网在 [`site/`](https://github.com/chengzuopeng/ccgauge/tree/main/site)（Astro + Tailwind），跟 npm 包独立发布 —— `pnpm site:dev` 启本地预览。
 
 ## 排障
 
-> **任何"为啥不工作"的问题先跑一下：** `ccgauge doctor`。一屏列出版本、env、构建产物、后台状态、indexer 扫描计数，报 issue 直接粘过去就行。
+> **任何"为啥不工作"的问题先跑一下：** **`ccgauge doctor`**。一屏列出版本、env、构建产物、后台状态、indexer 扫描计数，报 issue 直接粘。
 
-| 现象 | 建议命令 |
+| 现象 | 建议 |
 | --- | --- |
-| 任何异常想先一屏看清 | `ccgauge doctor` — 下面所有项都在它的诊断里 |
-| 端口被自动换掉 | `ccgauge --strict-port --port 3737` |
-| 后台服务状态不对 | 先 `ccgauge status`，PID 仍存活但不响应再 `ccgauge stop --force` |
-| 后台启动失败 | `ccgauge logs` 查看 `~/.ccgauge/ccgauge.log` |
-| 想要干净的 profile | `CCGAUGE_STATE_DIR=/tmp/ccgauge-test ccgauge start -b` |
-| Codex 没有数据 | 确认 `~/.codex/sessions` 存在；可在「设置」页查看检测到的路径 |
+| 端口被自动换 | `ccgauge --strict-port --port 3737` |
+| 后台服务状态不对 | `ccgauge status`，必要时 `ccgauge stop --force` |
+| 后台启动失败 | `ccgauge logs` 查 `~/.ccgauge/ccgauge.log` |
+| Codex 没数据 | 确认 `~/.codex/sessions` 存在；在「设置」页查检测到的路径 |
 | 不想自动打开浏览器 | `ccgauge --no-open` |
 
 ## 常见问答
 
-**ccgauge 会上传我的对话或日志吗？**
-不会。ccgauge 全程跑在本地，只读 Claude Code 和 Codex CLI 已经写在本地的 JSONL 文件，没有任何外网调用。
+**ccgauge 会上传对话或日志吗？**
+不会。全程跑在本地，只读 Claude Code 和 Codex CLI 已经写下的本地 JSONL 文件，零外网调用，不需要任何 API 凭证。
 
-**和 ccusage 有什么不同？**
-[ccusage](https://github.com/ryoppippi/ccusage) 是终端工具，把用量打成表格。ccgauge 是 Web 看板，提供图表、按会话下钻、5 小时窗口实时进度、按项目 / 模型分维度统计，并且**开箱覆盖 OpenAI Codex CLI**。
+**跟 [ccusage](https://github.com/ryoppippi/ccusage) 有什么不同？**
+ccusage 是把用量打成表格的终端工具。ccgauge 是一个完整的 Web 看板：图表、按会话下钻、5h 实时进度、按项目 / 模型分维度统计，并且**开箱覆盖 OpenAI Codex CLI**。还多了一个 MCP 服务让 LLM 用自然语言查你的用量，以及一个终端版 TUI 看板（`ccgauge report -d`）—— 不想开浏览器时用。
 
 **对 Claude Pro / Max / Team / Codex Plus 订阅用户有用吗？**
-有用。看板始终展示**美元等值**的 API 折算成本，让你看到"如果按 API 计费这些用量值多少钱"。订阅计费方式不同，ccgauge 不替代你的账单。
+有用。看板始终展示**美元等值**的 API 折算成本，看到"如果按 API 计费这些用量值多少"。订阅计费方式不同，ccgauge 不替代你的账单。
 
 **支持哪些模型？**
-- **Claude Code**：所有 `claude-*` 模型（Opus / Sonnet / Haiku，3.x / 4.x）
-- **OpenAI Codex CLI**：gpt-5 系列（gpt-5、gpt-5-mini、gpt-5-nano、gpt-5.4、gpt-5.5、gpt-5.5-mini、gpt-5.5-nano）、gpt-4.1 / gpt-4.1-mini，以及 o 系列（o3、o4-mini）
-- 未知模型自动回退到同 family 最新一档单价
-
-**能加我自己的 provider 吗？**
-能 —— 见 [增加新 Provider](#增加新-provider) 一节。Provider 适配层就是为了显式留扩展点。
-
-**需要 Anthropic / OpenAI 凭证吗？**
-不需要。ccgauge 不调用任何上游 API，只读 CLI 已经写在本地的 JSONL 文件。
-
-## 关键词
-
-`claude code 看板` · `claude code 用量` · `claude code 花费` · `claude code 监控` ·
-`codex cli 用量` · `codex cli 看板` · `openai codex 用量` · `openai codex 监控` ·
-`AI 编程 CLI token 监控` · `claude pro 计划用量` · `claude max 计划用量` · `codex plus 用量` ·
-`prompt caching 节省` · `5 小时窗口监控` · `rate limit 倒计时` · `ccusage 替代品` ·
-`ccusage web 版` · `token 用量分析` · `本地 AI 用量监控` · `自部署 AI 看板`
-
-## 产品官网
-
-产品官网（Astro + Tailwind 自建、中英双语、暗 / 亮主题、独立部署）放在
-[`site/`](./site/) 目录。它跟着主仓库一起在 git 里，但**不会**进 npm 包；
-命令和依赖统一由根目录 `package.json` 管理。
-
-```bash
-pnpm site:dev   # http://localhost:4321
-```
-
-构建 / 部署细节见 [`site/README.md`](./site/README.md)。
+所有 `claude-*` 模型（Opus / Sonnet / Haiku，3.x / 4.x）、gpt-5 系列、gpt-4.1 系列、o 系列（o3 / o4-mini）。未知模型自动回退到同 family 最新一档单价。
 
 ## 许可证
 
-MIT —— 详见 [LICENSE](https://github.com/chengzuopeng/ccgauge/blob/main/LICENSE)。
+MIT —— 见 [LICENSE](https://github.com/chengzuopeng/ccgauge/blob/main/LICENSE)。
