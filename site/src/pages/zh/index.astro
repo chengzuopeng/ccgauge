@@ -46,7 +46,7 @@ const mcpSnippet = `{
       <span aria-hidden="true">→</span>
     </a>
     <div slot="below-cta" class="mt-8 max-w-md">
-      <CodeBlock code={installSnippet} lang="bash" copyLabel="复制" copiedLabel="已复制！" />
+      <CodeBlock code={installSnippet} lang="bash" />
       <p class="mt-3 text-xs text-text-tertiary">
         一行命令。自动在浏览器打开 <span class="font-mono">localhost:3737</span>。无注册、无遥测、无 API key。
       </p>
@@ -195,7 +195,7 @@ const mcpSnippet = `{
         </a>
       </div>
       <div>
-        <CodeBlock code={mcpSnippet} lang="json" copyLabel="复制" copiedLabel="已复制！" />
+        <CodeBlock code={mcpSnippet} lang="json" />
       </div>
     </div>
   </section>

@@ -7,8 +7,15 @@ export const SITE_TITLE = 'ccgauge';
 export const SITE_TAGLINE_EN = 'Local usage dashboard for Claude Code & OpenAI Codex CLI';
 export const SITE_TAGLINE_ZH = 'Claude Code 与 OpenAI Codex CLI 的本地用量看板';
 
-/** Used for canonical / OG meta absolute URLs. Override per env if needed. */
-export const SITE_URL = 'https://ccgauge.dev';
+/**
+ * Compile-time fallback for canonical / OG / hreflang absolute URLs. In
+ * normal use the real source of truth is `astro.config.mjs#site` (read at
+ * runtime as `Astro.site` in `BaseLayout.astro`); this constant only kicks
+ * in when `Astro.site` is undefined — e.g. an oddball test rig that
+ * imports a layout outside of Astro's build pipeline. To switch deploy
+ * hosts, edit `astro.config.mjs#site`, not this string.
+ */
+export const SITE_URL_FALLBACK = 'https://ccgauge.dev';
 
 export const GITHUB_URL = 'https://github.com/chengzuopeng/ccgauge';
 export const NPM_URL = 'https://www.npmjs.com/package/ccgauge';

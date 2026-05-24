@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import ScreenshotGallery from '../components/ScreenshotGallery.astro';
-import { localePath } from '../i18n/utils';
+import { localePath, renderInlineCode } from '../i18n/utils';
 
 const locale = 'en';
 
@@ -199,7 +199,7 @@ const screenshots = [
         {s.bullets.map((b) => (
           <li class="flex items-baseline gap-2 text-sm text-text-secondary leading-relaxed">
             <span class="text-brand mt-0.5 flex-shrink-0" aria-hidden="true">▸</span>
-            <span set:html={b.replace(/`([^`]+)`/g, '<code class="font-mono text-xs px-1.5 py-0.5 rounded bg-bg-surface-hi border border-border text-text-primary">$1</code>')}></span>
+            <span set:html={renderInlineCode(b)}></span>
           </li>
         ))}
       </ul>

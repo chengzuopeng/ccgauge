@@ -1,7 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import CodeBlock from '../components/CodeBlock.astro';
-import { localePath } from '../i18n/utils';
+import { localePath, renderInlineCode } from '../i18n/utils';
 
 const locale = 'en';
 
@@ -30,12 +30,6 @@ const examples = [
   { title: 'Minimal — just totals, no chart or breakdown', code: 'ccgauge report --no-trend --no-breakdown' },
 ];
 
-function renderInline(s: string): string {
-  return s.replace(
-    /`([^`]+)`/g,
-    '<code class="font-mono text-xs px-1.5 py-0.5 rounded bg-bg-surface-hi border border-border text-text-primary">$1</code>',
-  );
-}
 ---
 
 <BaseLayout
@@ -87,7 +81,7 @@ function renderInline(s: string): string {
               </td>
               <td class="px-4 py-3 align-top text-text-tertiary num-mono">{f.default}</td>
               <td class="px-4 py-3 align-top text-text-secondary leading-relaxed">
-                <span set:html={renderInline(f.purpose)}></span>
+                <span set:html={renderInlineCode(f.purpose)}></span>
               </td>
             </tr>
           ))}

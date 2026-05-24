@@ -54,17 +54,6 @@ function stripBase(pathname: string): string {
 }
 
 /**
- * Parse the leading locale segment from a pathname. The default locale
- * (English) renders un-prefixed at the in-app root, so a path like
- * `/cli/` (or `/ccgauge/cli/`) resolves to `'en'`. Only `/zh/...`
- * (or `/ccgauge/zh/...`) carries an explicit prefix.
- */
-export function localeFromPath(pathname: string): Locale {
-  const seg = stripBase(pathname).split('/').filter(Boolean)[0];
-  return (LOCALES as readonly string[]).includes(seg) ? (seg as Locale) : DEFAULT_LOCALE;
-}
-
-/**
  * Strip both the deploy base AND the locale segment from `pathname`,
  * returning the part after the locale (un-rooted for easy reassembly).
  *
@@ -138,4 +127,26 @@ export function localePath(locale: Locale, path: string): string {
 export function assetUrl(path: string): string {
   const clean = path.replace(/^\/+/, '');
   return `${BASE}${clean}`;
+}
+
+/**
+ * Tailwind classes used by inline `<code>` chips inside body copy. Kept
+ * in one place so the rendered visual stays consistent with the rest of
+ * the design system if these classes ever need to drift.
+ */
+const INLINE_CODE_CLASSES =
+  'font-mono text-xs px-1.5 py-0.5 rounded bg-bg-surface-hi border border-border text-text-primary';
+
+/**
+ * Render a string with markdown-style inline code (`` `like this` ``)
+ * into an HTML fragment, wrapping each backtick-delimited run in a
+ * styled `<code>` tag.
+ *
+ * **Caller responsibility**: the returned HTML is *not* sanitized — it
+ * preserves any other characters verbatim (including `<`, `>`, `&`) so
+ * callers must pass trusted, author-written strings only. Render via
+ * `<span set:html={...}>` in Astro, never with untrusted user input.
+ */
+export function renderInlineCode(s: string): string {
+  return s.replace(/`([^`]+)`/g, `<code class="${INLINE_CODE_CLASSES}">$1</code>`);
 }

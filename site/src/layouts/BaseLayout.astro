@@ -5,7 +5,7 @@ import '../styles/global.css';
 
 import Nav from '../components/Nav.astro';
 import Footer from '../components/Footer.astro';
-import { SITE_TITLE, SITE_URL, THEME_STORAGE_KEY, type Locale } from '../consts';
+import { SITE_TITLE, SITE_URL_FALLBACK, THEME_STORAGE_KEY, type Locale } from '../consts';
 import { assetUrl, switchLocaleUrl } from '../i18n/utils';
 
 interface Props {
@@ -28,9 +28,9 @@ const fullTitle = title === SITE_TITLE ? title : `${title} · ${SITE_TITLE}`;
 // Prefer `Astro.site` (resolved from `astro.config.mjs`) so canonical /
 // OG / hreflang URLs use the actual deploy host — `chengzuopeng.github.io`
 // under GH Pages, `ccgauge.dev` once the custom domain is wired. The
-// hardcoded `SITE_URL` in `consts.ts` is the dev-time fallback for the
-// rare case `Astro.site` is undefined.
-const siteOrigin = (Astro.site ?? new URL(SITE_URL)).toString().replace(/\/+$/, '');
+// hardcoded `SITE_URL_FALLBACK` in `consts.ts` only catches edge cases
+// where `Astro.site` is undefined (off-pipeline layout imports, etc.).
+const siteOrigin = (Astro.site ?? new URL(SITE_URL_FALLBACK)).toString().replace(/\/+$/, '');
 // `Astro.url.pathname` already includes the deploy base on GH Pages
 // (e.g. `/ccgauge/cli/`), so the canonical URL just needs to be absolutized.
 const canonical = new URL(Astro.url.pathname, siteOrigin).toString();

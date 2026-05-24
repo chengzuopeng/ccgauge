@@ -7,27 +7,40 @@
  * things simple we render plain monospace text with brand styling — good
  * enough for the short install snippets / config blocks the marketing
  * site needs.
+ *
+ * Labels (`copyLabel`, `copiedLabel`, `failedLabel`) auto-localize via
+ * `useTranslations(Astro.currentLocale)` — callers don't need to thread
+ * Chinese strings through every usage. Pass explicit overrides only when
+ * a specific block needs a different label (rare).
  */
+
+import { useTranslations } from '../i18n/utils';
+import { DEFAULT_LOCALE, type Locale } from '../consts';
 
 interface Props {
   code: string;
   /** Language label shown top-right; purely decorative. */
   lang?: string;
-  /** Label used by aria-label on the copy button. */
+  /** Optional override for the copy button text + aria-label. */
   copyLabel?: string;
-  /** Label shown after a successful copy. */
+  /** Optional override for the text shown after a successful copy. */
   copiedLabel?: string;
-  /** Label shown briefly after a copy attempt fails (permission denied,
-   *  insecure context, etc.). Without this, callers used to see silence. */
+  /** Optional override for the text shown after the copy fails. */
   failedLabel?: string;
 }
+
+// `Astro.currentLocale` is computed from the URL routing config — for
+// pages under `/zh/...` it's `'zh'`, otherwise `'en'` (the default).
+// Cast through `Locale` so the `useTranslations` call type-checks.
+const locale = (Astro.currentLocale ?? DEFAULT_LOCALE) as Locale;
+const t = useTranslations(locale);
 
 const {
   code,
   lang,
-  copyLabel = 'Copy',
-  copiedLabel = 'Copied!',
-  failedLabel = 'Copy failed',
+  copyLabel = t('common.copy'),
+  copiedLabel = t('common.copied'),
+  failedLabel = t('common.copyFailed'),
 } = Astro.props;
 ---
 

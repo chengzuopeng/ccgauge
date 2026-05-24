@@ -129,8 +129,10 @@ Recommended: **Cloudflare Pages**.
   "Build command" = `pnpm install && pnpm site:build`,
   "Output" = `site/dist`.
 - DNS the chosen domain (e.g. `ccgauge.dev`) at Cloudflare.
-- Update `astro.config.mjs#site` and `src/consts.ts#SITE_URL` to the real
-  domain so canonical / OG meta tags are correct.
+- Update **`astro.config.mjs#site`** to the real domain so canonical /
+  OG / hreflang absolute URLs are correct. `BaseLayout.astro` reads this
+  through `Astro.site` at build time; `src/consts.ts#SITE_URL_FALLBACK`
+  only catches the off-pipeline edge case and rarely needs touching.
 
 Alternatives: Vercel, Netlify, GitHub Pages — all support sub-directory
 builds with a one-line config.
