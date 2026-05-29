@@ -21,6 +21,7 @@ import { combineTimeBuckets, combineTotals } from '@/lib/source-merge';
 import { getProvider } from '@/lib/providers';
 import { computeActivityStats, pickTokenComparison } from '@/lib/aggregator/activity';
 import { ActivityStatsSection } from '@/components/activity-stats';
+import { AutoRefresh } from '@/components/auto-refresh';
 import type { ModelSummary, ProviderId } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -81,6 +82,10 @@ async function OverviewContent({ source }: { source: EffectiveSource }) {
   if (records.length === 0) {
     return (
       <PageShell title={t('overview.title')} desc={t('brand.tagline')}>
+        {/* Keep the auto-refresh ticking even in the empty state — the
+            first session a new user creates after launching ccgauge
+            should appear without a manual reload. */}
+        <AutoRefresh intervalMs={30_000} />
         <EmptyState
           title={t('overview.empty.title')}
           desc={t('overview.subtitle.empty', { dirs: scan.stats.scannedDirs.length })}
@@ -202,6 +207,12 @@ async function OverviewContent({ source }: { source: EffectiveSource }) {
         ms: scan.stats.durationMs,
       })}
     >
+      {/* Silent 30s background refresh — re-streams the server tree so
+          all KPIs / charts / the 5h block update in place without
+          remounting the page or losing scroll position. Paused while
+          the tab is hidden. /usage uses the same component at 15s
+          since its turn-grouped table changes more often. */}
+      <AutoRefresh intervalMs={30_000} />
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           label={t('overview.kpi.tokensToday')}
