@@ -122,10 +122,10 @@ function ProgressBar({
 
 export function KpiSkeleton() {
   return (
-    <div className="card card-pad min-h-[132px] animate-pulse">
-      <div className="h-3 w-20 bg-bg-surface-hi rounded mb-3" />
-      <div className="h-8 w-32 bg-bg-surface-hi rounded mb-2" />
-      <div className="h-3 w-24 bg-bg-surface-hi rounded mt-auto" />
+    <div className="card card-pad min-h-[132px] flex flex-col">
+      <div className="skeleton-shimmer h-3 w-20 rounded mb-3" />
+      <div className="skeleton-shimmer h-8 w-32 rounded mb-2" />
+      <div className="skeleton-shimmer h-3 w-24 rounded mt-auto" />
     </div>
   );
 }

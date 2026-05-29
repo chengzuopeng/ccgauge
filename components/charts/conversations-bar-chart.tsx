@@ -16,8 +16,6 @@ import type { TokenStackDatum } from './token-stack-chart';
 // payload across both metric views — `turns` is the conversation count
 // (one per user prompt, matching the usage table's collapsed rows).
 
-const BAR_COLOR = 'rgb(var(--brand))';
-
 export function ConversationsBarChart({
   data,
   height = 'h-72',
@@ -42,6 +40,15 @@ export function ConversationsBarChart({
     <div className={`${height} w-full`}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 12, right: 8, bottom: 4, left: 8 }} barCategoryGap="22%">
+          {/* Subtle vertical sheen — full brand at the top fading down. Single
+              series so it adds depth without muddying any category coding.
+              Static (no enter animation) to stay calm under auto-refresh. */}
+          <defs>
+            <linearGradient id="convBarGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgb(var(--brand))" stopOpacity={0.95} />
+              <stop offset="100%" stopColor="rgb(var(--brand))" stopOpacity={0.5} />
+            </linearGradient>
+          </defs>
           <CartesianGrid
             stroke="rgb(var(--chart-grid))"
             strokeOpacity={0.6}
@@ -69,7 +76,7 @@ export function ConversationsBarChart({
             content={<ConversationsTooltip />}
             cursor={{ fill: 'rgb(var(--text-primary) / 0.05)', radius: 4 }}
           />
-          <Bar dataKey="turns" fill={BAR_COLOR} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+          <Bar dataKey="turns" fill="url(#convBarGrad)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
         </BarChart>
       </ResponsiveContainer>
     </div>

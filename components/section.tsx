@@ -73,7 +73,11 @@ export function PageShell({
   children: ReactNode;
 }) {
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5 sm:space-y-6">
+    // `dash-stagger`: each top-level block settles in on first mount and on
+    // route navigation. It does NOT replay on the background auto-refresh —
+    // `router.refresh()` keeps these DOM nodes mounted, so the CSS entrance
+    // animation only fires on a real (re)mount. Honors reduced-motion.
+    <div className="dash-stagger max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 sm:gap-4">
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-[1.75rem] font-semibold tracking-tight leading-tight truncate">

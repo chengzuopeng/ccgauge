@@ -82,9 +82,22 @@ class FileIndexer {
   /** In-flight forceRescan promise. Concurrent callers coalesce onto this so we
    *  never have two full scans clobbering each other's `files` map. */
   private rescanPromise: Promise<SnapshotExtended> | null = null;
+  /** Serializes every mutation of `files` (init scan, rescan, poll, reconcile)
+   *  so incremental updates never interleave with a clear()+fullScan. */
+  private mutationTail: Promise<unknown> = Promise.resolve();
 
   constructor(cacheName: string = DEFAULT_INDEX_NAME) {
     this.cacheName = cacheName;
+  }
+
+  /** Run `work` after all prior mutations finish. Failures do not block the queue. */
+  private runExclusive<T>(work: () => Promise<T>): Promise<T> {
+    const next = this.mutationTail.then(work, work);
+    this.mutationTail = next.then(
+      () => undefined,
+      () => undefined,
+    );
+    return next;
   }
 
   init(): Promise<void> {
@@ -109,13 +122,15 @@ class FileIndexer {
         for (const entry of persisted.files) persistedMap.set(entry.filePath, entry);
       }
 
-      await this.fullScan(persistedMap);
-      this.rebuildSnapshotNow();
-      this.indexDurationMs = Date.now() - start;
-      this.lastIndexedAt = new Date().toISOString();
+      await this.runExclusive(async () => {
+        await this.fullScan(persistedMap);
+        this.rebuildSnapshotNow();
+        this.indexDurationMs = Date.now() - start;
+        this.lastIndexedAt = new Date().toISOString();
+        this.schedulePersist();
+      });
       this.syncWatchersToDirs();
       this.setupPolling();
-      this.schedulePersist();
     } finally {
       this.isIndexing = false;
     }
@@ -263,54 +278,56 @@ class FileIndexer {
   }
 
   private async pollOnce(): Promise<void> {
-    const start = Date.now();
-    // Re-detect provider roots so a Codex/Claude install that appeared after
-    // startup gets picked up without requiring a manual rescan.
-    const dirDiff = await this.detectProviderDirs();
-    let changed = dirDiff.added.length > 0 || dirDiff.removed.length > 0;
-    if (changed) this.syncWatchersToDirs();
+    await this.runExclusive(async () => {
+      const start = Date.now();
+      // Re-detect provider roots so a Codex/Claude install that appeared after
+      // startup gets picked up without requiring a manual rescan.
+      const dirDiff = await this.detectProviderDirs();
+      let changed = dirDiff.added.length > 0 || dirDiff.removed.length > 0;
+      if (changed) this.syncWatchersToDirs();
 
-    const fileTasks: Array<{ file: string; provider: ProviderAdapter }> = [];
-    for (const [dir, provider] of this.dirToProvider) {
-      const files = await listJsonlFiles(dir, provider);
-      for (const f of files) fileTasks.push({ file: f, provider });
-    }
-    const seenPaths = new Set<string>(fileTasks.map((t) => t.file));
-    await Promise.all(
-      fileTasks.map(async ({ file, provider }) => {
-        try {
-          const stat = await fs.stat(file);
-          const existing = this.files.get(file);
-          if (existing && existing.mtimeMs === stat.mtimeMs && existing.size === stat.size) {
-            return;
-          }
-          const parsed = await provider.parseFile(file);
-          this.files.set(file, {
-            source: provider.id,
-            parserVersion: provider.parserVersion,
-            mtimeMs: stat.mtimeMs,
-            size: stat.size,
-            assistantRecords: parsed.assistant,
-            userRecords: parsed.user,
-            parentLinks: parsed.parentLinks,
-          });
-          changed = true;
-        } catch (err) {
-          this.recordError(`poll-parse ${file}: ${(err as Error).message}`);
-        }
-      }),
-    );
-    for (const tracked of Array.from(this.files.keys())) {
-      if (!seenPaths.has(tracked)) {
-        this.files.delete(tracked);
-        changed = true;
+      const fileTasks: Array<{ file: string; provider: ProviderAdapter }> = [];
+      for (const [dir, provider] of this.dirToProvider) {
+        const files = await listJsonlFiles(dir, provider);
+        for (const f of files) fileTasks.push({ file: f, provider });
       }
-    }
-    if (changed) {
-      this.lastWorkStart = start;
-      this.scheduleSnapshotRebuild();
-      this.schedulePersist();
-    }
+      const seenPaths = new Set<string>(fileTasks.map((t) => t.file));
+      await Promise.all(
+        fileTasks.map(async ({ file, provider }) => {
+          try {
+            const stat = await fs.stat(file);
+            const existing = this.files.get(file);
+            if (existing && existing.mtimeMs === stat.mtimeMs && existing.size === stat.size) {
+              return;
+            }
+            const parsed = await provider.parseFile(file);
+            this.files.set(file, {
+              source: provider.id,
+              parserVersion: provider.parserVersion,
+              mtimeMs: stat.mtimeMs,
+              size: stat.size,
+              assistantRecords: parsed.assistant,
+              userRecords: parsed.user,
+              parentLinks: parsed.parentLinks,
+            });
+            changed = true;
+          } catch (err) {
+            this.recordError(`poll-parse ${file}: ${(err as Error).message}`);
+          }
+        }),
+      );
+      for (const tracked of Array.from(this.files.keys())) {
+        if (!seenPaths.has(tracked)) {
+          this.files.delete(tracked);
+          changed = true;
+        }
+      }
+      if (changed) {
+        this.lastWorkStart = start;
+        this.scheduleSnapshotRebuild();
+        this.schedulePersist();
+      }
+    });
   }
 
   private scheduleFileReconcile(filePath: string, provider: ProviderAdapter): void {
@@ -327,43 +344,45 @@ class FileIndexer {
   }
 
   private async reconcileFile(filePath: string, provider: ProviderAdapter): Promise<void> {
-    const workStart = Date.now();
-    let stat: Awaited<ReturnType<typeof fs.stat>> | null = null;
-    try {
-      stat = await fs.stat(filePath);
-    } catch {
-      // File deleted/missing
-    }
-    if (!stat || !stat.isFile()) {
-      if (this.files.has(filePath)) {
-        this.files.delete(filePath);
+    await this.runExclusive(async () => {
+      const workStart = Date.now();
+      let stat: Awaited<ReturnType<typeof fs.stat>> | null = null;
+      try {
+        stat = await fs.stat(filePath);
+      } catch {
+        // File deleted/missing
+      }
+      if (!stat || !stat.isFile()) {
+        if (this.files.has(filePath)) {
+          this.files.delete(filePath);
+          this.lastWorkStart = workStart;
+          this.scheduleSnapshotRebuild();
+          this.schedulePersist();
+        }
+        return;
+      }
+      const existing = this.files.get(filePath);
+      if (existing && existing.mtimeMs === stat.mtimeMs && existing.size === stat.size) {
+        return;
+      }
+      try {
+        const parsed = await provider.parseFile(filePath);
+        this.files.set(filePath, {
+          source: provider.id,
+          parserVersion: provider.parserVersion,
+          mtimeMs: stat.mtimeMs,
+          size: stat.size,
+          assistantRecords: parsed.assistant,
+          userRecords: parsed.user,
+          parentLinks: parsed.parentLinks,
+        });
         this.lastWorkStart = workStart;
         this.scheduleSnapshotRebuild();
         this.schedulePersist();
+      } catch (err) {
+        this.recordError(`parse ${filePath}: ${(err as Error).message}`);
       }
-      return;
-    }
-    const existing = this.files.get(filePath);
-    if (existing && existing.mtimeMs === stat.mtimeMs && existing.size === stat.size) {
-      return;
-    }
-    try {
-      const parsed = await provider.parseFile(filePath);
-      this.files.set(filePath, {
-        source: provider.id,
-        parserVersion: provider.parserVersion,
-        mtimeMs: stat.mtimeMs,
-        size: stat.size,
-        assistantRecords: parsed.assistant,
-        userRecords: parsed.user,
-        parentLinks: parsed.parentLinks,
-      });
-      this.lastWorkStart = workStart;
-      this.scheduleSnapshotRebuild();
-      this.schedulePersist();
-    } catch (err) {
-      this.recordError(`parse ${filePath}: ${(err as Error).message}`);
-    }
+    });
   }
 
   private scheduleSnapshotRebuild(): void {
@@ -460,10 +479,20 @@ class FileIndexer {
   }
 
   async forceRescan(): Promise<SnapshotExtended> {
-    if (!this.initPromise) {
-      await this.init();
-      return this.snapshot!;
-    }
+    // Whether THIS call is the one kicking off the very first init().
+    // Read synchronously, before any await, so two concurrent callers
+    // can't both observe `true` — init() assigns initPromise synchronously.
+    const isFirstInit = !this.initPromise;
+    // Always let init() fully settle before we touch `files`. init() runs a
+    // full scan and is memoized, so once it has resolved this is a cheap
+    // no-op await. Skipping it is exactly what corrupts the index: runRescan()
+    // calls files.clear() and, if doInit()'s fullScan() is still in flight,
+    // the two writers race on the same Map → lost or partial records.
+    await this.init();
+    // The first init already produced a fresh full scan, so re-scanning here
+    // would only duplicate that work.
+    if (isFirstInit) return this.snapshot!;
+
     // Coalesce concurrent callers — running multiple full scans in parallel
     // wipes each other's `files` Map and produces inconsistent snapshots.
     if (this.rescanPromise) return this.rescanPromise;
@@ -476,22 +505,24 @@ class FileIndexer {
   }
 
   private async runRescan(): Promise<SnapshotExtended> {
-    const start = Date.now();
-    this.isIndexing = true;
-    this.lastWorkStart = start;
-    try {
-      this.files.clear();
-      await this.detectProviderDirs();
-      await this.fullScan(new Map());
-      this.rebuildSnapshotNow();
-      this.indexDurationMs = Date.now() - start;
-      this.lastIndexedAt = new Date().toISOString();
-      this.syncWatchersToDirs();
-      this.schedulePersist();
-      return this.snapshot!;
-    } finally {
-      this.isIndexing = false;
-    }
+    return this.runExclusive(async () => {
+      const start = Date.now();
+      this.isIndexing = true;
+      this.lastWorkStart = start;
+      try {
+        this.files.clear();
+        await this.detectProviderDirs();
+        await this.fullScan(new Map());
+        this.rebuildSnapshotNow();
+        this.indexDurationMs = Date.now() - start;
+        this.lastIndexedAt = new Date().toISOString();
+        this.syncWatchersToDirs();
+        this.schedulePersist();
+        return this.snapshot!;
+      } finally {
+        this.isIndexing = false;
+      }
+    });
   }
 
   getStatus(): IndexerStatus {
@@ -643,6 +674,3 @@ export function getIndexer(cacheName: string = DEFAULT_INDEX_NAME): FileIndexer 
   }
   return inst;
 }
-
-/** Backwards-compatible singleton — used by web/CLI code paths. */
-export const indexer = getIndexer();

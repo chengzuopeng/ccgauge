@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useT } from '@/lib/i18n/context';
+import { useTabIndicator } from '@/components/use-tab-indicator';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { ThemeSwitcher } from '@/components/theme-switcher';
 import { Logo } from '@/components/logo';
@@ -42,6 +43,11 @@ interface Props {
 export function Nav({ availableProviders, initialSource, providerInfos }: Props) {
   const pathname = usePathname();
   const t = useT();
+  const activeItem = ITEMS.find((it) =>
+    it.exact ? pathname === it.href : pathname === it.href || pathname.startsWith(it.href + '/'),
+  );
+  const activeHref = activeItem?.href ?? '';
+  const { containerRef: navRef, rect } = useTabIndicator<HTMLElement>(activeHref);
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-bg-base/85 backdrop-blur-md supports-[backdrop-filter]:bg-bg-base/70">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 flex items-center gap-2 sm:gap-4">
@@ -57,9 +63,20 @@ export function Nav({ availableProviders, initialSource, providerInfos }: Props)
           </span>
         </Link>
         <nav
-          className="flex-1 min-w-0 flex items-center gap-0.5 overflow-x-auto nav-scroller"
+          ref={navRef}
+          className="relative flex-1 min-w-0 flex items-center gap-0.5 overflow-x-auto nav-scroller"
           aria-label="Primary"
         >
+          {/* One underline that glides to the active item (instead of a
+              per-item bar that pops in/out). Inset 8px to match the old
+              left-2/right-2 look; hidden until measured. */}
+          {rect && (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute -bottom-[12px] h-[2px] bg-brand rounded-full transition-[transform,width] duration-200 ease-out-soft"
+              style={{ transform: `translateX(${rect.left + 8}px)`, width: Math.max(0, rect.width - 16) }}
+            />
+          )}
           {ITEMS.map((it) => {
             const active = it.exact
               ? pathname === it.href
@@ -69,6 +86,7 @@ export function Nav({ availableProviders, initialSource, providerInfos }: Props)
                 key={it.href}
                 href={it.href}
                 prefetch={false}
+                data-tab={it.href}
                 aria-current={active ? 'page' : undefined}
                 className={cn(
                   'relative px-2.5 sm:px-3 py-1.5 text-sm rounded-button font-medium whitespace-nowrap shrink-0',
@@ -79,12 +97,6 @@ export function Nav({ availableProviders, initialSource, providerInfos }: Props)
                 )}
               >
                 {t(it.tk)}
-                {active && (
-                  <span
-                    aria-hidden
-                    className="pointer-events-none absolute left-2 right-2 -bottom-[12px] h-[2px] bg-brand rounded-full"
-                  />
-                )}
               </Link>
             );
           })}

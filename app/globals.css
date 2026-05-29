@@ -269,6 +269,103 @@ body {
   }
 }
 
+/* =====================================================================
+ * Dashboard motion — calm, intent-driven, refresh-safe.
+ *
+ * This is a tool opened many times a day, so motion appears only on first
+ * mount and on user navigation — NEVER on the 15-30s background refresh.
+ * That falls out for free: `router.refresh()` keeps DOM nodes mounted, so
+ * CSS entrance animations don't re-trigger; only a real route change
+ * remounts and replays them. Everything honors prefers-reduced-motion
+ * (the global block near the top of this file + the guard below).
+ * ===================================================================== */
+
+@keyframes dash-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes bar-grow {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+@keyframes shimmer {
+  from {
+    background-position: -180% 0;
+  }
+  to {
+    background-position: 180% 0;
+  }
+}
+
+/* First-paint stagger for a page's top-level blocks (applied on PageShell).
+   Children settle in sequence; capped so long pages don't trickle forever. */
+.dash-stagger > * {
+  animation: dash-rise 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.dash-stagger > *:nth-child(1) {
+  animation-delay: 0.02s;
+}
+.dash-stagger > *:nth-child(2) {
+  animation-delay: 0.07s;
+}
+.dash-stagger > *:nth-child(3) {
+  animation-delay: 0.12s;
+}
+.dash-stagger > *:nth-child(4) {
+  animation-delay: 0.17s;
+}
+.dash-stagger > *:nth-child(5) {
+  animation-delay: 0.22s;
+}
+.dash-stagger > *:nth-child(n + 6) {
+  animation-delay: 0.26s;
+}
+
+/* Cost-by-model bar fills: grow from the left once on mount. Independent
+   of the width transition (which keeps gliding bars to new values on
+   refresh) because this animates transform, not width. */
+.bar-grow {
+  transform-origin: left center;
+  animation: bar-grow 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Shimmer skeleton — a sweeping highlight instead of a flat opacity pulse. */
+.skeleton-shimmer {
+  background-color: rgb(var(--bg-surface-hi));
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgb(var(--text-tertiary) / 0.08) 50%,
+    transparent 100%
+  );
+  background-size: 180% 100%;
+  background-repeat: no-repeat;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-stagger > *,
+  .bar-grow {
+    animation: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+  .skeleton-shimmer {
+    animation: none !important;
+    background-image: none !important;
+  }
+}
+
 /* Utility: hairline divider used inside cards (between header and body). */
 .divider-soft {
   border-top: 1px solid rgb(var(--border));

@@ -41,8 +41,11 @@ export function ModelBarChart({ models }: { models: ModelSummary[] }) {
               </span>
             </div>
             <div className="h-2 w-full bg-bg-surface-hi rounded-full overflow-hidden">
+              {/* `bar-grow` sweeps the fill out from the left once on mount
+                  (transform), while `transition-all` keeps the width gliding
+                  to new values on refresh — different properties, no clash. */}
               <div
-                className="h-full rounded-full transition-all duration-500 ease-out-soft group-hover:brightness-110"
+                className="bar-grow h-full rounded-full transition-all duration-500 ease-out-soft group-hover:brightness-110"
                 style={{ width: `${(m.cost / max) * 100}%`, background: colorFor(m.model) }}
               />
             </div>
