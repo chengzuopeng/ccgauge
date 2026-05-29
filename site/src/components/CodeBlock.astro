@@ -45,7 +45,7 @@ const {
 ---
 
 <div
-  class="group relative rounded-card border border-border bg-bg-surface overflow-hidden"
+  class="code-shell group relative rounded-card border border-border overflow-hidden"
   data-codeblock
 >
   {lang && (
@@ -65,9 +65,12 @@ const {
     class="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-button text-[11px] font-medium text-text-tertiary hover:text-text-primary hover:bg-bg-surface-hi border border-transparent hover:border-border transition-colors"
     aria-label={copyLabel}
   >
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <svg class="copy-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <rect x="9" y="9" width="13" height="13" rx="2" />
       <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+    <svg class="copy-check" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M20 6 9 17l-5-5" />
     </svg>
     <span data-copy-text>{copyLabel}</span>
   </button>
@@ -89,13 +92,15 @@ const {
       const failed = btn.dataset.failedLabel ?? 'Copy failed';
       const textEl = btn.querySelector('[data-copy-text]');
 
-      const flash = (text: string, klass: string) => {
+      const flash = (text: string, klass: string, copiedState: boolean) => {
         if (textEl) textEl.textContent = text;
         btn.classList.remove(SUCCESS_CLASS, FAILURE_CLASS);
         btn.classList.add(klass);
+        // The checkmark only makes sense on success.
+        btn.classList.toggle('is-copied', copiedState);
         window.setTimeout(() => {
           if (textEl) textEl.textContent = label;
-          btn.classList.remove(klass);
+          btn.classList.remove(klass, 'is-copied');
         }, STATE_RESET_MS);
       };
 
@@ -104,14 +109,14 @@ const {
       // the user denies clipboard permission. Cover both by gating on
       // the API's existence and try/catching the call.
       if (!navigator.clipboard?.writeText) {
-        flash(failed, FAILURE_CLASS);
+        flash(failed, FAILURE_CLASS, false);
         return;
       }
       try {
         await navigator.clipboard.writeText(payload);
-        flash(copied, SUCCESS_CLASS);
+        flash(copied, SUCCESS_CLASS, true);
       } catch {
-        flash(failed, FAILURE_CLASS);
+        flash(failed, FAILURE_CLASS, false);
       }
     });
   });

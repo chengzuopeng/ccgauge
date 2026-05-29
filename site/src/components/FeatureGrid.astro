@@ -10,12 +10,12 @@ const { eyebrow, title, description } = Astro.props;
 ---
 
 <section class="mx-auto max-w-7xl px-4 sm:px-6 py-14 sm:py-20">
-  <div class="max-w-2xl mb-10 sm:mb-12">
-    {eyebrow && <div class="pill-brand mb-3">{eyebrow}</div>}
+  <div class="max-w-2xl mb-10 sm:mb-12" data-reveal>
+    {eyebrow && <div class="section-kicker mb-3">{eyebrow}</div>}
     <h2 class="heading-section">{title}</h2>
     {description && <p class="lede mt-3">{description}</p>}
   </div>
-  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+  <div class="reveal-stagger grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
     <slot />
   </div>
 </section>

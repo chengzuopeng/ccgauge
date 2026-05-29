@@ -51,7 +51,7 @@ const promptExamples = [
   title="MCP 接入"
   description="把 ccgauge 接进 Claude Desktop / Cursor / 任何懂 MCP 的客户端。8 个 tool、一段配置、零粘贴。"
 >
-  <section class="mx-auto max-w-7xl px-4 sm:px-6 pt-12 sm:pt-20 pb-8">
+  <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 pt-12 sm:pt-20 pb-8">
     <div class="pill-brand mb-3">MCP</div>
     <h1 class="heading-hero">让 LLM 自己查它自己的账单。</h1>
     <p class="lede mt-5 max-w-3xl">
@@ -61,7 +61,7 @@ const promptExamples = [
     </p>
   </section>
 
-  <section class="mx-auto max-w-7xl px-4 sm:px-6 py-10">
+  <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 py-10">
     <h2 class="heading-section">1. 接进客户端</h2>
     <p class="lede mt-3 max-w-3xl">
       下面两段配置覆盖 ~95% 的 MCP 客户端。传输走 stdio JSON-RPC，不开端口、不放 socket 文件。
@@ -86,7 +86,7 @@ const promptExamples = [
     </p>
   </section>
 
-  <section class="mx-auto max-w-7xl px-4 sm:px-6 py-12">
+  <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 py-12">
     <h2 class="heading-section">2. 8 个 tool</h2>
     <p class="lede mt-3 max-w-3xl">
       每个 tool 都返回结构化 JSON。模型会根据你的问题自动选 tool，你不需要记名字。
@@ -101,7 +101,7 @@ const promptExamples = [
     </div>
   </section>
 
-  <section class="mx-auto max-w-7xl px-4 sm:px-6 py-12">
+  <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 py-12">
     <h2 class="heading-section">3. 可以这样问</h2>
     <p class="lede mt-3 max-w-3xl">
       措辞比你想得宽松 —— 模型会把人话翻成 MCP tool 调用。下面是一些起手式：
@@ -116,7 +116,7 @@ const promptExamples = [
     </ul>
   </section>
 
-  <section class="mx-auto max-w-7xl px-4 sm:px-6 py-12">
+  <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 py-12">
     <h2 class="heading-section">注意</h2>
     <ul class="mt-6 space-y-3 max-w-3xl">
       <li class="flex items-baseline gap-3">
@@ -146,7 +146,7 @@ const promptExamples = [
     </ul>
   </section>
 
-  <section class="mx-auto max-w-7xl px-4 sm:px-6 py-14">
+  <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 py-14">
     <a href={localePath(locale, 'features')} class="btn">
       ← 回到功能页
     </a>

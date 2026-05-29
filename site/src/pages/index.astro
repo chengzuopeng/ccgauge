@@ -56,7 +56,10 @@ const mcpSnippet = `{
 
   <!-- Trust strip / one-liner under the hero -->
   <section class="border-y border-border bg-bg-surface">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 py-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-xs text-text-tertiary uppercase tracking-[0.08em]">
+    <div
+      class="mx-auto max-w-7xl px-4 sm:px-6 py-4 flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-xs text-text-tertiary uppercase tracking-[0.08em]"
+      data-reveal
+    >
       <span class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-brand"></span> Claude Code</span>
       <span class="flex items-center gap-2"><span class="h-1.5 w-1.5 rounded-full bg-orange-400"></span> OpenAI Codex CLI</span>
       <span>100% local</span>
@@ -124,8 +127,8 @@ const mcpSnippet = `{
 
   <!-- Real screenshot showcase — usage drill-down, complements the hero -->
   <section class="mx-auto max-w-7xl px-4 sm:px-6 py-14 sm:py-20">
-    <div class="max-w-2xl mb-10">
-      <div class="pill-brand mb-3">Drill down to a single call</div>
+    <div class="max-w-2xl mb-10" data-reveal>
+      <div class="section-kicker mb-3">Drill down to a single call</div>
       <h2 class="heading-section">From monthly spend to the exact API call.</h2>
       <p class="lede mt-3">
         Every assistant call is grouped into its real conversation turn. Expand a turn to see
@@ -143,8 +146,8 @@ const mcpSnippet = `{
   <!-- Methodology teaser -->
   <section class="mx-auto max-w-7xl px-4 sm:px-6 py-14 sm:py-20">
     <div class="grid grid-cols-1 lg:grid-cols-[1fr_2fr] gap-8 lg:gap-12 items-start">
-      <div>
-        <div class="pill-brand mb-3">How the numbers work</div>
+      <div data-reveal>
+        <div class="section-kicker mb-3">How the numbers work</div>
         <h2 class="heading-section">Honest math. No black box.</h2>
         <p class="lede mt-3 max-w-md">
           Token counts come straight from the JSONL your CLI already writes. Cost uses ccgauge's
@@ -157,7 +160,7 @@ const mcpSnippet = `{
           See the full methodology <span aria-hidden="true">→</span>
         </a>
       </div>
-      <ul class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <ul class="reveal-stagger grid grid-cols-1 sm:grid-cols-2 gap-4">
         <li class="card card-pad">
           <div class="label mb-2">Token counts</div>
           <p class="text-sm text-text-secondary leading-relaxed">
@@ -193,8 +196,8 @@ const mcpSnippet = `{
   <!-- MCP teaser -->
   <section class="mx-auto max-w-7xl px-4 sm:px-6 py-14 sm:py-20">
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-      <div>
-        <div class="pill-brand mb-3">MCP-ready</div>
+      <div data-reveal>
+        <div class="section-kicker mb-3">MCP-ready</div>
         <h2 class="heading-section">Let your LLM read its own usage.</h2>
         <p class="lede mt-3">
           Add three lines to Claude Desktop's config and ask the model: <em>"how much did
@@ -205,7 +208,7 @@ const mcpSnippet = `{
           See all 8 MCP tools <span aria-hidden="true">→</span>
         </a>
       </div>
-      <div>
+      <div data-reveal style="--reveal-delay:0.12s">
         <CodeBlock code={mcpSnippet} lang="json" />
       </div>
     </div>

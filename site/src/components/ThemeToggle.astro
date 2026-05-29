@@ -89,7 +89,15 @@ const t = useTranslations(locale);
       } catch {
         /* ignore */
       }
-      apply(next);
+      // Crossfade the whole document between palettes where supported.
+      // Falls back to an instant swap on older browsers / reduced-motion.
+      const reduce =
+        window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (typeof document.startViewTransition === 'function' && !reduce) {
+        document.startViewTransition(() => apply(next));
+      } else {
+        apply(next);
+      }
     }
 
     btn.addEventListener('click', cycle);

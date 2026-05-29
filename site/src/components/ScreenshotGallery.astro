@@ -18,9 +18,9 @@ interface Props {
 const { items, locale } = Astro.props;
 ---
 
-<div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+<div class="reveal-stagger grid grid-cols-1 md:grid-cols-2 gap-5">
   {items.map((item) => (
-    <figure class="card overflow-hidden">
+    <figure class="screenshot-card card overflow-hidden">
       <div class="aspect-[16/10] bg-bg-surface-hi border-b border-border overflow-hidden">
         {item.name ? (
           <ThemedScreenshot name={item.name} locale={locale} alt={item.alt} />

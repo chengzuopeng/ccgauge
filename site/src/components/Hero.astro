@@ -30,9 +30,9 @@ const hasMedia = Boolean(screenshotName || imageSrc);
     <div class:list={['grid items-center gap-10 lg:gap-12', hasMedia ? 'lg:grid-cols-2' : '']}>
       <div class:list={['min-w-0', !hasMedia && 'max-w-3xl mx-auto text-center']}>
         {eyebrow && (
-          <div class="pill-brand mb-5">{eyebrow}</div>
+          <div class="pill-brand mb-5" data-animate style="--delay:0s">{eyebrow}</div>
         )}
-        <h1 class="heading-hero">
+        <h1 class="heading-hero" data-animate style="--delay:0.08s">
           {titleAccent ? (
             <>
               {title}{' '}
@@ -42,18 +42,24 @@ const hasMedia = Boolean(screenshotName || imageSrc);
             title
           )}
         </h1>
-        <p class="lede mt-5 sm:mt-6 max-w-2xl">
+        <p class="lede mt-5 sm:mt-6 max-w-2xl" data-animate style="--delay:0.16s">
           {lede}
         </p>
-        <div class:list={['mt-7 sm:mt-8 flex flex-wrap gap-3', !hasMedia && 'justify-center']}>
+        <div
+          class:list={['mt-7 sm:mt-8 flex flex-wrap gap-3', !hasMedia && 'justify-center']}
+          data-animate
+          style="--delay:0.24s"
+        >
           <slot name="cta" />
         </div>
-        <slot name="below-cta" />
+        <div data-animate style="--delay:0.32s">
+          <slot name="below-cta" />
+        </div>
       </div>
 
       {hasMedia && (
-        <div class="relative">
-          <div class="rounded-card border border-border-hi bg-bg-surface shadow-card overflow-hidden aspect-[16/10]">
+        <div class="relative" data-animate style="--delay:0.2s">
+          <div class="hero-frame aspect-[16/10]">
             {screenshotName && screenshotLocale ? (
               <ThemedScreenshot
                 name={screenshotName}

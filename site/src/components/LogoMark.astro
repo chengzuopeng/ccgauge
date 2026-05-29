@@ -1,12 +1,24 @@
 ---
 interface Props {
   class?: string;
+  /**
+   * When true, the gauge "powers on" once mounted: the needle swings from
+   * its rest offset to the live reading and the bottom bars rise. Driven by
+   * CSS transitions gated on `html.js` + a `.lit` class added by the
+   * site-wide motion script. Use on the nav mark; leave off for the footer.
+   */
+  animated?: boolean;
 }
 
-const { class: className = 'h-7 w-7' } = Astro.props;
+const { class: className = 'h-7 w-7', animated = false } = Astro.props;
 ---
 
-<svg viewBox="0 0 64 64" fill="none" aria-hidden="true" class={className}>
+<svg
+  viewBox="0 0 64 64"
+  fill="none"
+  aria-hidden="true"
+  class:list={[className, animated && 'logo-animated']}
+>
   <rect x="3" y="3" width="58" height="58" rx="16" fill="rgb(var(--brand-strong))"></rect>
   <rect x="3.75" y="3.75" width="56.5" height="56.5" rx="15.25" stroke="#FFFFFF" stroke-opacity="0.18" stroke-width="1.5"></rect>
   <path d="M15 39.5 A17 17 0 0 1 49 39.5" stroke="#FFFFFF" stroke-opacity="0.24" stroke-width="5" stroke-linecap="round"></path>
@@ -19,10 +31,10 @@ const { class: className = 'h-7 w-7' } = Astro.props;
     <path d="M40 28.5 L41.7 25.5"></path>
     <path d="M45.9 34.2 L49 32.4"></path>
   </g>
-  <path d="M32 39.5 L42.8 26" stroke="#FFFFFF" stroke-width="3.4" stroke-linecap="round"></path>
+  <path class="lm-needle" d="M32 39.5 L42.8 26" stroke="#FFFFFF" stroke-width="3.4" stroke-linecap="round"></path>
   <circle cx="32" cy="39.5" r="4.8" fill="#FFFFFF"></circle>
   <circle cx="32" cy="39.5" r="2" fill="#4F46E5"></circle>
-  <rect x="17" y="46" width="7" height="5" rx="2" fill="#34D399"></rect>
-  <rect x="28.5" y="43" width="7" height="8" rx="2" fill="#FBBF24"></rect>
-  <rect x="40" y="45" width="7" height="6" rx="2" fill="#93C5FD"></rect>
+  <rect class="lm-bar" style="--d:0.55s" x="17" y="46" width="7" height="5" rx="2" fill="#34D399"></rect>
+  <rect class="lm-bar" style="--d:0.66s" x="28.5" y="43" width="7" height="8" rx="2" fill="#FBBF24"></rect>
+  <rect class="lm-bar" style="--d:0.77s" x="40" y="45" width="7" height="6" rx="2" fill="#93C5FD"></rect>
 </svg>

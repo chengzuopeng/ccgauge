@@ -153,7 +153,7 @@ const screenshots = [
   title="功能"
   description="一页过完 ccgauge 的所有功能 —— Claude Code 与 Codex CLI 的本地仪表盘、命令行工具、MCP 服务。"
 >
-  <section class="mx-auto max-w-7xl px-4 sm:px-6 pt-12 sm:pt-20 pb-8">
+  <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 pt-12 sm:pt-20 pb-8">
     <div class="pill-brand mb-3">功能</div>
     <h1 class="heading-hero">ccgauge 的每个功能，一页讲完。</h1>
     <p class="lede mt-5 max-w-3xl">
@@ -177,7 +177,7 @@ const screenshots = [
     </div>
   </nav>
 
-  <section class="mx-auto max-w-7xl px-4 sm:px-6 py-10 sm:py-14">
+  <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 py-10 sm:py-14">
     <div class="max-w-3xl mb-8">
       <div class="pill-brand mb-3">产品截图</div>
       <h2 class="heading-section">文档里展示的是真实跑起来的仪表盘。</h2>
@@ -189,7 +189,7 @@ const screenshots = [
   </section>
 
   {sections.map((s) => (
-    <section id={s.id} class="mx-auto max-w-7xl px-4 sm:px-6 py-10 sm:py-14 scroll-mt-24">
+    <section data-reveal id={s.id} class="mx-auto max-w-7xl px-4 sm:px-6 py-10 sm:py-14 scroll-mt-24">
       <h2 class="heading-section">{s.title}</h2>
       <p class="lede mt-3 max-w-3xl">{s.lead}</p>
       <ul class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 max-w-4xl">
@@ -203,7 +203,7 @@ const screenshots = [
     </section>
   ))}
 
-  <section id="methodology" class="mx-auto max-w-7xl px-4 sm:px-6 py-12 sm:py-16 scroll-mt-24 border-t border-border">
+  <section data-reveal id="methodology" class="mx-auto max-w-7xl px-4 sm:px-6 py-12 sm:py-16 scroll-mt-24 border-t border-border">
     <div class="pill-brand mb-3">方法论</div>
     <h2 class="heading-section">ccgauge 是怎么数 token、算花费的。</h2>
     <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl">
@@ -239,7 +239,7 @@ const screenshots = [
     </div>
   </section>
 
-  <section class="mx-auto max-w-7xl px-4 sm:px-6 py-14 sm:py-20">
+  <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 py-14 sm:py-20">
     <div class="card card-pad flex flex-col sm:flex-row items-center justify-between gap-6">
       <div>
         <h2 class="text-xl font-semibold tracking-tight text-text-primary">准备试试？</h2>

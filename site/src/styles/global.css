@@ -69,7 +69,7 @@ html,
 body {
   background: rgb(var(--bg-base));
   color: rgb(var(--text-primary));
-  font-family: '"Geist Variable"', 'Geist', 'Inter', system-ui, -apple-system, BlinkMacSystemFont,
+  font-family: 'Geist Variable', 'Geist', 'Inter', system-ui, -apple-system, BlinkMacSystemFont,
     'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
   font-feature-settings: 'cv11', 'ss01', 'ss03';
   -webkit-font-smoothing: antialiased;
@@ -325,19 +325,40 @@ body::before {
   .feature-card {
     position: relative;
     isolation: isolate;
+    /* Pointer position, updated by the spotlight script. Falls back to the
+       top-center so the hover glow still reads if JS never runs. */
+    --mx: 50%;
+    --my: 0%;
   }
-  .feature-card::before {
+  /* Pointer-following spotlight. Sits above the card surface (so it shows
+     over the opaque bg) but below pointer events; `screen` blend lightens
+     rather than washes, matching the dark-first aesthetic. */
+  .feature-card::after {
     content: '';
     position: absolute;
     inset: 0;
-    z-index: -1;
+    z-index: 2;
     border-radius: inherit;
-    background: linear-gradient(135deg, rgb(var(--brand) / 0.18), transparent 42%);
+    pointer-events: none;
+    background: radial-gradient(
+      340px circle at var(--mx) var(--my),
+      rgb(var(--brand) / 0.16),
+      transparent 60%
+    );
     opacity: 0;
-    transition: opacity 0.2s ease;
+    transition: opacity 0.3s ease;
+    mix-blend-mode: screen;
   }
-  .feature-card:hover::before {
+  .feature-card:hover::after {
     opacity: 1;
+  }
+  .theme-light .feature-card::after {
+    mix-blend-mode: multiply;
+    background: radial-gradient(
+      340px circle at var(--mx) var(--my),
+      rgb(var(--brand) / 0.12),
+      transparent 60%
+    );
   }
   .feature-media img,
   .screenshot-card img,
@@ -368,5 +389,244 @@ body::before {
   }
   .scan-dot {
     animation: glow-pulse 2.4s ease-in-out infinite;
+  }
+}
+
+/* =====================================================================
+ * Motion engine
+ *
+ * Concept: "instruments powering on." Entrances sweep and settle, the
+ * logo needle swings to its reading, screenshots light up, cards track
+ * the cursor like a spotlit gauge face.
+ *
+ * Safety contract:
+ *   - All scroll/entrance reveal is gated behind `html.js`. Without JS the
+ *     content is fully visible (no FOUC, no hidden-forever blocks).
+ *   - `prefers-reduced-motion: reduce` neutralizes transforms/transitions
+ *     and shows everything immediately (handled here + the global block
+ *     near the top of this file).
+ * ===================================================================== */
+
+@keyframes aura-drift {
+  0% {
+    transform: translate3d(-4%, -2%, 0) scale(1);
+  }
+  100% {
+    transform: translate3d(5%, 3%, 0) scale(1.12);
+  }
+}
+
+/* ---- Ambient background aura (slow drifting brand blobs) ------------ */
+.bg-aura {
+  position: fixed;
+  inset: -20% -10% auto -10%;
+  height: 80vh;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.9;
+  background:
+    radial-gradient(40% 50% at 20% 20%, rgb(var(--brand) / 0.16), transparent 70%),
+    radial-gradient(38% 48% at 82% 12%, rgb(var(--brand-strong) / 0.12), transparent 70%);
+  filter: blur(8px);
+  animation: aura-drift 26s ease-in-out infinite alternate;
+}
+
+/* ---- Film grain overlay (texture against flat near-black) ----------- */
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+.theme-light .grain {
+  opacity: 0.05;
+  mix-blend-mode: multiply;
+}
+
+/* ---- Scroll-driven reveal system (JS-gated) ------------------------- */
+html.js [data-reveal] {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.7s cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 0.7s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: var(--reveal-delay, 0s);
+  will-change: opacity, transform;
+}
+html.js [data-reveal].in-view {
+  opacity: 1;
+  transform: none;
+}
+
+/* Staggered children: observe the container, cascade the children. */
+html.js .reveal-stagger > * {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.65s cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 0.65s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+html.js .reveal-stagger.in-view > * {
+  opacity: 1;
+  transform: none;
+}
+.reveal-stagger > *:nth-child(1) {
+  transition-delay: 0.04s;
+}
+.reveal-stagger > *:nth-child(2) {
+  transition-delay: 0.1s;
+}
+.reveal-stagger > *:nth-child(3) {
+  transition-delay: 0.16s;
+}
+.reveal-stagger > *:nth-child(4) {
+  transition-delay: 0.22s;
+}
+.reveal-stagger > *:nth-child(5) {
+  transition-delay: 0.28s;
+}
+.reveal-stagger > *:nth-child(6) {
+  transition-delay: 0.34s;
+}
+.reveal-stagger > *:nth-child(7) {
+  transition-delay: 0.4s;
+}
+.reveal-stagger > *:nth-child(8) {
+  transition-delay: 0.46s;
+}
+
+/* ---- Logo: needle sweep + bars rising (transition-driven, JS-lit) --- */
+html.js .logo-animated .lm-needle {
+  transform-box: view-box;
+  transform-origin: 32px 39.5px;
+  transform: rotate(-116deg);
+  transition: transform 1s cubic-bezier(0.2, 0.8, 0.2, 1) 0.15s;
+}
+html.js .logo-animated.lit .lm-needle {
+  transform: rotate(0deg);
+}
+html.js .logo-animated .lm-bar {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  transform: scaleY(0);
+  transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+html.js .logo-animated.lit .lm-bar {
+  transform: scaleY(1);
+  transition-delay: var(--d, 0s);
+}
+/* Hover: needle gives a little kick once it has settled. */
+html.js a:hover .logo-animated.lit .lm-needle {
+  transform: rotate(-9deg);
+  transition-duration: 0.4s;
+  transition-delay: 0s;
+}
+
+/* ---- Nav: animated underline + scroll-progress fill ----------------- */
+.nav-link {
+  position: relative;
+}
+.nav-link::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 3px;
+  height: 2px;
+  border-radius: 2px;
+  background: rgb(var(--brand));
+  transform: scaleX(0);
+  transform-origin: center;
+  transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.nav-link:hover::after {
+  transform: scaleX(1);
+}
+.nav-link.is-active::after {
+  transform: scaleX(1);
+}
+
+.scroll-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  transform: scaleX(var(--scroll-progress, 0));
+  transform-origin: left;
+  background: linear-gradient(90deg, rgb(var(--brand)), rgb(var(--brand-strong)));
+  will-change: transform;
+}
+
+/* ---- Buttons: one-shot shine sweep + tactile press ------------------ */
+.btn-brand {
+  position: relative;
+  overflow: hidden;
+}
+.btn-brand::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    transparent 30%,
+    rgb(255 255 255 / 0.35) 50%,
+    transparent 70%
+  );
+  transform: translateX(-160%);
+  transition: transform 0.6s ease;
+  pointer-events: none;
+}
+.btn-brand:hover::after {
+  transform: translateX(160%);
+}
+.btn-brand:active {
+  transform: translateY(0) scale(0.98);
+}
+.btn:active {
+  transform: translateY(0) scale(0.99);
+}
+
+/* ---- Copy button: checkmark morph ----------------------------------- */
+[data-copy-btn] .copy-check {
+  display: none;
+}
+[data-copy-btn].is-copied .copy-icon {
+  display: none;
+}
+[data-copy-btn].is-copied .copy-check {
+  display: inline;
+}
+
+/* ---- Theme crossfade via View Transitions --------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.35s;
+    animation-timing-function: cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+}
+
+/* ---- Reduced-motion: collapse everything to a calm, visible state --- */
+@media (prefers-reduced-motion: reduce) {
+  html.js [data-reveal],
+  html.js .reveal-stagger > * {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .bg-aura {
+    animation: none !important;
+  }
+  html.js .logo-animated .lm-needle,
+  html.js .logo-animated .lm-bar {
+    transition: none !important;
+    transform: none !important;
+  }
+  .btn-brand::after {
+    display: none;
   }
 }

@@ -24,9 +24,9 @@ const { icon, title, body, imageSrc, imageAlt, screenshotName, screenshotLocale,
 const hasMedia = Boolean(screenshotName || imageSrc);
 ---
 
-<article class="card card-interactive flex flex-col overflow-hidden">
+<article class="feature-card card card-interactive flex flex-col overflow-hidden" data-spotlight>
   {hasMedia && (
-    <div class="aspect-[16/10] bg-bg-surface-hi border-b border-border overflow-hidden">
+    <div class="feature-media aspect-[16/10] bg-bg-surface-hi border-b border-border overflow-hidden">
       {screenshotName && screenshotLocale ? (
         <ThemedScreenshot name={screenshotName} locale={screenshotLocale} alt={imageAlt ?? ''} />
       ) : (
