@@ -22,8 +22,7 @@ import { sanitizeForUser } from '../sanitize';
 
 interface FileEntry {
   source: ProviderId;
-  /** Provider's parserVersion at the time these records were produced.
-   *  Used to invalidate persisted entries when parser semantics change. */
+
   parserVersion: string;
   mtimeMs: number;
   size: number;
@@ -58,8 +57,7 @@ const SCAN_DEPTH_LIMIT = 8;
 const MAX_ERROR_HISTORY = 20;
 
 class FileIndexer {
-  /** Cache namespace — different consumers (web vs MCP) use different
-   *  names so they don't fight over the same on-disk persisted file. */
+
   private readonly cacheName: string;
   private files = new Map<string, FileEntry>();
   private snapshot: SnapshotExtended | null = null;
@@ -76,21 +74,17 @@ class FileIndexer {
   private dirToProvider = new Map<string, ProviderAdapter>();
   private errors: string[] = [];
   private loadedFromDisk = false;
-  /** When set, rebuildSnapshotNow uses this as duration start so stats.durationMs
-   *  reflects the full operation (parse + dedup + sort), not just snapshot rebuild. */
+
   private lastWorkStart: number | null = null;
-  /** In-flight forceRescan promise. Concurrent callers coalesce onto this so we
-   *  never have two full scans clobbering each other's `files` map. */
+
   private rescanPromise: Promise<SnapshotExtended> | null = null;
-  /** Serializes every mutation of `files` (init scan, rescan, poll, reconcile)
-   *  so incremental updates never interleave with a clear()+fullScan. */
+
   private mutationTail: Promise<unknown> = Promise.resolve();
 
   constructor(cacheName: string = DEFAULT_INDEX_NAME) {
     this.cacheName = cacheName;
   }
 
-  /** Run `work` after all prior mutations finish. Failures do not block the queue. */
   private runExclusive<T>(work: () => Promise<T>): Promise<T> {
     const next = this.mutationTail.then(work, work);
     this.mutationTail = next.then(
@@ -136,8 +130,6 @@ class FileIndexer {
     }
   }
 
-  /** Re-detect provider data directories. Updates `dirToProvider` and `existingDirs`
-   *  in place. Returns the diff so callers can act on added/removed dirs. */
   private async detectProviderDirs(): Promise<{ added: string[]; removed: string[] }> {
     const wanted = new Map<string, ProviderAdapter>();
     const dirs: string[] = [];
@@ -178,9 +170,7 @@ class FileIndexer {
         try {
           const stat = await fs.stat(file);
           const persistedEntry = persistedMap.get(file);
-          // Cache hit only if file fingerprint AND parser version match —
-          // otherwise the persisted records were produced by a parser whose
-          // semantics have since been fixed and must be re-parsed.
+
           if (
             persistedEntry &&
             persistedEntry.source === provider.id &&
@@ -220,21 +210,19 @@ class FileIndexer {
     }
   }
 
-  /** Reconcile watchers to currently-known dirs. Adds watchers for new dirs,
-   *  closes watchers for dirs that no longer exist. Idempotent. */
   private syncWatchersToDirs(): void {
-    // Close watchers for dirs that have disappeared
+
     for (const [dir, watcher] of this.watchers) {
       if (!this.dirToProvider.has(dir)) {
         try {
           watcher.close();
         } catch {
-          // ignore
+
         }
         this.watchers.delete(dir);
       }
     }
-    // Add watchers for newly-detected dirs
+
     for (const [dir, provider] of this.dirToProvider) {
       if (this.watchers.has(dir)) continue;
       try {
@@ -256,17 +244,7 @@ class FileIndexer {
 
   private setupPolling(): void {
     if (this.pollTimer) clearInterval(this.pollTimer);
-    // Belt-and-suspenders on top of fs.watch — useful on a network share /
-    // FUSE mount / older Linux where `fs.watch(recursive)` is unreliable,
-    // but on modern macOS + Linux 5.x + Windows the watcher catches
-    // everything and the poll just keeps the laptop warm.
-    //
-    // Web dashboard: keep polling ON by default (user explicitly opened
-    // the page, expects new provider installs to be auto-detected).
-    // MCP server: default to OFF so we don't keep the host warm in a
-    // background daemon spawned by an LLM client — the next tool call
-    // already triggers `init()` which re-detects dirs as a side effect.
-    // Either default can be flipped via `CCGAUGE_POLL_FALLBACK={0,1}`.
+
     const isMcp = this.cacheName === 'mcp';
     const envOpt = process.env.CCGAUGE_POLL_FALLBACK;
     const enable = envOpt === '1' ? true : envOpt === '0' ? false : !isMcp;
@@ -280,8 +258,7 @@ class FileIndexer {
   private async pollOnce(): Promise<void> {
     await this.runExclusive(async () => {
       const start = Date.now();
-      // Re-detect provider roots so a Codex/Claude install that appeared after
-      // startup gets picked up without requiring a manual rescan.
+
       const dirDiff = await this.detectProviderDirs();
       let changed = dirDiff.added.length > 0 || dirDiff.removed.length > 0;
       if (changed) this.syncWatchersToDirs();
@@ -350,7 +327,7 @@ class FileIndexer {
       try {
         stat = await fs.stat(filePath);
       } catch {
-        // File deleted/missing
+
       }
       if (!stat || !stat.isFile()) {
         if (this.files.has(filePath)) {
@@ -439,10 +416,6 @@ class FileIndexer {
       a.timestamp.localeCompare(b.timestamp),
     );
 
-    // Cross-file post-link: stitch Claude sub-agent files into their
-    // parent session so the usage table groups them under the originating
-    // user turn instead of showing the synthesised sub-agent prompt as a
-    // separate row. Mutates `parentMap` in place; safe to re-run.
     linkSidechainParents({
       assistantRecords: dedupedAssistants,
       userRecords: dedupedUsers,
@@ -455,8 +428,7 @@ class FileIndexer {
       filesScanned: this.files.size,
       recordsParsed,
       assistantRecords: dedupedAssistants.length,
-      // Wall-clock from when this work started (parse/poll/init) to snapshot ready.
-      // Falls back to snapshot rebuild duration if no parse work preceded.
+
       durationMs: Date.now() - workStart,
       scannedDirs: this.existingDirs,
     };
@@ -479,22 +451,13 @@ class FileIndexer {
   }
 
   async forceRescan(): Promise<SnapshotExtended> {
-    // Whether THIS call is the one kicking off the very first init().
-    // Read synchronously, before any await, so two concurrent callers
-    // can't both observe `true` — init() assigns initPromise synchronously.
+
     const isFirstInit = !this.initPromise;
-    // Always let init() fully settle before we touch `files`. init() runs a
-    // full scan and is memoized, so once it has resolved this is a cheap
-    // no-op await. Skipping it is exactly what corrupts the index: runRescan()
-    // calls files.clear() and, if doInit()'s fullScan() is still in flight,
-    // the two writers race on the same Map → lost or partial records.
+
     await this.init();
-    // The first init already produced a fresh full scan, so re-scanning here
-    // would only duplicate that work.
+
     if (isFirstInit) return this.snapshot!;
 
-    // Coalesce concurrent callers — running multiple full scans in parallel
-    // wipes each other's `files` Map and produces inconsistent snapshots.
     if (this.rescanPromise) return this.rescanPromise;
     this.rescanPromise = this.runRescan();
     try {
@@ -505,11 +468,19 @@ class FileIndexer {
   }
 
   private async runRescan(): Promise<SnapshotExtended> {
-    return this.runExclusive(async () => {
-      const start = Date.now();
-      this.isIndexing = true;
-      this.lastWorkStart = start;
-      try {
+    this.isIndexing = true;
+    try {
+      return await this.runExclusive(async () => {
+        const start = Date.now();
+        this.lastWorkStart = start;
+        if (this.snapshotRebuildTimer) {
+          clearTimeout(this.snapshotRebuildTimer);
+          this.snapshotRebuildTimer = null;
+        }
+        if (this.persistTimer) {
+          clearTimeout(this.persistTimer);
+          this.persistTimer = null;
+        }
         this.files.clear();
         await this.detectProviderDirs();
         await this.fullScan(new Map());
@@ -519,10 +490,10 @@ class FileIndexer {
         this.syncWatchersToDirs();
         this.schedulePersist();
         return this.snapshot!;
-      } finally {
-        this.isIndexing = false;
-      }
-    });
+      });
+    } finally {
+      this.isIndexing = false;
+    }
   }
 
   getStatus(): IndexerStatus {
@@ -577,7 +548,7 @@ class FileIndexer {
       this.errors.splice(0, this.errors.length - MAX_ERROR_HISTORY);
     }
     if (process.env.CCGAUGE_DEBUG) {
-      // Server-side debug logs keep the raw absolute paths.
+
       console.error(`[ccgauge:indexer] ${new Date().toISOString()} ${msg}`);
     }
   }
@@ -587,7 +558,7 @@ class FileIndexer {
       try {
         w.close();
       } catch {
-        // ignore
+
       }
     }
     this.watchers.clear();
@@ -602,10 +573,6 @@ class FileIndexer {
     this.fileDebouncers.clear();
   }
 }
-
-/** Replace the user's home directory in any string with `~` so absolute
- *  paths (which may contain the OS username) don't leak through API
- *  responses like /api/scan or the Settings UI. */
 
 async function dirExists(p: string): Promise<boolean> {
   try {
@@ -662,9 +629,6 @@ function indexerRegistry(): Map<string, FileIndexer> {
   return globalThis.__ccgaugeIndexers;
 }
 
-/** Get (or create + cache) a FileIndexer instance for the given cache
- *  namespace. The web dashboard uses the default name; the MCP server
- *  passes 'mcp' so it has its own on-disk persisted file and watcher set. */
 export function getIndexer(cacheName: string = DEFAULT_INDEX_NAME): FileIndexer {
   const reg = indexerRegistry();
   let inst = reg.get(cacheName);

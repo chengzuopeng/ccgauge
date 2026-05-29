@@ -10,7 +10,7 @@ export async function getServerLocale(): Promise<Locale> {
     const v = c.get(LOCALE_COOKIE)?.value;
     if (v === 'zh' || v === 'en') return v;
   } catch {
-    // not in a request context
+
   }
   return DEFAULT_LOCALE;
 }

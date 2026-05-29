@@ -1,19 +1,10 @@
-/* react-day-picker stock stylesheet — must come first because CSS
-   `@import` rules are only valid at the top of a file. We import
-   it here (NOT in the date-range-picker component) so our `--rdp-*`
-   overrides at the bottom of this file load AFTER the library's
-   defaults, ensuring the override always wins at equal specificity.
-   Without this ordering, the library's `.rdp-root { --rdp-*: ... }`
-   block would beat ours and we'd see default circular day buttons
-   in our brand colors. PostCSS (via Next's default config) inlines
-   the import at build time. */
+
 @import 'react-day-picker/style.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Default = dark (matches what server emits when no class is present) */
 :root,
 .theme-dark {
   --bg-base: 10 10 10;
@@ -27,10 +18,7 @@
   --text-tertiary: 120 120 128;
   --brand: 129 140 248;
   --brand-hover: 165 180 252;
-  /* `brand-strong` is one step darker than `brand` (Indigo-500 vs -400)
-     so that filled chips with white text clear WCAG AA (4.5:1) in dark
-     mode. Don't use this for text-on-dark-bg — Indigo-500 there only
-     reaches ~4:1. Use plain `brand` for those. */
+
   --brand-strong: 99 102 241;
   --success: 34 197 94;
   --warning: 250 204 21;
@@ -45,6 +33,7 @@
   --shadow-card-hover: 0 1px 0 0 rgb(255 255 255 / 0.04), 0 8px 24px -8px rgb(0 0 0 / 0.6);
   --shadow-popover: 0 4px 12px -2px rgb(0 0 0 / 0.4), 0 16px 48px -8px rgb(0 0 0 / 0.6);
   --ring-focus: 129 140 248;
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .theme-light {
@@ -59,9 +48,7 @@
   --text-tertiary: 145 145 156;
   --brand: 79 70 229;
   --brand-hover: 67 56 202;
-  /* In light mode `brand` (Indigo-600) is already strong enough for white
-     text (~8.6:1). Keep `brand-strong` identical so components don't have
-     to branch on theme. */
+
   --brand-strong: 79 70 229;
   --success: 22 163 74;
   --warning: 217 119 6;
@@ -90,10 +77,7 @@
 }
 
 html {
-  /* Force the html element to be a scroll container with the scrollbar
-     always laid out. Without this, navigations between pages with different
-     content heights flip-flop the viewport scrollbar in/out, which shifts
-     the centered nav bar horizontally by the scrollbar width. */
+
   overflow-y: scroll;
   scrollbar-gutter: stable;
 }
@@ -146,9 +130,6 @@ body {
   border-radius: 3px;
 }
 
-/* Nav scroller: keep `overflow-x: auto` for very narrow viewports but never
-   render the scrollbar track — on macOS the auto-hide thin bar can leave a
-   thin gray "rest state" that reads as a divider against the bg. */
 .nav-scroller {
   scrollbar-width: none;
 }
@@ -158,7 +139,6 @@ body {
   height: 0;
 }
 
-/* Keyboard-only focus ring (mouse clicks won't trigger it). */
 :where(button, a, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid rgb(var(--ring-focus) / 0.6);
   outline-offset: 2px;
@@ -269,17 +249,6 @@ body {
   }
 }
 
-/* =====================================================================
- * Dashboard motion — calm, intent-driven, refresh-safe.
- *
- * This is a tool opened many times a day, so motion appears only on first
- * mount and on user navigation — NEVER on the 15-30s background refresh.
- * That falls out for free: `router.refresh()` keeps DOM nodes mounted, so
- * CSS entrance animations don't re-trigger; only a real route change
- * remounts and replays them. Everything honors prefers-reduced-motion
- * (the global block near the top of this file + the guard below).
- * ===================================================================== */
-
 @keyframes dash-rise {
   from {
     opacity: 0;
@@ -307,10 +276,8 @@ body {
   }
 }
 
-/* First-paint stagger for a page's top-level blocks (applied on PageShell).
-   Children settle in sequence; capped so long pages don't trickle forever. */
 .dash-stagger > * {
-  animation: dash-rise 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: dash-rise 0.42s var(--ease-out-soft) both;
 }
 .dash-stagger > *:nth-child(1) {
   animation-delay: 0.02s;
@@ -331,15 +298,11 @@ body {
   animation-delay: 0.26s;
 }
 
-/* Cost-by-model bar fills: grow from the left once on mount. Independent
-   of the width transition (which keeps gliding bars to new values on
-   refresh) because this animates transform, not width. */
 .bar-grow {
   transform-origin: left center;
-  animation: bar-grow 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: bar-grow 0.6s var(--ease-out-soft) both;
 }
 
-/* Shimmer skeleton — a sweeping highlight instead of a flat opacity pulse. */
 .skeleton-shimmer {
   background-color: rgb(var(--bg-surface-hi));
   background-image: linear-gradient(
@@ -366,49 +329,21 @@ body {
   }
 }
 
-/* Utility: hairline divider used inside cards (between header and body). */
 .divider-soft {
   border-top: 1px solid rgb(var(--border));
 }
 
-/* Usage page: hide the KPI + trend block when the user collapsed the overview.
-   The data attribute is set by the no-flash script (synchronously, before
-   paint, from localStorage) and toggled at runtime by <OverviewToggle />.
-   Attribute name + value mirror lib/storage-keys.ts — CSS can't import a
-   constant, so keep these in sync if you ever rename them. */
 html[data-usage-overview='hidden'] .usage-overview-block {
   display: none;
 }
 
-/* react-day-picker (Usage → Custom range picker) ----------------------
-   The library's stock stylesheet (imported in components/date-range-picker.tsx)
-   ships with a self-contained "rdp" theme that doesn't know about our
-   dashboard. We rebind its `--rdp-*` variables to the existing brand /
-   surface / text tokens so the calendar:
-     1. Follows the light/dark theme switch automatically (the tokens
-        themselves swap under `.theme-light` / `.theme-dark`).
-     2. Matches the dashboard's brand color, radii, and typography.
-     3. Doesn't need extra props or per-render classNames in the React
-        component — the styling is a pure data layer.
-   All overrides are scoped to `.rdp-root` so they can't leak. */
 .rdp-root {
-  /* Selected day fill + range edges. `accent` is the solid filled
-     end-of-range / selected fill; `accent-background` is the soft
-     tint that spans the middle of the range. */
+
   --rdp-accent-color: rgb(var(--brand-strong));
   --rdp-accent-background-color: rgb(var(--brand) / 0.14);
 
-  /* Today indicator — a calm brand-tinted dot under the number (see
-     `.rdp-today .rdp-day_button` below). The library exposes a color
-     var that styles the number text itself; we keep that as a backup
-     so today is still legible if the dot fails to render. */
   --rdp-today-color: rgb(var(--brand));
 
-  /* Day cell sizing. 36×36 gives day numbers room to breathe at
-     14px — at 32×32 the larger glyphs (e.g. "30") used to touch the
-     selected-pill edges. The button radius matches the dashboard's
-     `rounded-button` (8px) so selected days slot naturally next to
-     the picker's footer buttons. */
   --rdp-day-height: 2.25rem;
   --rdp-day-width: 2.25rem;
   --rdp-day_button-height: 2.25rem;
@@ -416,20 +351,12 @@ html[data-usage-overview='hidden'] .usage-overview-block {
   --rdp-day_button-border-radius: 8px;
   --rdp-day_button-border: 1px solid transparent;
 
-  /* Nav chevron buttons sit in the caption row at 28px to match the
-     visual weight of a `.btn-ghost` row icon — smaller and the
-     hit area starts feeling cramped on touchpads. */
   --rdp-nav_button-height: 1.75rem;
   --rdp-nav_button-width: 1.75rem;
 
-  /* Calmer disabled/outside opacities than the library defaults so
-     past-month days still register as "real" but recede behind the
-     active month. */
   --rdp-disabled-opacity: 0.32;
   --rdp-outside-opacity: 0.32;
 
-  /* No border ring around selected — we already telegraph selection
-     with the solid fill + range gradient. */
   --rdp-selected-border: none;
 
   --rdp-weekday-opacity: 1;
@@ -437,36 +364,25 @@ html[data-usage-overview='hidden'] .usage-overview-block {
   color: rgb(var(--text-primary));
 }
 
-/* Caption (Month Year) — site uses 13-14px semibold for section
-   headings (`.num-mid` is 24px, this is one tier below). The library
-   default bumps to 1.25em which felt outsized against our compact
-   popover. */
 .rdp-caption_label {
   font-weight: 600;
-  font-size: 0.875rem;          /* 14px */
+  font-size: 0.875rem;
   color: rgb(var(--text-primary));
   letter-spacing: -0.005em;
 }
 
-/* Weekday header — same DNA as `.label` (11px uppercase, brand-neutral
-   tertiary) but a touch tighter tracking since the calendar grid
-   already provides visual rhythm. */
 .rdp-weekday {
   color: rgb(var(--text-tertiary));
   font-weight: 600;
-  font-size: 0.6875rem;         /* 11px */
+  font-size: 0.6875rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   padding-bottom: 0.25rem;
 }
 
-/* Day button — base interactive cell. Slightly larger glyph (14px)
-   and tabular-nums so two-digit days line-align with single-digit
-   days down the column. The transition mirrors the dashboard's
-   150ms ease used in `.btn`. */
 .rdp-day_button {
   font-weight: 500;
-  font-size: 0.8125rem;         /* 13px */
+  font-size: 0.8125rem;
   font-variant-numeric: tabular-nums;
   color: rgb(var(--text-primary));
   transition:
@@ -487,9 +403,6 @@ html[data-usage-overview='hidden'] .usage-overview-block {
   font-weight: 600;
 }
 
-/* Today: an underline-style dot below the number. Doesn't fight with
-   the selected/range styling — when today IS the selected day, the
-   dot turns white so it stays visible on the brand-strong fill. */
 .rdp-today:not(.rdp-selected) .rdp-day_button {
   color: rgb(var(--brand));
 }
@@ -511,9 +424,6 @@ html[data-usage-overview='hidden'] .usage-overview-block {
   background: rgb(255 255 255 / 0.85);
 }
 
-/* Nav chevron buttons — adopt our ghost-button language (muted by
-   default, lift to primary on hover) so the calendar's top bar lives
-   in the same visual register as other section headers. */
 .rdp-button_previous,
 .rdp-button_next {
   color: rgb(var(--text-tertiary));
@@ -538,18 +448,12 @@ html[data-usage-overview='hidden'] .usage-overview-block {
   cursor: not-allowed;
 }
 
-/* Range middle background uses a subtler tint (0.14 vs the default
-   0.25) so 5+ day ranges don't dominate the calendar visually. The
-   button itself stays transparent so today's brand dot still shows
-   through. */
 .rdp-range_middle .rdp-day_button {
   background-color: transparent;
   color: rgb(var(--text-primary));
   font-weight: 500;
 }
 
-/* Caption row — give the month label a touch more bottom padding so
-   the weekday header doesn't crowd it. */
 .rdp-month_caption {
   padding: 0 0 0.5rem;
 }

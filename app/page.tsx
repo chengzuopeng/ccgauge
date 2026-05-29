@@ -66,25 +66,19 @@ export default async function OverviewPage({
 
 async function OverviewContent({ source }: { source: EffectiveSource }) {
   const scan = await getCachedScan();
-  // For 'all', this is a pass-through (no source filter); for a single
-  // provider it narrows to that provider's records.
+
   const records = filterBySource(scan.records, source);
   const sources = expandSources(source);
 
   const t = await getServerT();
   const locale = await getServerLocale();
   const fmtTokens = (n: number) => formatTokensCompact(n, locale);
-  // For "Top model" label rendering we need to pick the right provider's
-  // shortener — the model entry carries its own `source` so we look it up
-  // per row instead of relying on a single provider here.
+
   const shorten = (m: ModelSummary) => getProvider(m.source).shortenModel(m.model);
 
   if (records.length === 0) {
     return (
       <PageShell title={t('overview.title')} desc={t('brand.tagline')}>
-        {/* Keep the auto-refresh ticking even in the empty state — the
-            first session a new user creates after launching ccgauge
-            should appear without a manual reload. */}
         <AutoRefresh intervalMs={30_000} />
         <EmptyState
           title={t('overview.empty.title')}
@@ -98,8 +92,6 @@ async function OverviewContent({ source }: { source: EffectiveSource }) {
   const yesterdayRecs = records.filter((r) => isYesterday(r.timestamp));
   const monthRecs = records.filter((r) => isThisMonth(r.timestamp));
 
-  // Dispatch per source then merge — keeps the aggregator's single-source
-  // contract intact while letting the All view sum across providers.
   const today = combineTotals(sources.map((s) => aggregateTotals(todayRecs, { source: s })));
   const yest = combineTotals(sources.map((s) => aggregateTotals(yesterdayRecs, { source: s })));
   const month = combineTotals(sources.map((s) => aggregateTotals(monthRecs, { source: s })));
@@ -115,9 +107,6 @@ async function OverviewContent({ source }: { source: EffectiveSource }) {
       ? today.cacheReadTokens / (today.cacheReadTokens + today.inputTokens + today.cacheCreationTokens)
       : 0;
 
-  // Each provider's 5-hour block is a separate rate-limit window
-  // (Anthropic vs OpenAI). For 'all' we compute both and render side by
-  // side; for a single provider we render the original single card.
   const blocksBySource: Array<{ source: ProviderId; serialized: ReturnType<typeof blockToSerialized> }> = sources.map(
     (s) => {
       const provider = getProvider(s);
@@ -129,19 +118,11 @@ async function OverviewContent({ source }: { source: EffectiveSource }) {
 
   const thirtyAgo = new Date();
   thirtyAgo.setDate(thirtyAgo.getDate() - 30);
-  // Run the time aggregator per source, then merge buckets so same-day
-  // cells get the sum across providers.
+
   const trendBuckets = combineTimeBuckets(
     sources.map((s) => aggregateByTime(records, 'day', { source: s, from: thirtyAgo })),
   );
 
-  // Count conversations (= usage-table rows) per day. A "conversation" is
-  // a turn: every assistant record is mapped to its turn root via the
-  // parent chain (skipping synthetic user records), then we group records
-  // by turn root and attribute the whole turn to the day of its earliest
-  // record. This matches what the usage table shows when rows are
-  // collapsed — one row per user prompt regardless of how many API calls
-  // it triggered.
   const fromIso = thirtyAgo.toISOString();
   const scopedRecords = records.filter((r) => r.timestamp >= fromIso);
   const scopedUsers = filterBySource(scan.userRecords, source).filter(
@@ -177,8 +158,6 @@ async function OverviewContent({ source }: { source: EffectiveSource }) {
       ? t('overview.trend.activeDays', { n: 1 })
       : t('overview.trend.activeDays.plural', { n: activeDays });
 
-  // Models: Claude and Codex model names are disjoint, so a flatMap+sort
-  // works without merging by name.
   const monthModelsAllSources = sources
     .flatMap((s) => aggregateByModel(records, { source: s, from: startOfMonth() }))
     .sort((a, b) => b.cost - a.cost);
@@ -186,9 +165,6 @@ async function OverviewContent({ source }: { source: EffectiveSource }) {
   const topModelPct =
     topModel && month.cost > 0 ? formatPct(topModel.cost / month.cost) : '—';
 
-  // Use the active source's stats for the overview header. For All, sum
-  // across the source breakdown so file/record counts reflect the merged
-  // view rather than just one provider.
   const sourceFileCount =
     source === 'all'
       ? scan.bySource.reduce((sum, s) => sum + s.filesScanned, 0)
@@ -207,11 +183,6 @@ async function OverviewContent({ source }: { source: EffectiveSource }) {
         ms: scan.stats.durationMs,
       })}
     >
-      {/* Silent 30s background refresh — re-streams the server tree so
-          all KPIs / charts / the 5h block update in place without
-          remounting the page or losing scroll position. Paused while
-          the tab is hidden. /usage uses the same component at 15s
-          since its turn-grouped table changes more often. */}
       <AutoRefresh intervalMs={30_000} />
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
@@ -267,11 +238,7 @@ async function OverviewContent({ source }: { source: EffectiveSource }) {
         </div>
         <div className="flex">
           {source === 'all' && blocksBySource.length > 1 ? (
-            // Single card + a small switcher on top. We don't show both
-            // blocks at once — the 5-hour windows are per-provider, can't
-            // be summed, and the user usually only cares about whichever
-            // is currently active. Default selection picks the busier
-            // provider so the card lands on the more interesting block.
+
             <BlockProgressSwitcher
               slots={blocksBySource.map((b) => ({
                 source: b.source,
@@ -304,16 +271,6 @@ function startOfMonth(): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
 }
 
-/** Choose which provider's block to surface first on the All view.
- *
- *  Priority:
- *    1. If only one provider has an active block, pick that one — the
- *       other side shows an empty state, no point defaulting to it.
- *    2. If both have active blocks, pick whichever spent more in USD —
- *       cost normalises across providers (raw tokens favour Claude due
- *       to its huge cache reads).
- *    3. If neither has an active block, pick the first provider as a
- *       deterministic fallback (the user can still toggle). */
 function pickBusierBlock(
   blocks: Array<{ source: ProviderId; serialized: ReturnType<typeof blockToSerialized> }>,
 ): ProviderId {

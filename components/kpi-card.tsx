@@ -26,7 +26,7 @@ export function KpiCard({
     <div
       className={cn(
         'card card-pad relative flex flex-col gap-2 min-h-[132px] overflow-hidden',
-        accent !== 'default' && 'pt-[18px] sm:pt-[22px]', // make room for accent bar
+        accent !== 'default' && 'pt-[18px] sm:pt-[22px]',
         className,
       )}
     >

@@ -32,10 +32,6 @@ export const GET = withApiErrorHandling(async (req: Request) => {
   const projects = url.searchParams.get('projects')?.split(',').filter(Boolean) ?? undefined;
   const view = url.searchParams.get('view') || 'time';
 
-  // Custom range pulls bounds from explicit ?from / ?to ISO dates.
-  // We require at least `from` to be valid for `range=custom`; an empty
-  // pair would silently degrade to "no filter" which is almost never
-  // what a custom-range request meant.
   let dates: { from?: Date; to?: Date };
   if (range === 'custom') {
     const fromParam = url.searchParams.get('from');
@@ -67,16 +63,14 @@ export const GET = withApiErrorHandling(async (req: Request) => {
     return NextResponse.json({ source, totals, buckets });
   }
   if (view === 'model') {
-    // Model name spaces are disjoint across providers — flatMap + sort.
+
     const modelList = sources
       .flatMap((s) => aggregateByModel(records, { ...baseOpts, source: s }))
       .sort((a, b) => b.cost - a.cost);
     return NextResponse.json({ source, totals, models: modelList });
   }
   if (view === 'project') {
-    // Same cwd may appear once per source in the All view — that's the
-    // documented behaviour, callers can group by (cwd, source) if they
-    // want to merge client-side.
+
     const projectList = sources
       .flatMap((s) => aggregateByProject(records, { ...baseOpts, source: s }))
       .sort((a, b) => b.cost - a.cost);

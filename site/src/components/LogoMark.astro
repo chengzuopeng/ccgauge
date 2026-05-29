@@ -1,12 +1,7 @@
 ---
 interface Props {
   class?: string;
-  /**
-   * When true, the gauge "powers on" once mounted: the needle swings from
-   * its rest offset to the live reading and the bottom bars rise. Driven by
-   * CSS transitions gated on `html.js` + a `.lit` class added by the
-   * site-wide motion script. Use on the nav mark; leave off for the footer.
-   */
+  
   animated?: boolean;
 }
 

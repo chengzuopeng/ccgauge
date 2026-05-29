@@ -6,19 +6,19 @@ import { cn } from '@/lib/utils';
 import { useT } from '@/lib/i18n/context';
 
 interface MultiSelectProps {
-  /** URL search-param key. Selected values join with comma. */
+
   paramKey: string;
   all: string[];
   selected: string[];
-  /** Pretty render of a value (e.g. shortenModel). */
+
   render?: (v: string) => string;
-  /** Trigger label keys. */
+
   labelAllKey: string;
   labelSingleKey: string;
   labelMultiKey: string;
-  /** Optional ARIA label for the trigger button. */
+
   ariaLabel?: string;
-  /** Show search input above the list when option count exceeds this. */
+
   searchThreshold?: number;
 }
 

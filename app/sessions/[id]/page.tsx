@@ -30,11 +30,7 @@ export default async function SessionDetailPage({
 }) {
   const { id } = await params;
   const sp = await searchParams;
-  // Even if the user lands here with `?source=all`, a single session lives
-  // entirely inside one provider. Find which one by scanning all records
-  // for the sessionId, then key everything off the record's own source.
-  // Preserve `?source=all` on back-links so the user returns to their
-  // original filter context rather than getting silently downgraded.
+
   const requestedSource = await resolveSource(sp.source);
   const sessionId = decodeURIComponent(id);
   const t = await getServerT();
@@ -43,8 +39,7 @@ export default async function SessionDetailPage({
 
   const sessionRecords = scan.records.filter((r) => r.sessionId === sessionId);
   if (sessionRecords.length === 0) notFound();
-  // All records in a session share the same provider (Claude Code / Codex
-  // never co-author a single sessionId); take the first.
+
   const source = sessionRecords[0].source;
   const provider = getProvider(source);
   const shorten = (m: string) => provider.shortenModel(m);

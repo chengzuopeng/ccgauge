@@ -9,13 +9,6 @@ const { locale } = Astro.props;
 const t = useTranslations(locale);
 ---
 
-<!--
-  Three-state theme cycler (dark → light → system → dark). On click we
-  read the current persisted value, advance it one step, write it back,
-  and re-apply the matching <html> class. The same logic that the
-  no-flash inline script in BaseLayout runs is duplicated here in JS so
-  the toggle stays a one-file component.
--->
 <button
   type="button"
   id="theme-toggle"
@@ -24,7 +17,7 @@ const t = useTranslations(locale);
   aria-label={t('theme.label')}
   title={t('theme.label')}
 >
-  <!-- Icons swap based on resolved theme via the inline script below. -->
+  
   <svg class="theme-icon-dark" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
   </svg>
@@ -51,10 +44,10 @@ const t = useTranslations(locale);
         const v = localStorage.getItem(key);
         if (v === 'dark' || v === 'light' || v === 'system') return v;
       } catch {
-        /* ignore */
+        
       }
-      // Must match the no-flash script default in BaseLayout — keep these
-      // two strings in sync, or first-paint and toggle init disagree.
+      
+      
       return 'system';
     }
 
@@ -73,8 +66,8 @@ const t = useTranslations(locale);
       root.classList.remove('theme-light', 'theme-dark');
       root.classList.add(resolved === 'light' ? 'theme-light' : 'theme-dark');
       root.setAttribute('data-theme', resolved);
-      // Reveal the matching icon (next-state icon, so user sees what
-      // clicking will do — Linear / Vercel pattern).
+      
+      
       const next = order[(order.indexOf(theme) + 1) % order.length];
       btn!.querySelectorAll('svg').forEach((el) => el.classList.add('hidden'));
       const target = btn!.querySelector(`.theme-icon-${next}`);
@@ -87,10 +80,10 @@ const t = useTranslations(locale);
       try {
         localStorage.setItem(key, next);
       } catch {
-        /* ignore */
+        
       }
-      // Crossfade the whole document between palettes where supported.
-      // Falls back to an instant swap on older browsers / reduced-motion.
+      
+      
       const reduce =
         window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
       if (typeof document.startViewTransition === 'function' && !reduce) {
@@ -102,10 +95,10 @@ const t = useTranslations(locale);
 
     btn.addEventListener('click', cycle);
 
-    // Initial icon state — match what no-flash already applied.
+    
     apply(readStored());
 
-    // React to system changes when in "system" mode.
+    
     if (window.matchMedia) {
       const mq = window.matchMedia('(prefers-color-scheme: light)');
       mq.addEventListener?.('change', () => {

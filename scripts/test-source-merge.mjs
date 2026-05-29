@@ -1,12 +1,4 @@
 #!/usr/bin/env node --experimental-strip-types --no-warnings
-/**
- * Smoke test for `lib/source-merge.ts` — the helpers behind the
- * dashboard's "All" view (combines Claude + Codex into one summary).
- *
- * These helpers run on every overview / usage / projects page when the
- * user picks `source=all`, so getting them wrong shows up as wrong KPI
- * numbers across the entire dashboard.
- */
 
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -17,9 +9,6 @@ const root = dirname(dirname(__filename));
 
 const { combineTotals, combineTimeBuckets } = await import(join(root, 'lib/source-merge.ts'));
 
-// ── combineTotals ─────────────────────────────────────────────────────
-
-// Empty input: returns the zero snapshot (NOT undefined / null).
 {
   const out = combineTotals([]);
   assert.equal(out.inputTokens, 0);
@@ -28,7 +17,6 @@ const { combineTotals, combineTimeBuckets } = await import(join(root, 'lib/sourc
   console.log('✓ combineTotals: empty input → zero snapshot');
 }
 
-// Single input: returned as-is (no transformation, perf shortcut).
 {
   const t = {
     inputTokens: 100,
@@ -45,7 +33,6 @@ const { combineTotals, combineTimeBuckets } = await import(join(root, 'lib/sourc
   console.log('✓ combineTotals: single input is returned as-is (no copy)');
 }
 
-// Two inputs: numeric fields sum component-wise.
 {
   const claude = {
     inputTokens: 100,
@@ -74,13 +61,12 @@ const { combineTotals, combineTimeBuckets } = await import(join(root, 'lib/sourc
   assert.equal(out.cacheCreationTokens, 30);
   assert.equal(out.totalTokens, 530);
   assert.equal(out.requests, 8);
-  // Floating-point: keep to 2 d.p. for $ since we know inputs are clean.
+
   assert.equal(out.cost.toFixed(2), '2.40');
   assert.equal(out.saved.toFixed(2), '0.40');
   console.log('✓ combineTotals: two-input field-wise sum');
 }
 
-// Three inputs (future-proof: more providers later).
 {
   const a = { inputTokens: 10, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, totalTokens: 10, cost: 0.1, saved: 0, requests: 1 };
   const b = { inputTokens: 20, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, totalTokens: 20, cost: 0.2, saved: 0, requests: 2 };
@@ -92,16 +78,12 @@ const { combineTotals, combineTimeBuckets } = await import(join(root, 'lib/sourc
   console.log('✓ combineTotals: three-input sum (forward-compatible)');
 }
 
-// ── combineTimeBuckets ────────────────────────────────────────────────
-
-// Empty list of series.
 {
   const out = combineTimeBuckets([]);
   assert.deepEqual(out, []);
   console.log('✓ combineTimeBuckets: empty input → empty output');
 }
 
-// One series passes through (perf shortcut).
 {
   const one = [
     bucket('2026-05-10', 'May 10', { input: 100, cost: 1.0, requests: 1, models: { 'claude-opus-4-7': { tokens: 100, cost: 1.0, requests: 1 } } }),
@@ -111,7 +93,6 @@ const { combineTotals, combineTimeBuckets } = await import(join(root, 'lib/sourc
   console.log('✓ combineTimeBuckets: single series is returned as-is');
 }
 
-// Two series with the SAME day key — sum numeric fields, union models.
 {
   const claudeSeries = [
     bucket('2026-05-10', 'May 10', { input: 100, output: 50, cacheRead: 200, cacheCreation: 30, total: 380, cost: 1.5, saved: 0.4, requests: 5, models: { 'claude-opus-4-7': { tokens: 380, cost: 1.5, requests: 5 } } }),
@@ -123,14 +104,12 @@ const { combineTotals, combineTimeBuckets } = await import(join(root, 'lib/sourc
   ];
   const merged = combineTimeBuckets([claudeSeries, codexSeries]);
 
-  // Sorted by key ascending.
   assert.deepEqual(
     merged.map((b) => b.key),
     ['2026-05-10', '2026-05-11', '2026-05-12'],
     'merged series is sorted ascending by key',
   );
 
-  // Day 5-10: both sources contribute → fields sum, models union.
   const may10 = merged.find((b) => b.key === '2026-05-10');
   assert.equal(may10.inputTokens, 170);
   assert.equal(may10.outputTokens, 130);
@@ -141,12 +120,10 @@ const { combineTotals, combineTimeBuckets } = await import(join(root, 'lib/sourc
   assert.equal(may10.models['claude-opus-4-7'].tokens, 380);
   assert.equal(may10.models['gpt-5.2-codex'].tokens, 150);
 
-  // Day 5-11: Claude only.
   const may11 = merged.find((b) => b.key === '2026-05-11');
   assert.equal(may11.totalTokens, 50);
   assert.equal(Object.keys(may11.models).length, 1);
 
-  // Day 5-12: Codex only.
   const may12 = merged.find((b) => b.key === '2026-05-12');
   assert.equal(may12.totalTokens, 20);
   assert.equal(Object.keys(may12.models).length, 1);
@@ -154,7 +131,6 @@ const { combineTotals, combineTimeBuckets } = await import(join(root, 'lib/sourc
   console.log('✓ combineTimeBuckets: same-day sum + models union, disjoint days pass through');
 }
 
-// Non-mutation invariant: caller still owns the input buckets.
 {
   const input = [
     bucket('2026-05-10', 'May 10', { input: 100, total: 100, cost: 1.0, requests: 1, models: { 'm': { tokens: 100, cost: 1.0, requests: 1 } } }),
@@ -162,16 +138,12 @@ const { combineTotals, combineTimeBuckets } = await import(join(root, 'lib/sourc
   const inputBefore = JSON.parse(JSON.stringify(input));
   const merged = combineTimeBuckets([input, [bucket('2026-05-10', 'May 10', { input: 20, total: 20, cost: 0.5, requests: 1, models: { 'n': { tokens: 20, cost: 0.5, requests: 1 } } })]]);
 
-  // After merging, mutating `merged` MUST NOT mutate `input`.
   merged[0].inputTokens = 99999;
   merged[0].models['m'].tokens = 99999;
   assert.deepEqual(input, inputBefore, 'merging must not mutate the caller\'s input buckets');
   console.log('✓ combineTimeBuckets: merging does not mutate the caller\'s input arrays');
 }
 
-// Same-key model merge across sources — defensive: if two sources DID
-// happen to emit a colliding model name (unlikely, but the doc comment
-// promises namespaces are disjoint), summing must still be safe.
 {
   const s1 = [bucket('d', 'd', { input: 100, total: 100, cost: 1, requests: 1, models: { 'shared': { tokens: 100, cost: 1, requests: 1 } } })];
   const s2 = [bucket('d', 'd', { input: 50, total: 50, cost: 0.5, requests: 1, models: { 'shared': { tokens: 50, cost: 0.5, requests: 1 } } })];
@@ -182,8 +154,6 @@ const { combineTotals, combineTimeBuckets } = await import(join(root, 'lib/sourc
 }
 
 console.log('\nAll source-merge assertions passed.');
-
-// ── helpers ───────────────────────────────────────────────────────────
 
 function bucket(key, label, partial = {}) {
   return {

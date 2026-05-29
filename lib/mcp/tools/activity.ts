@@ -30,7 +30,6 @@ const ZERO_TOTALS_PUBLIC: FlatTotals = {
   turns: 0,
 };
 
-/** ISO week start (Monday) for the given offset. 0=current week, -1=last, etc. */
 function weekWindow(offset: number): { from: Date; to: Date; label: string } {
   const now = new Date();
   const day = now.getDay() || 7;
@@ -45,7 +44,6 @@ function weekWindow(offset: number): { from: Date; to: Date; label: string } {
   return { from: monday, to: sunday, label: `${fmt(monday)} → ${fmt(sunday)}` };
 }
 
-/** Group sessions by project (cwd) for a daily/weekly summary view. */
 function groupSessionsByProject(entries: FlatSessionEntry[]) {
   const map = new Map<string, { project: string; cwd: string; sessions: FlatSessionEntry[] }>();
   for (const s of entries) {
@@ -86,7 +84,7 @@ function topToolUses(
 }
 
 export function registerActivityTools(server: McpServer): void {
-  // ── daily_summary ──
+
   server.registerTool(
     'daily_summary',
     {
@@ -127,7 +125,6 @@ export function registerActivityTools(server: McpServer): void {
     }),
   );
 
-  // ── weekly_summary ──
   server.registerTool(
     'weekly_summary',
     {
@@ -156,12 +153,6 @@ export function registerActivityTools(server: McpServer): void {
 
       const totals = totalsWithBySource(snap.records, source, week, ctx);
 
-      // Per-day cost trend (7 entries, including zero-fill days). One
-      // `timeBuckets` call returns at most 7 daily buckets keyed by
-      // YYYY-MM-DD — we then merge that into a fixed 7-slot skeleton so
-      // zero-activity days still show up. Replaces the old hot path that
-      // called `totalsWithBySource` once per day (8 total passes over
-      // the record set per weekly_summary call).
       const dayBuckets = timeBuckets(snap.records, source, 'day', {
         from: week.from,
         to: week.to,
@@ -180,7 +171,7 @@ export function registerActivityTools(server: McpServer): void {
         if (hit) {
           days.push({ date: key, totals: hit.totals, bySource: hit.bySource });
         } else {
-          // Zero-fill so the LLM sees a consistent 7-entry array shape.
+
           days.push({
             date: key,
             totals: { ...ZERO_TOTALS_PUBLIC },
@@ -219,7 +210,6 @@ export function registerActivityTools(server: McpServer): void {
     }),
   );
 
-  // ── recent_activity ──
   server.registerTool(
     'recent_activity',
     {
@@ -252,10 +242,6 @@ export function registerActivityTools(server: McpServer): void {
       const limit = args.limit ?? 10;
       const days = args.days ?? 30;
 
-      // Day-aligned window: from start-of-(N days ago) through end-of-today.
-      // Aggregating sessions across the user's whole history just to return
-      // the top 10 by end_time grows linearly with their CLI lifetime, so
-      // we narrow the input set first.
       const now = new Date();
       const from = new Date(now);
       from.setDate(from.getDate() - (days - 1));
@@ -283,5 +269,4 @@ export function registerActivityTools(server: McpServer): void {
   );
 }
 
-// Re-export types for convenience (avoid unused import warnings).
 export type { FlatSessionEntry, FlatProjectEntry, FlatModelEntry, AssistantRecord, ProviderId };

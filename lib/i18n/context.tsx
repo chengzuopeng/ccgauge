@@ -18,12 +18,11 @@ const I18nContext = createContext<Ctx>({
 });
 
 const LS_KEY = 'ccgauge.locale';
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 365; // 1 year
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
 
 export function I18nProvider({ initialLocale, children }: { initialLocale: Locale; children: React.ReactNode }) {
   const router = useRouter();
 
-  // On first mount, sync localStorage → cookie if they differ.
   useEffect(() => {
     try {
       const ls = localStorage.getItem(LS_KEY) as Locale | null;

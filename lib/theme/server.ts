@@ -9,7 +9,7 @@ export async function getServerTheme(): Promise<Theme> {
     const v = c.get(THEME_COOKIE)?.value;
     if (v === 'light' || v === 'dark' || v === 'system') return v;
   } catch {
-    // not in a request context
+
   }
   return DEFAULT_THEME;
 }

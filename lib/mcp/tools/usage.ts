@@ -20,7 +20,7 @@ import { getProvider } from '@/lib/providers';
 import { costFromUsage } from '@/lib/pricing/cost-from-usage';
 
 export function registerUsageTools(server: McpServer): void {
-  // ── usage_summary ──
+
   server.registerTool(
     'usage_summary',
     {
@@ -52,7 +52,6 @@ export function registerUsageTools(server: McpServer): void {
     }),
   );
 
-  // ── usage_by_time ──
   server.registerTool(
     'usage_by_time',
     {
@@ -88,7 +87,6 @@ export function registerUsageTools(server: McpServer): void {
     }),
   );
 
-  // ── usage_by_model ──
   server.registerTool(
     'usage_by_model',
     {
@@ -128,7 +126,6 @@ export function registerUsageTools(server: McpServer): void {
     }),
   );
 
-  // ── usage_by_project ──
   server.registerTool(
     'usage_by_project',
     {
@@ -168,7 +165,6 @@ export function registerUsageTools(server: McpServer): void {
     }),
   );
 
-  // ── usage_by_session ──
   server.registerTool(
     'usage_by_session',
     {
@@ -230,11 +226,6 @@ export function registerUsageTools(server: McpServer): void {
     }),
   );
 
-  // ── cost_estimator ──
-  // Pure pricing calculator — no record lookup, no indexer. Answers
-  // "if I send N input + M output tokens to <model> on <source>, what
-  // does it cost in USD?" using the provider's built-in pricing table.
-  // README promotes this for cap planning and pre-purchase what-ifs.
   server.registerTool(
     'cost_estimator',
     {
@@ -271,9 +262,7 @@ export function registerUsageTools(server: McpServer): void {
       const source = args.source;
       const provider = getProvider(source);
       const { pricing, matchType } = provider.resolvePricing(args.model);
-      // Build a synthetic AssistantRecord.usage so we hit the same code
-      // path that prices live records — cache-creation bucket disambiguation
-      // and per-1M-token math stay in one place.
+
       const usage = {
         input_tokens: args.input_tokens ?? 0,
         output_tokens: args.output_tokens ?? 0,

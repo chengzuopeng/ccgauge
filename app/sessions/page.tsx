@@ -29,8 +29,7 @@ export default async function SessionsPage({
   const records = filterBySource(scan.records, source);
   const userRecords = filterBySource(scan.userRecords, source);
   const sources = expandSources(source);
-  // For mixed-source rows the model shortener needs to know each row's
-  // provider — sessions already carry `source` after aggregation.
+
   const shortenFor = (s: { source: typeof sources[number] }) => (m: string) =>
     getProvider(s.source).shortenModel(m);
 
@@ -42,9 +41,6 @@ export default async function SessionsPage({
     );
   }
 
-  // List-style aggregator: run per source and concatenate. Sessions never
-  // span providers, so there's no risk of cross-source merging in the
-  // aggregator's `sessionId` keying.
   const sessions = sources
     .flatMap((s) => aggregateBySession(records, userRecords, { source: s }))
     .sort((a, b) => b.endTime.localeCompare(a.endTime));

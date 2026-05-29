@@ -103,30 +103,16 @@ export interface AssistantRecord {
   usage: Required<Pick<Usage, 'input_tokens' | 'output_tokens' | 'cache_creation_input_tokens' | 'cache_read_input_tokens'>> & {
     cache_creation_5m: number;
     cache_creation_1h: number;
-    /**
-     * Reasoning tokens (OpenAI o-series / Codex). For display only — these
-     * are already included in `output_tokens` and billed at the output
-     * rate. Anthropic models leave this undefined.
-     */
+
     reasoning_tokens?: number;
   };
   toolNames: string[];
   hasThinking: boolean;
   textPreview: string;
   filePath: string;
-  /**
-   * Provider-specific reasoning depth / effort tag.
-   *   - Codex: turn_context.effort  (low / medium / high / minimal)
-   *   - Claude: undefined (no equivalent in the JSONL)
-   */
+
   effort?: string;
-  /**
-   * True when this record belongs to a Claude Code sub-agent invocation
-   * (stored under `.../<parent-session-uuid>/subagents/agent-*.jsonl`).
-   * Used by the indexer's post-link pass to identify subagent files and
-   * by the UI for optional visual markers. Codex records leave this
-   * undefined.
-   */
+
   isSidechain?: boolean;
 }
 
@@ -139,17 +125,9 @@ export interface UserRecord {
   sessionId: string;
   cwd: string;
   textPreview: string;
-  /**
-   * True when textPreview was injected by Claude Code itself rather than
-   * typed by the human (skill metadata, <system-reminder>, sub-agent
-   * synthesized prompts, etc.). Used to skip these as turn roots while
-   * still letting them be displayed per-call.
-   */
+
   isSynthetic?: boolean;
-  /**
-   * True when this record belongs to a Claude Code sub-agent invocation.
-   * See {@link AssistantRecord.isSidechain}.
-   */
+
   isSidechain?: boolean;
   filePath: string;
 }
@@ -230,18 +208,12 @@ export interface BlockSummary {
 
 export interface SessionSummary {
   sessionId: string;
-  /** Provider this session originated from. A session never spans both
-   *  providers; populated by the aggregator from the first record's
-   *  source. Used by the All view to label rows in mixed lists. */
+
   source: ProviderId;
   cwd: string;
-  /** Plain basename of `cwd`. Always available, never worktree-aware. */
+
   projectName: string;
-  /** Worktree-aware display label — `"<main-repo> (<worktree-name>)"`
-   *  when `cwd` lives inside `.git/worktrees/...` or Claude Code's
-   *  `.claude/worktrees/...`; otherwise identical to `projectName`.
-   *  Same shape as `UsageTurnRow.projectLabel` so the sessions / usage
-   *  tables stay in sync for cross-worktree projects. */
+
   projectLabel: string;
   startTime: string;
   endTime: string;
@@ -261,9 +233,7 @@ export interface SessionSummary {
 }
 
 export interface ProjectSummary {
-  /** Provider these aggregated records came from. For the All view,
-   *  the same `cwd` may appear twice — once per source — so this field
-   *  is the disambiguator. */
+
   source: ProviderId;
   cwd: string;
   projectName: string;

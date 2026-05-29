@@ -12,8 +12,7 @@ export const GET = withApiErrorHandling(async (req: Request) => {
   const source = await resolveSource(url.searchParams.get('source'));
   const scan = await getCachedScan();
   const records = filterBySource(scan.records, source);
-  // For 'all', same cwd may appear once per source — by design, so the
-  // caller can attribute usage to each provider independently.
+
   const projects = expandSources(source)
     .flatMap((s) => aggregateByProject(records, { source: s }))
     .sort((a, b) => b.cost - a.cost);

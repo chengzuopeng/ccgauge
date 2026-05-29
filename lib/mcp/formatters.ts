@@ -16,24 +16,11 @@ import { summarizeTurns } from '@/lib/turns';
 import { PROVIDERS } from './schema';
 import type { EffectiveSource } from './context';
 
-/** Snap-level context needed to compute turn counts. Bundled separately
- *  from `records` so per-source / per-model / per-time aggregators can
- *  re-derive turn boundaries cheaply (the user/parent links may live
- *  outside the filtered slice — same data the dashboard's
- *  `buildTurnIndex` consumes). */
 export interface TurnsContext {
   users: UserRecord[];
   parentMap: Record<string, string | null>;
 }
 
-/** A flattened, LLM-friendly version of {@link AggregateTotals}. Adds
- *  `reasoning_tokens` for surface symmetry with the underlying records
- *  (reasoning is included in `output_tokens` per the billing convention)
- *  plus `turns` — the number of distinct user prompts that hit this
- *  window/source. One turn can span many `requests` (tool loops,
- *  reasoning steps, sub-agents); that's what makes `turns` more
- *  meaningful than `requests` for "how often does the user actually
- *  send something". */
 export interface FlatTotals {
   input_tokens: number;
   output_tokens: number;
@@ -76,10 +63,6 @@ function withinDates(rec: AssistantRecord, opts: { from?: Date; to?: Date }): bo
   return true;
 }
 
-/** Compute totals for a single provider source. Reasoning is summed
- *  separately from output for transparency, even though it's already
- *  inside output_tokens for billing. `ctx` is needed to derive `turns`
- *  via summarizeTurns. */
 export function totalsForSource(
   records: AssistantRecord[],
   source: ProviderId,
@@ -115,18 +98,13 @@ function sumTotals(parts: FlatTotals[]): FlatTotals {
       cost_usd: acc.cost_usd + p.cost_usd,
       saved_usd: acc.saved_usd + p.saved_usd,
       requests: acc.requests + p.requests,
-      // Turns DON'T sum the same way other fields do: a turn never
-      // spans providers (parent chain doesn't cross source), so
-      // claude.turns + codex.turns IS the all-view turn count.
+
       turns: acc.turns + p.turns,
     }),
     { ...ZERO_TOTALS },
   );
 }
 
-/** A bundle of totals + per-source breakdown. All analytical tools return
- *  a value of this shape so the LLM can read either the combined view or
- *  drill into a specific provider without a follow-up call. */
 export interface TotalsWithBySource {
   totals: FlatTotals;
   bySource: Record<ProviderId, FlatTotals>;
@@ -152,8 +130,6 @@ export function totalsWithBySource(
   };
 }
 
-// ── time-series ──────────────────────────────────────────────────────────
-
 export interface TimeBucketPoint {
   label: string;
   key: string;
@@ -169,7 +145,7 @@ export function timeBuckets(
   ctx: TurnsContext,
 ): TimeBucketPoint[] {
   const sources = effectiveSource === 'all' ? PROVIDERS : [effectiveSource as ProviderId];
-  // Aggregate per source and merge into a single key→bucket map keyed by `key`.
+
   const bucketMap = new Map<string, TimeBucketPoint>();
 
   for (const s of sources) {
@@ -179,11 +155,6 @@ export function timeBuckets(
       ...opts,
     });
 
-    // Aggregator doesn't carry reasoning_tokens (it's a display-only field
-    // sourced from the parser), so re-bucket the source records under the
-    // same key scheme and accumulate reasoning per bucket. Without this
-    // step every bucket reports reasoning_tokens=0 even when the totals
-    // are correct, which silently breaks any "reasoning over time" question.
     const reasoningByKey = new Map<string, number>();
     const fromIso = opts.from?.toISOString();
     const toIso = opts.to?.toISOString();
@@ -199,10 +170,6 @@ export function timeBuckets(
       }
     }
 
-    // Per-bucket turn counts. A turn is attributed to its earliest
-    // record's timestamp — same convention the dashboard's overview
-    // trend chart uses, so MCP and dashboard agree on the daily
-    // conversation count.
     const turnsByKey = new Map<string, number>();
     const turnSums = summarizeTurns(inWindow, ctx.users, ctx.parentMap);
     for (const tn of turnSums.values()) {
@@ -241,16 +208,11 @@ export function timeBuckets(
   return Array.from(bucketMap.values()).sort((a, b) => a.key.localeCompare(b.key));
 }
 
-// ── model breakdown ──────────────────────────────────────────────────────
-
 export interface FlatModelEntry {
   source: ProviderId;
   model: string;
   requests: number;
-  /** Distinct user prompts whose **first** record used this model.
-   *  A turn is counted under one model only — the one that
-   *  opened it — so summing `turns` across models equals the
-   *  scope's `totals.turns`. */
+
   turns: number;
   input_tokens: number;
   output_tokens: number;
@@ -274,7 +236,7 @@ export function modelEntries(
     const sourceRecs = recordsForSource(records, s);
     const inWindow = sourceRecs.filter((r) => withinDates(r, opts));
     const list = aggregateByModel(sourceRecs, { source: s, ...opts });
-    // Bucket turn counts by the model of the turn's first record.
+
     const turnsByModel = new Map<string, number>();
     for (const tn of summarizeTurns(inWindow, ctx.users, ctx.parentMap).values()) {
       turnsByModel.set(tn.firstModel, (turnsByModel.get(tn.firstModel) ?? 0) + 1);
@@ -299,17 +261,13 @@ export function modelEntries(
   return out.sort((a, b) => b.cost_usd - a.cost_usd);
 }
 
-// ── project breakdown ────────────────────────────────────────────────────
-
 export interface FlatProjectEntry {
   source: ProviderId;
   cwd: string;
   project_name: string;
   sessions: number;
   requests: number;
-  /** Distinct user prompts that originated in this cwd. A turn is
-   *  attributed to the cwd of its earliest record (turns rarely
-   *  cross cwds in practice, but if they did we'd pick the opener). */
+
   turns: number;
   input_tokens: number;
   output_tokens: number;
@@ -364,8 +322,6 @@ export function projectEntries(
   return out.sort((a, b) => b.cost_usd - a.cost_usd);
 }
 
-// ── session breakdown ────────────────────────────────────────────────────
-
 export interface FlatSessionEntry {
   source: ProviderId;
   session_id: string;
@@ -377,9 +333,7 @@ export interface FlatSessionEntry {
   end_time: string;
   duration_ms: number;
   requests: number;
-  /** Distinct user prompts (= rows in the dashboard's usage table)
-   *  recorded in this session. A long-running session with lots of
-   *  back-and-forth has many turns; a one-shot has 1. */
+
   turns: number;
   input_tokens: number;
   output_tokens: number;

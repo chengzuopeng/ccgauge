@@ -16,9 +16,7 @@ export default [
       '.next-test/**',
       'docs/**',
       'dist/**',
-      // Marketing site has its own Astro toolchain (`cd site && pnpm check`).
-      // Keep the main repo's eslint off of it so it doesn't trip on Astro
-      // conventions (triple-slash refs in env.d.ts, generated dist JS).
+
       'site/**',
       'next-env.d.ts',
       'tsconfig.tsbuildinfo',

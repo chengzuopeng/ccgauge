@@ -7,9 +7,9 @@ interface SectionProps {
   right?: ReactNode;
   children: ReactNode;
   className?: string;
-  /** Render the description inline next to the title (default: stacked below). */
+
   inlineDesc?: boolean;
-  /** Make the inner content area grow to fill the section (for equal-height rows). */
+
   fillBody?: boolean;
 }
 
@@ -23,10 +23,7 @@ export function Section({
   fillBody,
 }: SectionProps) {
   return (
-    // No vertical margin baked in here — let the parent layout (PageShell's
-    // `space-y-*`, grid `gap-*`, or an explicit `mt-*` in `className`)
-    // control spacing. Sections used as the root of a stretched flex/grid
-    // cell rely on starting at y=0 so siblings line up.
+
     <section className={cn('card overflow-hidden', fillBody && 'flex flex-col', className)}>
       {(title || right) && (
         <header
@@ -73,10 +70,7 @@ export function PageShell({
   children: ReactNode;
 }) {
   return (
-    // `dash-stagger`: each top-level block settles in on first mount and on
-    // route navigation. It does NOT replay on the background auto-refresh —
-    // `router.refresh()` keeps these DOM nodes mounted, so the CSS entrance
-    // animation only fires on a real (re)mount. Honors reduced-motion.
+
     <div className="dash-stagger max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 sm:gap-4">
         <div className="min-w-0">

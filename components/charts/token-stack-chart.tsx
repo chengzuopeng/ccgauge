@@ -19,13 +19,9 @@ export interface TokenStackDatum {
   cacheRead: number;
   cacheCreation: number;
   cost: number;
-  /** Raw API call count for this bucket (one per AssistantRecord). */
+
   requests: number;
-  /** Conversation count — number of distinct turn roots whose first API
-   *  call lands in this bucket, matching what the usage table shows as
-   *  rows (one row per user prompt, excluding expanded child API calls).
-   *  Optional because most chart consumers only render token stacks;
-   *  only the overview trend card needs this. */
+
   turns?: number;
 }
 

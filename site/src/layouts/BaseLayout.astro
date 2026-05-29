@@ -9,38 +9,26 @@ import { SITE_TITLE, SITE_URL_FALLBACK, THEME_STORAGE_KEY, type Locale } from '.
 import { assetUrl, switchLocaleUrl } from '../i18n/utils';
 
 interface Props {
-  /** Page title shown in <title> and og:title; the site name is appended automatically. */
+  
   title: string;
-  /** Short description used for the meta description tag and og:description. */
+  
   description: string;
-  /** Locale of the current page — drives <html lang>, hreflang, and i18n nav links. */
+  
   locale: Locale;
-  /**
-   * Path of the OG image, relative to `/images/`. Defaults to
-   * `og-default.png`, a generated social card. Social-media crawlers do not
-   * reliably render SVG OG images.
-   */
+  
   ogImage?: string;
 }
 
 const { title, description, locale, ogImage = 'og-default.png' } = Astro.props;
 const fullTitle = title === SITE_TITLE ? title : `${title} · ${SITE_TITLE}`;
-// Prefer `Astro.site` (resolved from `astro.config.mjs`) so canonical /
-// OG / hreflang URLs use the actual deploy host — `chengzuopeng.github.io`
-// under GH Pages, `ccgauge.dev` once the custom domain is wired. The
-// hardcoded `SITE_URL_FALLBACK` in `consts.ts` only catches edge cases
-// where `Astro.site` is undefined (off-pipeline layout imports, etc.).
+
 const siteOrigin = (Astro.site ?? new URL(SITE_URL_FALLBACK)).toString().replace(/\/+$/, '');
-// `Astro.url.pathname` already includes the deploy base on GH Pages
-// (e.g. `/ccgauge/cli/`), so the canonical URL just needs to be absolutized.
+
 const canonical = new URL(Astro.url.pathname, siteOrigin).toString();
-// `assetUrl` handles the base prefix; `new URL(..., siteOrigin)` then
-// makes it absolute for OG / Twitter crawlers.
+
 const ogImageUrl = new URL(assetUrl(`images/${ogImage}`), siteOrigin).toString();
 const htmlLang = locale === 'zh' ? 'zh-CN' : 'en';
-// `switchLocaleUrl` is base-aware: it strips both the deploy base and
-// the locale segment, then re-attaches the target locale plus the base.
-// Absolute URLs needed for hreflang per the spec.
+
 const hreflangEnUrl = new URL(switchLocaleUrl(Astro.url.pathname, 'en'), siteOrigin).toString();
 const hreflangZhUrl = new URL(switchLocaleUrl(Astro.url.pathname, 'zh'), siteOrigin).toString();
 ---
@@ -57,7 +45,7 @@ const hreflangZhUrl = new URL(switchLocaleUrl(Astro.url.pathname, 'zh'), siteOri
     <link rel="canonical" href={canonical} />
     <link rel="icon" type="image/svg+xml" href={assetUrl('favicon.svg')} />
 
-    <!-- Open Graph -->
+    
     <meta property="og:type" content="website" />
     <meta property="og:title" content={fullTitle} />
     <meta property="og:description" content={description} />
@@ -65,30 +53,17 @@ const hreflangZhUrl = new URL(switchLocaleUrl(Astro.url.pathname, 'zh'), siteOri
     <meta property="og:image" content={ogImageUrl} />
     <meta property="og:locale" content={htmlLang.replace('-', '_')} />
 
-    <!-- Twitter card -->
+    
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={fullTitle} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImageUrl} />
 
-    <!--
-      hreflang for the matching alternate locale. English is the default
-      and serves un-prefixed under the deploy base (`/`, `/cli/`, … or
-      `/ccgauge/`, `/ccgauge/cli/`, …); Chinese lives at `<base>/zh/...`.
-      `switchLocaleUrl` handles both the base prefix and the locale swap.
-    -->
+    
     <link rel="alternate" hreflang="en" href={hreflangEnUrl} />
     <link rel="alternate" hreflang="zh" href={hreflangZhUrl} />
 
-    <!--
-      No-flash theme script. Runs synchronously before any paint so users
-      who picked light/dark previously don't see a flash. Mirrors the
-      strategy used in the main dashboard's `components/no-flash-script.tsx`.
-
-      Default = `system` (tracks `prefers-color-scheme`). Returning users
-      keep their explicit choice. The `data-theme` attribute is convenient
-      for CSS / dev tooling.
-    -->
+    
     <script is:inline define:vars={{ key: THEME_STORAGE_KEY }}>
       (function () {
         try {
@@ -96,7 +71,7 @@ const hreflangZhUrl = new URL(switchLocaleUrl(Astro.url.pathname, 'zh'), siteOri
           try {
             t = localStorage.getItem(key);
           } catch (_) {
-            /* localStorage may be disabled */
+            
           }
           if (t !== 'light' && t !== 'dark' && t !== 'system') t = 'system';
           var resolved = t;
@@ -110,19 +85,18 @@ const hreflangZhUrl = new URL(switchLocaleUrl(Astro.url.pathname, 'zh'), siteOri
           root.classList.remove('theme-light', 'theme-dark');
           root.classList.add(resolved === 'light' ? 'theme-light' : 'theme-dark');
           root.setAttribute('data-theme', resolved);
-          // Flag JS so the reveal system can hide-then-animate. Without this
-          // class (JS disabled / failed) all `[data-reveal]` content stays
-          // visible — never hidden-forever. Set pre-paint to avoid a flash.
+          
+          
+          
           root.classList.add('js');
         } catch (e) {
-          /* ignore */
+          
         }
       })();
     </script>
   </head>
   <body class="min-h-screen bg-bg text-text-primary antialiased">
-    <!-- Ambient atmosphere: slow-drifting brand aura + fine film grain.
-         Both fixed, behind content (z-index:-1), and inert. -->
+    
     <div class="bg-aura" aria-hidden="true"></div>
     <div class="grain" aria-hidden="true"></div>
 
@@ -138,18 +112,13 @@ const hreflangZhUrl = new URL(switchLocaleUrl(Astro.url.pathname, 'zh'), siteOri
     </main>
     <Footer locale={locale} />
 
-    <!--
-      Site-wide motion controller. All effects degrade safely:
-        - reduced-motion → reveal everything at once, no pointer/aura work
-        - no IntersectionObserver → reveal everything at once
-        - no JS at all → `html.js` is never set, so CSS keeps content visible
-    -->
+    
     <script>
       (() => {
         const reduce =
           window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-        // --- Scroll reveal -------------------------------------------------
+        
         const revealTargets = document.querySelectorAll('[data-reveal], .reveal-stagger');
         if (reduce || !('IntersectionObserver' in window)) {
           revealTargets.forEach((el) => el.classList.add('in-view'));
@@ -163,16 +132,16 @@ const hreflangZhUrl = new URL(switchLocaleUrl(Astro.url.pathname, 'zh'), siteOri
                 }
               }
             },
-            // No negative bottom margin: that would create a dead band at
-            // the page bottom where short elements never intersect and stay
-            // hidden forever. A small threshold gives the "settle in once a
-            // bit is on screen" feel without that risk.
+            
+            
+            
+            
             { threshold: 0.12 },
           );
           revealTargets.forEach((el) => io.observe(el));
         }
 
-        // --- Pointer spotlight on cards -----------------------------------
+        
         if (!reduce) {
           document.querySelectorAll<HTMLElement>('[data-spotlight]').forEach((card) => {
             card.addEventListener(
@@ -187,7 +156,7 @@ const hreflangZhUrl = new URL(switchLocaleUrl(Astro.url.pathname, 'zh'), siteOri
           });
         }
 
-        // --- Scroll progress (nav bottom-border fill) ---------------------
+        
         const progressEls = document.querySelectorAll<HTMLElement>('[data-scroll-progress]');
         if (progressEls.length) {
           let ticking = false;
@@ -209,7 +178,7 @@ const hreflangZhUrl = new URL(switchLocaleUrl(Astro.url.pathname, 'zh'), siteOri
           update();
         }
 
-        // --- Logo: swing the needle to its reading once mounted -----------
+        
         const lightLogos = () =>
           document.querySelectorAll('.logo-animated').forEach((el) => el.classList.add('lit'));
         requestAnimationFrame(() => requestAnimationFrame(lightLogos));

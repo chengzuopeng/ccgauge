@@ -6,20 +6,16 @@ import { TokenStackChart, type TokenStackDatum } from '@/components/charts/token
 import { ConversationsBarChart } from '@/components/charts/conversations-bar-chart';
 import { useT } from '@/lib/i18n/context';
 import { useTabIndicator } from '@/components/use-tab-indicator';
+import { TabIndicator } from '@/components/tab-indicator';
 
 type Metric = 'tokens' | 'conversations';
 
 interface Props {
   data: TokenStackDatum[];
-  /** Pre-localized hint about how many days in the window have data
-   *  (e.g. "25 天有数据"). Computed server-side because the active-day
-   *  count comes from the raw record set, not the chart payload. */
+
   activeDaysHint: string;
 }
 
-/** The overview "Usage trend" card. Wraps the title + right-slot
- *  controls so the metric toggle can drive both the chart and the
- *  description on the client without a round-trip. */
 export function OverviewTrendCard({ data, activeDaysHint }: Props) {
   const t = useT();
   const [metric, setMetric] = useState<Metric>('tokens');
@@ -63,13 +59,7 @@ function MetricToggle({
   return (
     <div className="inline-flex items-center rounded-md border border-border bg-bg-surface p-0.5">
       <div ref={containerRef} role="tablist" aria-label={t('overview.trend.title')} className="relative flex gap-0.5">
-        {rect && (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-y-0 rounded bg-brand-strong shadow-sm transition-[transform,width] duration-200 ease-out-soft"
-            style={{ transform: `translateX(${rect.left}px)`, width: rect.width }}
-          />
-        )}
+        <TabIndicator rect={rect} />
         {opts.map((o) => {
           const isActive = o.id === value;
           return (

@@ -23,8 +23,7 @@ export default async function ModelsPage({
   const scan = await getCachedScan();
   const records = filterBySource(scan.records, source);
   const sources = expandSources(source);
-  // Each model entry carries its own `source`; use it to pick the right
-  // shortener for mixed lists.
+
   const shortenFor = (m: { source: typeof sources[number]; model: string }) =>
     getProvider(m.source).shortenModel(m.model);
 
@@ -35,9 +34,7 @@ export default async function ModelsPage({
       </PageShell>
     );
   }
-  // Claude and Codex model names are disjoint (claude-* vs gpt-*/o-*) so
-  // simple concatenation + sort produces a clean mixed list with no
-  // collision risk.
+
   const models = sources
     .flatMap((s) => aggregateByModel(records, { source: s }))
     .sort((a, b) => b.cost - a.cost);
@@ -70,10 +67,7 @@ export default async function ModelsPage({
               ? m.cacheReadTokens / Math.max(1, m.cacheReadTokens + m.inputTokens + m.cacheCreationTokens)
               : 0;
           return (
-            // Use a (source, model) compound key — same model name can't
-            // appear under two sources today (Claude vs OpenAI namespaces
-            // are disjoint), but the compound key future-proofs against
-            // any naming collision and keeps the All view stable.
+
             <div key={`${m.source}:${m.model}`} className="card card-pad space-y-3">
               <div className="flex items-baseline justify-between gap-2">
                 <div>

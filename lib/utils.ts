@@ -101,9 +101,7 @@ export function formatDateTime(ts: string | number | Date): string {
 
 export function projectNameFromCwd(cwd: string): string {
   if (!cwd) return '(unknown)';
-  // Trim trailing separators (both posix and windows) before taking the
-  // leaf segment; a Windows cwd like `C:\Users\me\proj` would otherwise
-  // come back as the whole string when split('/') gives a single part.
+
   const trimmed = cwd.replace(/[/\\]+$/, '');
   const parts = trimmed.split(/[/\\]+/);
   return parts[parts.length - 1] || cwd;
@@ -134,7 +132,7 @@ export function shortenModel(model: string): string {
     }
     return noPrefix.toUpperCase();
   }
-  // Anthropic / Claude path
+
   let m = noPrefix.replace(/-(\d{8})$/, '');
   m = m.replace(/^claude-/, '');
   const parts = m.split('-');

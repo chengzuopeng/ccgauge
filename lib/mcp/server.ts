@@ -6,10 +6,7 @@ import { registerProvidersResource } from './resources/providers';
 import { getMcpIndexerReady } from './context';
 
 const SERVER_NAME = 'ccgauge';
-// Injected at bundle time by `scripts/build-mcp.mjs` via esbuild's `define`,
-// sourced from package.json#version so the server identifies itself
-// consistently with the npm release that ships it. Falls back to the
-// literal "dev" only when imported outside the bundle (e.g. dev / tests).
+
 declare const __SERVER_VERSION__: string;
 const SERVER_VERSION =
   typeof __SERVER_VERSION__ !== 'undefined' ? __SERVER_VERSION__ : 'dev';
@@ -35,25 +32,12 @@ export function createServer(): McpServer {
   return server;
 }
 
-/** Boot the MCP server on stdio. Used by `ccgauge mcp`. */
 export async function runStdioServer(): Promise<void> {
-  // Anything we write to stdout becomes JSON-RPC noise — make sure
-  // logs go to stderr.
+
   const log = (...args: unknown[]) => {
     process.stderr.write(`[ccgauge-mcp] ${args.map(String).join(' ')}\n`);
   };
 
-  // Eagerly init the indexer so the first tool call doesn't pay the
-  // cold-start cost. We don't await here — let it warm up in the
-  // background.
-  //
-  // Safety: this is NOT fire-and-forget in the "hope the data is ready"
-  // sense. Every tool handler in `tools/{usage,activity}.ts` starts with
-  // `await getMcpIndexerReady()`, and `Indexer.init()` is memoized via a
-  // shared `initPromise` (see `data-loader/indexer.ts`). So even if the
-  // first tool call lands before this warm-up resolves, it awaits the
-  // SAME promise and gets fully-loaded data — never an empty snapshot.
-  // The warm-up just shaves cold-start latency off the first call.
   getMcpIndexerReady()
     .then((idx) => {
       const s = idx.getStatus();
@@ -66,7 +50,6 @@ export async function runStdioServer(): Promise<void> {
   const server = createServer();
   const transport = new StdioServerTransport();
 
-  // Graceful shutdown on stdin close (parent process exits).
   const shutdown = () => {
     log('shutting down');
     transport.close().catch(() => {});

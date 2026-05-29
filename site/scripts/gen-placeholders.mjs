@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-/**
- * Generates the placeholder SVGs referenced by the marketing site pages.
- * Run once after `pnpm install` so dev-mode pages don't 404 on missing
- * images. When you have real AI-generated artwork, drop the WebP/PNG
- * files next to these and update the references in `src/pages/`.
- *
- * Usage:
- *   node scripts/gen-placeholders.mjs
- *
- * The output SVGs share a dark-indigo aesthetic so the marketing site
- * looks intentional even before real images land.
- */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -20,7 +8,6 @@ const here = dirname(fileURLToPath(import.meta.url));
 const imagesDir = resolve(here, '..', 'public', 'images');
 mkdirSync(imagesDir, { recursive: true });
 
-// Brand palette (mirrors site/src/styles/global.css)
 const BG = '#0A0A0A';
 const BG_SURFACE = '#161616';
 const BORDER = '#2A2A2C';
@@ -54,7 +41,7 @@ function frame({ width = 1600, height = 1000, label, decoration }) {
 }
 
 const placeholders = {
-  // 1. Hero — isometric dashboard suggestion: bars + heatmap grid + ambient glow
+
   'hero-dashboard.svg': frame({
     label: 'hero-dashboard',
     decoration: `
@@ -85,7 +72,6 @@ const placeholders = {
     `,
   }),
 
-  // 2. CLI report — terminal window
   'feature-cli.svg': frame({
     label: 'feature-cli',
     decoration: `
@@ -126,7 +112,6 @@ const placeholders = {
     `,
   }),
 
-  // 3. MCP — three nodes connected
   'feature-mcp.svg': frame({
     label: 'feature-mcp',
     decoration: `
@@ -149,8 +134,6 @@ const placeholders = {
     `,
   }),
 
-  // 4. Dashboard (will be replaced by real screenshot in the page — but
-  //    keep a placeholder for completeness)
   'feature-dashboard.svg': frame({
     label: 'feature-dashboard',
     decoration: `
@@ -172,7 +155,6 @@ const placeholders = {
     `,
   }),
 
-  // 5. Privacy — shield + disk silhouette
   'feature-privacy.svg': frame({
     label: 'feature-privacy',
     decoration: `
@@ -199,7 +181,6 @@ const placeholders = {
     `,
   }),
 
-  // 6. i18n — two browser frames with character blocks
   'feature-i18n.svg': frame({
     label: 'feature-i18n',
     decoration: `
@@ -232,7 +213,6 @@ const placeholders = {
     `,
   }),
 
-  // 7. OG image (1200×630) — wordmark + accent
   'og-default.svg': frame({
     width: 1200,
     height: 630,
@@ -259,7 +239,6 @@ const placeholders = {
     `,
   }),
 
-  // 8. OG image for CLI page
   'og-cli.svg': frame({
     width: 1200,
     height: 630,

@@ -33,29 +33,23 @@ export default async function ProjectDetailPage({
   const sp = await searchParams;
   const source = await resolveSource(sp.source);
   const cwd = decodeURIComponent(id);
-  // Resolve to the canonical (main repo) path so that clicking a project
-  // card that was created from a merged worktree group still shows all
-  // records from every worktree of that project. Also handles old bookmarks
-  // that pointed directly at a worktree cwd.
+
   const canonicalCwd = resolveCanonicalCwd(cwd);
   const t = await getServerT();
   const locale = await getServerLocale();
   const scan = await getCachedScan();
   const sources = expandSources(source);
-  // For mixed-source rows on this page (sessions table) the model
-  // shortener needs to read each row's own provider.
+
   const shortenFor = (s: { source: typeof sources[number] }) => (m: string) =>
     getProvider(s.source).shortenModel(m);
 
-  // Include records from any worktree that resolves to the same canonical root.
   const records = filterBySource(scan.records, source)
     .filter((r) => resolveCanonicalCwd(r.cwd) === canonicalCwd);
   if (records.length === 0) notFound();
   const userRecords = filterBySource(scan.userRecords, source);
 
   const totals = combineTotals(sources.map((s) => aggregateTotals(records, { source: s })));
-  // Sessions in the project detail list: per-source then concat. Sessions
-  // never cross providers, so concatenation is safe.
+
   const sessions = sources
     .flatMap((s) => aggregateBySession(records, userRecords, { source: s }))
     .sort((a, b) => b.endTime.localeCompare(a.endTime));

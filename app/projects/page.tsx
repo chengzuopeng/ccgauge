@@ -17,18 +17,6 @@ import type { AssistantRecord, ProjectSummary } from '@/lib/types';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-/**
- * Collapses multiple ProjectSummary entries that belong to the same git
- * repository (main + worktrees) into a single entry, keyed by
- * (canonicalCwd, source).  Token / cost / request stats are summed and
- * timestamps take min/max; sessions count is recomputed by unioning every
- * sessionId encountered across all sub-projects so it matches the detail
- * page (where the aggregator naturally de-dupes across worktrees).
- *
- * The merged entry's `cwd` is the canonical path (main repo dir) and its
- * `projectName` is derived from that path — so the card and detail-page
- * URL are stable regardless of which worktree the records actually lived in.
- */
 function mergeWorktreeProjects(
   projects: ProjectSummary[],
   records: AssistantRecord[],
@@ -37,7 +25,7 @@ function mergeWorktreeProjects(
 
   for (const p of projects) {
     const canonical = resolveCanonicalCwd(p.cwd);
-    // Keep source in the key so All-view still shows one row per provider.
+
     const key = `${p.source}::${canonical}`;
     const existing = grouped.get(key);
     if (!existing) {
@@ -63,10 +51,6 @@ function mergeWorktreeProjects(
     }
   }
 
-  // Recompute unique session counts by scanning the underlying records.
-  // Plain summation over-counts when one sessionId touches multiple cwds
-  // (rare, but still wrong on principle) and diverges from the detail page
-  // which always sees a unioned record set.
   const sessionSets = new Map<string, Set<string>>();
   for (const r of records) {
     const key = `${r.source}::${resolveCanonicalCwd(r.cwd)}`;
@@ -105,14 +89,11 @@ export default async function ProjectsPage({
       </PageShell>
     );
   }
-  // Aggregate per source, then collapse all git worktrees that share the
-  // same canonical repo root into a single project row. For 'all' this
-  // still produces up to 2 rows per canonical project (one per provider).
+
   const rawProjects = sources.flatMap((s) => aggregateByProject(records, { source: s }));
   const projects = mergeWorktreeProjects(rawProjects, records).sort((a, b) => b.cost - a.cost);
   const totalCost = projects.reduce((s, p) => s + p.cost, 0);
-  // Each project row has its own `source` — use it to pick the right
-  // model name shortener instead of a page-level provider.
+
   const shortenFor = (p: { source: typeof sources[number] }) => (m: string) =>
     getProvider(p.source).shortenModel(m);
 
@@ -123,8 +104,7 @@ export default async function ProjectsPage({
           const pct = totalCost > 0 ? p.cost / totalCost : 0;
           return (
             <Link
-              // For All view, the same cwd appears once per source; keep
-              // both card identities stable with a (cwd, source) compound key.
+
               key={`${p.source}:${p.cwd}`}
               href={`/projects/${encodeURIComponent(p.cwd)}?source=${p.source}`}
               className="card card-pad hover:border-border-hi transition-colors group"

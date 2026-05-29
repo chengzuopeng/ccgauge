@@ -14,10 +14,7 @@ export function normalizeUsageRange(
 
 export function rangeToDates(range: UsageRange): { from?: Date; to?: Date } {
   const now = new Date();
-  // 'all' returns no bounds. 'custom' also returns no bounds here — the
-  // caller is expected to detect `range === 'custom'` and switch over to
-  // `parseCustomRange(from, to)` with the URL params. Keeping the
-  // signature single-arg avoids touching every existing call site.
+
   if (range === 'all' || range === 'custom') return {};
   if (range === '1d') {
     const from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -34,22 +31,6 @@ export function rangeToDates(range: UsageRange): { from?: Date; to?: Date } {
   return { from };
 }
 
-/**
- * Parse a YYYY-MM-DD string into a local-time `Date` at 00:00:00, or
- * `undefined` if the input isn't a well-formed and calendar-valid date.
- *
- * Two-stage validation:
- *  1. Regex shape check rejects garbage like `'yesterday'` or `'25-05-01'`.
- *  2. Round-trip check rejects calendar overflow: `new Date(2025, 1, 30)`
- *     silently normalises to March 2nd, which would otherwise let a
- *     `?from=2025-02-30` typo surface as March data labelled as February.
- *     We rebuild Y-M-D from the constructed Date and reject if any
- *     component shifted.
- *
- * Kept inline (not imported from `lib/date-utils.ts`) so the test
- * harness's strip-types Node runtime can import this file standalone
- * without resolving sibling `.ts` modules.
- */
 function parseIsoDate(s?: string | null): Date | undefined {
   if (!s || typeof s !== 'string') return undefined;
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
@@ -69,18 +50,6 @@ function parseIsoDate(s?: string | null): Date | undefined {
   return d;
 }
 
-/**
- * Parse the `from` / `to` URL params used by `range=custom`.
- *
- * - `from` is inclusive — the day the user picked at 00:00:00 local.
- * - `to`   is **also inclusive**, so we shift it to 23:59:59.999 of the
- *   same local day. Records timestamped at, e.g., 22:30 of the picked
- *   `to` date should still count.
- * - Either bound may be missing; the caller treats `undefined` as "no
- *   lower / upper bound for this side", same as `range=all`.
- * - We do **not** swap when `from > to` — that's left to the caller
- *   (the RangePicker already normalizes on Apply).
- */
 export function parseCustomRange(
   fromStr?: string | null,
   toStr?: string | null,

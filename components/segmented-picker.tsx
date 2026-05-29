@@ -4,6 +4,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useT } from '@/lib/i18n/context';
 import { useTabIndicator } from '@/components/use-tab-indicator';
+import { TabIndicator } from '@/components/tab-indicator';
 
 export interface SegmentedOption {
   value: string;
@@ -25,9 +26,7 @@ export function SegmentedPicker({ paramKey, defaultValue, options, ariaLabel }: 
   const rawCurrent = params.get(paramKey) || defaultValue;
   const current = options.some((o) => o.value === rawCurrent) ? rawCurrent : defaultValue;
   const { containerRef, rect } = useTabIndicator<HTMLDivElement>(current);
-  const groupRef = containerRef;
-  // Before the pill is measured (server paint / pre-hydration) the active
-  // button keeps a solid fill so the control never looks selection-less.
+
   const showFallback = rect === null;
 
   function set(v: string) {
@@ -43,29 +42,20 @@ export function SegmentedPicker({ paramKey, defaultValue, options, ariaLabel }: 
     const dir = e.key === 'ArrowRight' ? 1 : -1;
     const nextIdx = (idx + dir + options.length) % options.length;
     set(options[nextIdx].value);
-    const buttons = groupRef.current?.querySelectorAll<HTMLButtonElement>('button[role="radio"]');
+    const buttons = containerRef.current?.querySelectorAll<HTMLButtonElement>('button[role="radio"]');
     buttons?.[nextIdx]?.focus();
   }
 
   return (
     <div className="inline-flex rounded-button border border-border bg-bg-surface p-0.5">
       <div
-        ref={groupRef}
+        ref={containerRef}
         role="radiogroup"
         aria-label={ariaLabel}
         onKeyDown={onKey}
         className="relative flex gap-0.5"
       >
-        {/* Sliding pill — glides under the active option. Hidden until the
-            first measurement; the active button carries a solid fallback
-            fill in the meantime so there's no selection-less flash. */}
-        {rect && (
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-y-0 rounded bg-brand-strong shadow-sm ring-1 ring-brand/40 transition-[transform,width] duration-200 ease-out-soft"
-            style={{ transform: `translateX(${rect.left}px)`, width: rect.width }}
-          />
-        )}
+        <TabIndicator rect={rect} className="ring-1 ring-brand/40" />
         {options.map((p) => {
           const active = current === p.value;
           return (

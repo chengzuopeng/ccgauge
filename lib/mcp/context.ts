@@ -2,12 +2,8 @@ import { getIndexer } from '@/lib/data-loader/indexer';
 import type { ProviderId } from '@/lib/types';
 import { atEndOfDay, atStartOfDay, parseDateLike, parseLocalDateOnly } from '@/lib/date-utils';
 
-/** Cache namespace for the MCP server's own indexer instance. Keeps it
- *  disjoint from the web dashboard's persisted file. */
 export const MCP_INDEX_NAME = 'mcp';
 
-/** Get (and lazily init) the MCP-scoped indexer. The first call kicks off
- *  the full scan; subsequent calls are O(1). */
 export async function getMcpIndexerReady() {
   const idx = getIndexer(MCP_INDEX_NAME);
   await idx.init();
@@ -16,16 +12,6 @@ export async function getMcpIndexerReady() {
 
 export type EffectiveSource = ProviderId | 'all';
 
-/** Convert a date-range tool arg into [from, to] Date objects.
- *
- *  Strict: throws if `from`/`to` can't be parsed, or if `range` isn't a
- *  known value. The schema layer should already reject these, but we
- *  re-check here so any bypass surfaces as a clear MCP error instead of
- *  silently returning all-time data (which would mislead the LLM into
- *  thinking it answered the user's actual question).
- *
- *  Returns { from?, to?, label } — `undefined` bounds mean "open on that
- *  side", which only happens for the explicit `range: "all"` choice. */
 export function parseDateRange(args: {
   range?: string;
   from?: string;
@@ -84,15 +70,7 @@ export function parseDateRange(args: {
     case '7d':
     case '30d':
     case '90d': {
-      // Day-aligned window: `[start-of(N-1 days ago), end-of-today]`. Two
-      // reasons to snap rather than use a rolling [now - N*24h, now]:
-      // (a) `today` / `yesterday` / `this_week` already snap, so all
-      //     named ranges share the same convention; and
-      // (b) summing N daily_summary results equals one usage_summary
-      //     over the same N-day range, which an LLM will assume holds.
-      // The -(N-1) puts today inside the window — `7d` means "today
-      // plus six prior days", matching how the dashboard's range picker
-      // labels the same option.
+
       const n = parseInt(range, 10);
       const start = new Date(startOfToday);
       start.setDate(start.getDate() - (n - 1));
@@ -116,18 +94,6 @@ function parseStrictDate(s: string, field: 'from' | 'to', isUpperBound: boolean)
   return dt;
 }
 
-/** Parse a "single day" argument used by `daily_summary` and any future
- *  per-day report tool. Accepts the same vocabulary as the schema's
- *  `daySchema` refinement:
- *  - `today` / `yesterday`
- *  - weekday names `monday` … `sunday` → most recent occurrence
- *    (today included)
- *  - explicit `YYYY-MM-DD` (validated for calendar overflow via
- *    `parseLocalDateOnly`)
- *
- *  Returns the `[from, to]` window covering that single calendar day in
- *  the server's local timezone, plus a stable `label`. Throws on input
- *  the schema layer should have already rejected. */
 export function parseDayArg(input: string | undefined): {
   from: Date;
   to: Date;
@@ -169,7 +135,7 @@ export function parseDayArg(input: string | undefined): {
 }
 
 function startOfWeek(d: Date): Date {
-  // ISO week: Monday as start.
+
   const day = d.getDay() || 7;
   const monday = new Date(d);
   monday.setDate(monday.getDate() - day + 1);
@@ -177,7 +143,6 @@ function startOfWeek(d: Date): Date {
   return monday;
 }
 
-/** Convert anything → safe ISO date string for the response payload. */
 export function isoOrUndefined(d: Date | undefined): string | undefined {
   return d?.toISOString();
 }

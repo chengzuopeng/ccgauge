@@ -7,25 +7,24 @@ export interface ActivityStats {
   activeDays: number;
   currentStreak: number;
   longestStreak: number;
-  /** 0-23, the hour of day with the most assistant records. -1 if no data. */
+
   peakHour: number;
-  /** Most-used model (by request count). null if no data. */
+
   favoriteModel: string | null;
-  /** 7 rows (Sun..Sat) × 24 cols (0..23). Cell = message count. */
+
   heatmap: number[][];
-  /** Highest single cell (message count) — for normalizing the heatmap intensity. */
+
   heatmapMax: number;
-  /** Same shape as heatmap, but cells are token sums (input+output+cR+cW). */
+
   tokenHeatmap: number[][];
-  /** Sum of input+output+cR+cW across all included records. */
+
   tokensSummed: number;
 }
 
 interface Opts {
-  /** Provider to scope by. `'all'` includes records from every provider —
-   *  used by the Overview "All" view to show combined activity. */
+
   source: ProviderId | 'all';
-  /** Optional cap on how far back the streak walk looks. Defaults to 365. */
+
   streakWindowDays?: number;
 }
 
@@ -71,8 +70,8 @@ export function computeActivityStats(
     if (Number.isNaN(d.getTime())) continue;
     const dayKey = localDayKey(d);
     dayKeys.add(dayKey);
-    const dow = d.getDay(); // 0..6, Sun..Sat
-    const hour = d.getHours(); // 0..23
+    const dow = d.getDay();
+    const hour = d.getHours();
     hourCounts[hour] += 1;
     heatmap[dow][hour] += 1;
     modelCounts.set(r.model, (modelCounts.get(r.model) ?? 0) + 1);
@@ -151,13 +150,11 @@ function computeStreaks(
 ): { current: number; longest: number } {
   if (dayKeys.size === 0) return { current: 0, longest: 0 };
 
-  // Build sorted ascending list of day timestamps (midnight).
   const days = Array.from(dayKeys)
     .map((k) => new Date(k + 'T00:00:00').getTime())
     .filter((t) => Number.isFinite(t))
     .sort((a, b) => a - b);
 
-  // Longest run of consecutive calendar days.
   let longest = 1;
   let run = 1;
   for (let i = 1; i < days.length; i += 1) {
@@ -169,8 +166,6 @@ function computeStreaks(
     }
   }
 
-  // Current streak: walk back from today (or yesterday if today has no
-  // activity yet — preserves the streak across the not-yet-active morning).
   const todayMs = atMidnight(Date.now());
   const lastDay = days[days.length - 1];
   if (todayMs - lastDay > DAY_MS) {
@@ -194,41 +189,31 @@ function atMidnight(ms: number): number {
   return d.getTime();
 }
 
-// --- Fun comparison: tokens vs famous works ---
-//
-// Source: published word counts (rough). Tokens estimated at ~1.3 tokens/word
-// for English prose. Used purely as flavor text — not precise.
-
 interface Reference {
   key: string;
   tokens: number;
 }
 
 const REFERENCES: Reference[] = [
-  { key: 'haiku', tokens: 22 }, // ~17 words
-  { key: 'tweet', tokens: 50 }, // ~38 words
-  { key: 'littlePrince', tokens: 22_000 }, // ~17K words
-  { key: 'gatsby', tokens: 65_000 }, // ~50K words
-  { key: 'hobbit', tokens: 124_000 }, // ~95K words
-  { key: 'lotrTrilogy', tokens: 624_000 }, // ~480K words
-  { key: 'warAndPeace', tokens: 763_000 }, // ~587K words
-  { key: 'harryPotterAll', tokens: 1_430_000 }, // ~1.1M words
-  { key: 'encyclopediaBritannica', tokens: 57_200_000 }, // ~44M words
-  { key: 'wikipediaEn', tokens: 6_500_000_000 }, // ~5B words
+  { key: 'haiku', tokens: 22 },
+  { key: 'tweet', tokens: 50 },
+  { key: 'littlePrince', tokens: 22_000 },
+  { key: 'gatsby', tokens: 65_000 },
+  { key: 'hobbit', tokens: 124_000 },
+  { key: 'lotrTrilogy', tokens: 624_000 },
+  { key: 'warAndPeace', tokens: 763_000 },
+  { key: 'harryPotterAll', tokens: 1_430_000 },
+  { key: 'encyclopediaBritannica', tokens: 57_200_000 },
+  { key: 'wikipediaEn', tokens: 6_500_000_000 },
 ];
 
 export interface TokenComparison {
-  /** i18n key suffix to look up the reference name. */
+
   refKey: string;
-  /** How many copies of the reference work the user has effectively used. */
+
   multiplier: number;
 }
 
-/**
- * Pick the largest reference where multiplier ≥ 5 — that's the most
- * impressive but still meaningful comparison. Falls back to the smallest
- * reference if total is tiny.
- */
 export function pickTokenComparison(totalTokens: number): TokenComparison | null {
   if (totalTokens <= 0) return null;
   let chosen: Reference | null = null;

@@ -3,20 +3,14 @@ import path from 'node:path';
 import os from 'node:os';
 import type { AssistantRecord, ProviderId, UserRecord } from '../types';
 
-// v2: added per-entry parserVersion so a parser semantic change auto-invalidates
-// stale records without requiring users to delete ~/.ccgauge by hand.
 const SCHEMA_VERSION = 2;
 
-/** Default cache name used by the Web dashboard / CLI. The MCP server uses
- *  its own name ("mcp") so the two processes don't compete for the same
- *  on-disk file. */
 export const DEFAULT_INDEX_NAME = 'default';
 
 export interface PersistedFileEntry {
   filePath: string;
   source: ProviderId;
-  /** Provider's parserVersion when these records were produced. If it no
-   *  longer matches the current adapter, the file is re-parsed on startup. */
+
   parserVersion: string;
   mtimeMs: number;
   size: number;
@@ -37,8 +31,7 @@ function getStateDir(): string {
 }
 
 function getIndexPath(name: string): string {
-  // Backward compatibility: the original "default" cache file was just
-  // index-v{N}.json. Named caches get index-{name}-v{N}.json.
+
   const fileName =
     name === DEFAULT_INDEX_NAME
       ? `index-v${SCHEMA_VERSION}.json`
@@ -87,6 +80,6 @@ export async function clearPersistedIndex(
   try {
     await fs.unlink(getIndexPath(name));
   } catch {
-    // ignore
+
   }
 }

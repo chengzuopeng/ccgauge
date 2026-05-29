@@ -10,8 +10,7 @@ export const runtime = 'nodejs';
 export const GET = withApiErrorHandling(async (req: Request) => {
   const url = new URL(req.url);
   const source = await resolveSource(url.searchParams.get('source'));
-  // For 'all' we expose both providers' built-in price tables under a
-  // bySource map so the caller can pick which one to render or merge.
+
   if (source === 'all') {
     const bySource: Record<string, Record<string, Pricing>> = {
       claude: BUILTIN_PRICING,

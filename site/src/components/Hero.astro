@@ -6,14 +6,13 @@ import { assetUrl } from '../i18n/utils';
 interface Props {
   eyebrow?: string;
   title: string;
-  /** Highlighted segment of `title` rendered in brand color. Optional. */
+  
   titleAccent?: string;
   lede: string;
-  /** Image src (relative to /images/). Optional — when omitted the right
-   *  slot collapses and the text spans full width. */
+  
   imageSrc?: string;
   imageAlt?: string;
-  /** Screenshot basename under /images/screenshots, rendered for the current locale + theme. */
+  
   screenshotName?: string;
   screenshotLocale?: Locale;
 }
@@ -23,7 +22,7 @@ const hasMedia = Boolean(screenshotName || imageSrc);
 ---
 
 <section class="relative overflow-hidden">
-  <!-- Soft brand glow behind the hero -->
+  
   <div class="pointer-events-none absolute inset-x-0 top-[-120px] h-[400px] hero-glow" aria-hidden="true"></div>
 
   <div class="relative mx-auto max-w-7xl px-4 sm:px-6 pt-12 sm:pt-20 pb-12 sm:pb-16">
@@ -77,7 +76,7 @@ const hasMedia = Boolean(screenshotName || imageSrc);
               />
             )}
           </div>
-          <!-- Decorative caret in brand color, mirrors dashboard accent -->
+          
           <div
             class="pointer-events-none absolute -bottom-3 -right-3 h-16 w-16 rounded-card border border-border-hi bg-bg-surface-hi flex items-center justify-center"
             aria-hidden="true"

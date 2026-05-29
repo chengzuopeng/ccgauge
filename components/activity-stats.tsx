@@ -44,14 +44,12 @@ export function ActivityStatsSection({ stats, comparison, locale, className }: P
       className={className}
     >
       <div className="flex flex-col md:flex-row gap-5 md:gap-8 items-stretch flex-1">
-        {/* Left: KPI stack (3 tiles, equal flex) */}
         <div className="grid grid-cols-3 md:flex md:flex-col md:w-[170px] md:shrink-0 gap-2.5">
           {tiles.map((tile) => (
             <Tile key={tile.label} label={tile.label} value={tile.value} />
           ))}
         </div>
 
-        {/* Right: heatmap + comparison, fills available width */}
         <div className="flex-1 min-w-0 flex flex-col">
           <Heatmap
             data={stats.heatmap}
@@ -142,9 +140,7 @@ function Heatmap({
 
   return (
     <div className="w-full">
-      {/* Grid: [day labels col][24 cell cols stretching] */}
       <div className="grid gap-y-[3px] [grid-template-columns:auto_1fr] items-center">
-        {/* 7 rows: each row is one day */}
         {data.map((row, dow) => (
           <DayRow
             key={dow}
@@ -156,7 +152,6 @@ function Heatmap({
             onLeave={() => setHover(null)}
           />
         ))}
-        {/* Hour scale row: empty cell + 24 labeled columns */}
         <div className="text-[10px] text-text-tertiary opacity-0 select-none pr-2">.</div>
         <div className="grid [grid-template-columns:repeat(24,minmax(0,1fr))] text-[10px] text-text-tertiary tabular-nums gap-[3px] mt-1">
           {Array.from({ length: 24 }).map((_, h) => (
@@ -264,10 +259,7 @@ function HeatmapTooltip({
   t: (k: string, vars?: Record<string, string | number>) => string;
 }) {
   const cellCenter = hover.rect.left + hover.rect.width / 2;
-  // Flip the tooltip below the cell when there isn't enough room above
-  // (heatmap scrolled near the top of the viewport). 96px ≈ tooltip
-  // height + 8px gap; using a constant buffer is fine because the tooltip
-  // content size is bounded by min-w-[180px] and ~4 rows of text.
+
   const TOOLTIP_VERTICAL_BUFFER_PX = 96;
   const flipBelow = hover.rect.top < TOOLTIP_VERTICAL_BUFFER_PX;
   const top = flipBelow ? hover.rect.top + hover.rect.height + 8 : hover.rect.top - 8;

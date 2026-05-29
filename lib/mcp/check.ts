@@ -4,10 +4,6 @@ declare const __SERVER_VERSION__: string;
 const SERVER_VERSION =
   typeof __SERVER_VERSION__ !== 'undefined' ? __SERVER_VERSION__ : 'dev';
 
-/** `ccgauge mcp --check` — boot the indexer, print a one-screen status
- *  report, and exit. Lets users verify their install before wiring up an
- *  MCP client (which is otherwise the only way to confirm the bundle works
- *  end-to-end). Returns a process exit code. */
 export async function printCheck(): Promise<number> {
   const out = (s: string) => process.stdout.write(`${s}\n`);
   out(`ccgauge MCP server v${SERVER_VERSION}`);

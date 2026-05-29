@@ -1,17 +1,5 @@
 #!/usr/bin/env node
-/**
- * Next.js with output: 'standalone' produces .next/standalone/server.js
- * but does NOT copy public/ or .next/static/ into the standalone tree.
- * This script:
- *   1. copies static + public into the standalone tree
- *   2. prunes runtime-unused dependencies that the Next tracer pulled in
- *      (sharp / libvips native binaries — we use images.unoptimized = true,
- *      and shipping platform-specific .node / .dylib files would break
- *      cross-platform `npx ccgauge`; typescript — never used at runtime).
- *   3. defensive: if any top-level node_modules entries are symlinks
- *      (legacy pnpm isolated layout), materialize them so npm pack doesn't
- *      drop them. With `.npmrc node-linker=hoisted` this is a no-op.
- */
+
 import { promises as fs, existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,8 +22,6 @@ if (existsSync(publicDir)) {
 }
 console.log('[postbuild] copied static assets into .next/standalone');
 
-// Order matters: prune first (so we don't waste disk copying dirs we're
-// about to delete), then materialize what's left into real directories.
 const pruned = await pruneStandalone(standalone);
 if (pruned.entries.length) {
   console.log(
@@ -51,11 +37,6 @@ if (materialized.length) {
   for (const m of materialized) console.log(`  - ${m}`);
 }
 
-// Walk the immediate children of `dir`. For each entry that is a symlink
-// pointing inside the standalone tree (typical pnpm layout: `next` →
-// `.pnpm/next@.../node_modules/next`), replace it with a recursive copy of
-// the target. Skips `.pnpm` and `.bin` themselves. Recurses into scoped
-// (`@scope/`) sub-dirs so `@scope/pkg` symlinks are also handled.
 async function materializeSymlinks(nm) {
   if (!existsSync(nm)) return [];
   const out = [];
@@ -77,7 +58,7 @@ async function materializeSymlinks(nm) {
         try {
           real = await fs.realpath(p);
         } catch {
-          // Broken symlink (e.g. its .pnpm/ target was just pruned).
+
           await fs.rm(p, { force: true });
           continue;
         }
@@ -85,7 +66,7 @@ async function materializeSymlinks(nm) {
         await copyDir(real, p);
         out.push(`${prefix}${e.name}`);
       } else if (e.isDirectory() && e.name.startsWith('@')) {
-        // scoped packages: descend one more level
+
         await walk(p, `${e.name}/`);
       }
     }
@@ -93,12 +74,9 @@ async function materializeSymlinks(nm) {
 }
 
 async function pruneStandalone(standaloneDir) {
-  // Top-level package names to wipe from .next/standalone/node_modules/.
-  // sharp + @img/*: Next image-optimization deps; we set images.unoptimized=true,
-  //   and shipping platform-specific .node / .dylib files would break Linux.
-  // typescript: pulled in by Next traceability but never executed at runtime.
+
   const PRUNE_TOP_LEVEL = ['typescript', 'sharp', '@img'];
-  // Patterns for the legacy pnpm isolated layout (node_modules/.pnpm/<pkg>@x).
+
   const PRUNE_PNPM = [
     /^@img\+/,
     /^sharp@/,
@@ -109,7 +87,6 @@ async function pruneStandalone(standaloneDir) {
   const nm = join(standaloneDir, 'node_modules');
   if (!existsSync(nm)) return result;
 
-  // Hoisted layout: simple top-level wipe.
   for (const name of PRUNE_TOP_LEVEL) {
     const p = join(nm, name);
     try {
@@ -118,11 +95,10 @@ async function pruneStandalone(standaloneDir) {
       await fs.rm(p, { recursive: true, force: true });
       result.entries.push(name);
     } catch {
-      // not present
+
     }
   }
 
-  // Isolated (.pnpm) layout, if present: clean the underlying realdirs too.
   const pnpm = join(nm, '.pnpm');
   if (existsSync(pnpm)) {
     for (const e of await fs.readdir(pnpm, { withFileTypes: true })) {
@@ -151,12 +127,12 @@ async function dirSize(dir) {
           const st = await fs.stat(p);
           total += st.size;
         } catch {
-          // ignore
+
         }
       }
     }
   } catch {
-    // ignore
+
   }
   return total;
 }

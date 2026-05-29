@@ -28,13 +28,8 @@ export const codexAdapter: ProviderAdapter = {
   shortLabel: 'X',
   color: { fg: '#047857', bg: '#d1fae5' },
   logoSrc: '/codex-logo.png',
-  // v2: switched from last_token_usage to total_token_usage delta (fixed
-  //     ~26% over-counting from duplicate/refresh token_count events).
-  // v3: split reasoning_tokens out as a display-only breakdown alongside
-  //     output_tokens (which still includes reasoning for billing).
-  // v4: persist `effort` from turn_context onto each emitted record so the
-  //     UI can tag the model column (e.g. `gpt-5.2-codex · high`).
-  parserVersion: 'codex-v4-effort',
+
+  parserVersion: 'codex-v5-last-total-prev',
   capabilities: {
     hasCacheCreation: false,
     hasReasoningTokens: true,

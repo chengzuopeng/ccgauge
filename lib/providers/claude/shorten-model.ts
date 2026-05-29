@@ -4,7 +4,9 @@ function capitalize(s: string): string {
 
 export function shortenClaudeModel(model: string): string {
   if (!model) return '(unknown)';
-  let m = model.replace(/-(\d{8})$/, '').replace(/^(vertex_ai|bedrock|anthropic)\//, '');
+  let m = model
+    .replace(/-(\d{8})$/, '')
+    .replace(/^(vertex_ai|bedrock|anthropic)\//, '');
   m = m.replace(/^claude-/, '');
   const parts = m.split('-');
   if (parts.length >= 2) {

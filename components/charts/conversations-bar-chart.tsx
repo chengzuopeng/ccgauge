@@ -12,10 +12,6 @@ import {
 import { useT, useI18n } from '@/lib/i18n/context';
 import type { TokenStackDatum } from './token-stack-chart';
 
-// Reuses `TokenStackDatum` so the overview page can carry one combined
-// payload across both metric views — `turns` is the conversation count
-// (one per user prompt, matching the usage table's collapsed rows).
-
 export function ConversationsBarChart({
   data,
   height = 'h-72',
@@ -40,9 +36,6 @@ export function ConversationsBarChart({
     <div className={`${height} w-full`}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 12, right: 8, bottom: 4, left: 8 }} barCategoryGap="22%">
-          {/* Subtle vertical sheen — full brand at the top fading down. Single
-              series so it adds depth without muddying any category coding.
-              Static (no enter animation) to stay calm under auto-refresh. */}
           <defs>
             <linearGradient id="convBarGrad" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="rgb(var(--brand))" stopOpacity={0.95} />
@@ -98,9 +91,6 @@ function ConversationsTooltip(props: {
         <span className="text-text-secondary">{t('chart.tooltip.conversations')}</span>
         <span className="num-mono text-text-primary">{(d.turns ?? 0).toLocaleString()}</span>
       </div>
-      {/* Surface raw request count as a small footnote — it's the same data
-          users see on the usage table when they expand a row, so it's helpful
-          context but shouldn't be the headline number. */}
       <div className="flex items-center justify-between mt-1 text-text-tertiary">
         <span>{t('chart.tooltip.requests')}</span>
         <span className="num-mono">{d.requests.toLocaleString()}</span>

@@ -1,18 +1,3 @@
-// Web-side helpers for the "All" source view.
-//
-// The web pages never pass `source: 'all'` to the aggregator — the aggregator
-// strictly requires a single ProviderId. Instead, when source is 'all', the
-// page (or API route) runs each aggregator ONCE per provider and uses the
-// helpers in this file to merge numeric results into a single flat output.
-//
-// This mirrors what `lib/mcp/formatters.ts` does for the MCP server, but
-// without wrapping into the `bySource` shape — MCP needs both halves so the
-// LLM can answer per-provider questions; the web UI just wants merged
-// numbers to render in regular KPI cards / charts.
-//
-// List-style aggregators (model / project / session) DON'T need a merge
-// helper. Pages run them per source and `.flatMap` the results: each output
-// entry already carries its own `source` field, so concatenation is enough.
 
 import type { AggregateBucket } from './types';
 
@@ -38,7 +23,6 @@ const ZERO: Totals = {
   requests: 0,
 };
 
-/** Sum numeric fields across N totals snapshots. Used when source='all'. */
 export function combineTotals(parts: Totals[]): Totals {
   if (parts.length === 0) return { ...ZERO };
   if (parts.length === 1) return parts[0];
@@ -57,15 +41,6 @@ export function combineTotals(parts: Totals[]): Totals {
   );
 }
 
-/** Merge per-source time-series into a single combined series.
- *
- *  Buckets with the same `key` (e.g. same day for daily granularity) are
- *  merged by summing the numeric fields. Models maps are unioned (each
- *  source contributes its own model entries, which don't collide because
- *  Claude / OpenAI use disjoint model name spaces).
- *
- *  Returns the merged buckets sorted by key ascending (same convention as
- *  `aggregateByTime`). */
 export function combineTimeBuckets(perSource: AggregateBucket[][]): AggregateBucket[] {
   if (perSource.length === 0) return [];
   if (perSource.length === 1) return perSource[0];
@@ -74,11 +49,7 @@ export function combineTimeBuckets(perSource: AggregateBucket[][]): AggregateBuc
     for (const b of series) {
       const existing = merged.get(b.key);
       if (!existing) {
-        // Deep-clone the bucket AND every entry in its `models` map.
-        // Shallow-cloning the outer map alone would leave the model
-        // entries shared with the caller's input — and the merge loop
-        // below mutates those entries in place, which would corrupt
-        // the indexer's cached aggregator output. (See test-source-merge.mjs.)
+
         merged.set(b.key, {
           ...b,
           models: cloneModelsMap(b.models),

@@ -4,18 +4,18 @@ import ThemedScreenshot from './ThemedScreenshot.astro';
 import { assetUrl } from '../i18n/utils';
 
 interface Props {
-  /** Optional icon emoji or single character; falls back to a brand dot. */
+  
   icon?: string;
   title: string;
-  /** Short 1-2 sentence description. */
+  
   body: string;
-  /** Image src (relative to /images/). */
+  
   imageSrc?: string;
   imageAlt?: string;
-  /** Screenshot basename under /images/screenshots, rendered for the current locale + theme. */
+  
   screenshotName?: string;
   screenshotLocale?: Locale;
-  /** Optional CTA: { label, href } */
+  
   ctaLabel?: string;
   ctaHref?: string;
 }

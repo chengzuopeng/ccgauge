@@ -1,12 +1,13 @@
 #!/usr/bin/env node --experimental-strip-types --no-warnings
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
 
 const __filename = fileURLToPath(import.meta.url);
 const root = dirname(dirname(__filename));
 
-// Use Node's built-in TS strip support to import .ts directly.
 const { parseCodexJsonlFile } = await import(join(root, 'lib/providers/codex/parse-codex-jsonl.ts'));
 const { resolveCodexPricing, BUILTIN_PRICING_OPENAI } = await import(join(root, 'lib/providers/codex/pricing.ts'));
 const { costFromUsage } = await import(join(root, 'lib/pricing/cost-from-usage.ts'));
@@ -33,8 +34,7 @@ const sumReasoning = a.reduce((s, r) => s + (r.usage.reasoning_tokens ?? 0), 0);
 assert.equal(sumInput, 1500, 'input_tokens after subtracting cached');
 assert.equal(sumCacheRead, 2000, 'cached_input_tokens flows to cache_read');
 assert.equal(sumOutput, 260, 'output + reasoning merged into output_tokens');
-// Each emitted record should also expose reasoning as a display-only breakdown
-// (subset of output_tokens; not counted again in totals/cost).
+
 assert.equal(sumReasoning, 60, 'reasoning_tokens (display-only) is present per record');
 for (const rec of a) {
   if (rec.usage.reasoning_tokens && rec.usage.reasoning_tokens > 0) {
@@ -102,5 +102,145 @@ assert.equal(isUsageRange('30d'), true);
 assert.equal(isUsageRange('last_decade'), false);
 assert.equal(normalizeUsageRange('last_decade', '7d'), '7d');
 assert.ok(rangeToDates('7d').from instanceof Date);
+
+{
+  const dir = mkdtempSync(join(tmpdir(), 'ccgauge-codex-'));
+  const mixFile = join(dir, 'mix-session.jsonl');
+  const lines = [
+    JSON.stringify({
+      timestamp: '2026-05-01T10:00:00Z',
+      type: 'session_meta',
+      payload: { id: 'sess-mix', cwd: '/tmp/proj' },
+    }),
+    JSON.stringify({
+      timestamp: '2026-05-01T10:00:01Z',
+      type: 'turn_context',
+      payload: { turn_id: 'turn-mix', cwd: '/tmp/proj', model: 'gpt-5' },
+    }),
+    JSON.stringify({
+      timestamp: '2026-05-01T10:00:02Z',
+      type: 'event_msg',
+      payload: {
+        type: 'user_message',
+        message: 'hi',
+      },
+    }),
+    JSON.stringify({
+      timestamp: '2026-05-01T10:00:03Z',
+      type: 'event_msg',
+      payload: {
+        type: 'token_count',
+        info: {
+          last_token_usage: {
+            input_tokens: 100,
+            cached_input_tokens: 20,
+            output_tokens: 30,
+            reasoning_output_tokens: 5,
+          },
+        },
+      },
+    }),
+    JSON.stringify({
+      timestamp: '2026-05-01T10:00:04Z',
+      type: 'event_msg',
+      payload: {
+        type: 'token_count',
+        info: {
+          total_token_usage: {
+            input_tokens: 100,
+            cached_input_tokens: 20,
+            output_tokens: 30,
+            reasoning_output_tokens: 5,
+          },
+        },
+      },
+    }),
+  ];
+  writeFileSync(mixFile, lines.join('\n') + '\n', 'utf8');
+  const mixed = await parseCodexJsonlFile(mixFile);
+  rmSync(dir, { recursive: true, force: true });
+  assert.equal(mixed.assistant.length, 1, 'refresh total after last must not emit again');
+  const mixInput = mixed.assistant.reduce((s, r) => s + r.usage.input_tokens, 0);
+  const mixOutput = mixed.assistant.reduce((s, r) => s + r.usage.output_tokens, 0);
+  assert.equal(mixInput, 80, 'only the last_token_usage delta is counted');
+  assert.equal(mixOutput, 35, 'only the last_token_usage delta is counted');
+  console.log('✓ last_token_usage → total_token_usage refresh does not double-count');
+}
+
+{
+  const dir = mkdtempSync(join(tmpdir(), 'ccgauge-codex-'));
+  const mixFile = join(dir, 'step-session.jsonl');
+  const lines = [
+    JSON.stringify({
+      timestamp: '2026-05-01T11:00:00Z',
+      type: 'session_meta',
+      payload: { id: 'sess-step', cwd: '/tmp/proj' },
+    }),
+    JSON.stringify({
+      timestamp: '2026-05-01T11:00:01Z',
+      type: 'turn_context',
+      payload: { turn_id: 'turn-step', cwd: '/tmp/proj', model: 'gpt-5' },
+    }),
+    JSON.stringify({
+      timestamp: '2026-05-01T11:00:02Z',
+      type: 'event_msg',
+      payload: { type: 'user_message', message: 'hi' },
+    }),
+    JSON.stringify({
+      timestamp: '2026-05-01T11:00:03Z',
+      type: 'event_msg',
+      payload: {
+        type: 'token_count',
+        info: {
+          total_token_usage: {
+            input_tokens: 1000,
+            cached_input_tokens: 0,
+            output_tokens: 200,
+            reasoning_output_tokens: 0,
+          },
+        },
+      },
+    }),
+    JSON.stringify({
+      timestamp: '2026-05-01T11:00:04Z',
+      type: 'event_msg',
+      payload: {
+        type: 'token_count',
+        info: {
+          last_token_usage: {
+            input_tokens: 200,
+            cached_input_tokens: 0,
+            output_tokens: 50,
+            reasoning_output_tokens: 0,
+          },
+        },
+      },
+    }),
+    JSON.stringify({
+      timestamp: '2026-05-01T11:00:05Z',
+      type: 'event_msg',
+      payload: {
+        type: 'token_count',
+        info: {
+          total_token_usage: {
+            input_tokens: 1200,
+            cached_input_tokens: 0,
+            output_tokens: 250,
+            reasoning_output_tokens: 0,
+          },
+        },
+      },
+    }),
+  ];
+  writeFileSync(mixFile, lines.join('\n') + '\n', 'utf8');
+  const stepped = await parseCodexJsonlFile(mixFile);
+  rmSync(dir, { recursive: true, force: true });
+  assert.equal(stepped.assistant.length, 2, 'total then last then total emits twice');
+  const stepInput = stepped.assistant.reduce((s, r) => s + r.usage.input_tokens, 0);
+  const stepOutput = stepped.assistant.reduce((s, r) => s + r.usage.output_tokens, 0);
+  assert.equal(stepInput, 1200, '1000 from first total + 200 from last, not doubled');
+  assert.equal(stepOutput, 250, '200 from first total + 50 from last, not doubled');
+  console.log('✓ total → last → total counts each tranche once');
+}
 
 console.log('\nAll codex parser + pricing assertions passed.');

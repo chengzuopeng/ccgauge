@@ -47,8 +47,7 @@ function filterTurnsByQuery(turns: UsageTurnRow[], q: string): UsageTurnRow[] {
 function sortTurns(turns: UsageTurnRow[], key: SortKey, dir: 'asc' | 'desc'): UsageTurnRow[] {
   const arr = turns.slice();
   arr.sort((a, b) => {
-    // "Time" sort uses the turn's start timestamp — that's what the column
-    // displays, so click-to-sort should be consistent with the visible value.
+
     const av = key === 'timestamp' ? a.timestamp : (a[key] as number);
     const bv = key === 'timestamp' ? b.timestamp : (b[key] as number);
     if (av === bv) return 0;
@@ -77,19 +76,6 @@ export default async function UsagePage({
   const sp = await searchParams;
   const range = normalizeUsageRange(sp.range, '7d');
 
-  // Bail BEFORE any other server work if `range=custom` is missing or
-  // has an invalid `from` — otherwise `parseCustomRange` would return
-  // `{}` (no bounds) and the page would silently render all-time data
-  // while the URL still says "custom". /api/usage and /api/export/usage
-  // both 400 on the same shape, so we mirror that strictness on the
-  // RSC side by canonicalising the URL back to the default range and
-  // stripping the dangling from/to params.
-  //
-  // We must call `redirect()` before any other `await`s that begin
-  // streaming server work; otherwise React would have already started
-  // rendering and Next falls back to a `<meta http-equiv="refresh">`,
-  // which the user can briefly see flicker as all-time data on screen.
-  // Doing it here yields a clean HTTP 307 with no flash.
   if (range === 'custom' && !parseCustomRange(sp.from, sp.to).from) {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(sp)) {
@@ -102,11 +88,7 @@ export default async function UsagePage({
   }
 
   const source = await resolveSource(sp.source);
-  // Default granularity is `day`, but `1d` (a single calendar day)
-  // looks empty on a daily chart so we drop to `hour`. For custom
-  // ranges we keep `day` — picking a tight 1-day custom range and
-  // wanting hour-granularity is rare enough that the explicit
-  // granularity picker covers it.
+
   const gran = isGranularity(sp.gran) ? sp.gran : range === '1d' ? 'hour' : 'day';
   const models = sp.models ? sp.models.split(',').filter(Boolean) : [];
   const projects = sp.projects ? sp.projects.split(',').filter(Boolean) : [];
@@ -125,19 +107,11 @@ export default async function UsagePage({
 
   const sources = expandSources(source);
 
-  // `projects` URL param holds **canonical** cwds (worktrees collapsed
-  // to their main-repo path), matching the /projects page's grouping.
-  // The aggregator's projects filter is exact-cwd, so we narrow records
-  // here instead of passing the filter down — a single record with a
-  // worktree cwd would otherwise miss a canonical-cwd selection.
   const projectsSet = new Set(projects);
   const projectFilteredRecords = projects.length
     ? allSourceRecords.filter((r) => projectsSet.has(resolveCanonicalCwd(r.cwd)))
     : allSourceRecords;
 
-  // Run per-source then merge — `aggregateTotals` / `aggregateByTime`
-  // require a concrete ProviderId, so the All view dispatches twice and
-  // combines numeric results before they hit the KPI cards / chart.
   const baseOpts = {
     from: dates.from,
     to: dates.to,
@@ -161,9 +135,7 @@ export default async function UsagePage({
 
   const filteredRecords = projectFilteredRecords.filter((r) => {
     if (dates.from && r.timestamp < dates.from.toISOString()) return false;
-    // Aggregator paths already get `to` via `baseOpts`; the turn-row
-    // pipeline filters records here, so we mirror the upper bound or
-    // the table can show rows past the custom `to` date.
+
     if (dates.to && r.timestamp > dates.to.toISOString()) return false;
     if (models.length && !models.includes(r.model)) return false;
     return true;
@@ -178,8 +150,7 @@ export default async function UsagePage({
   const pageSlice = sorted.slice(safePage * USAGE_PAGE_SIZE, (safePage + 1) * USAGE_PAGE_SIZE);
 
   const allModels = Array.from(new Set(allSourceRecords.map((r) => r.model))).sort();
-  // The ProjectFilter dropdown shows canonical (main-repo) cwds only —
-  // worktrees collapse under their main project, just like /projects.
+
   const allProjects = Array.from(
     new Set(
       allSourceRecords
@@ -194,9 +165,6 @@ export default async function UsagePage({
         Math.max(1, totals.cacheReadTokens + totals.inputTokens + totals.cacheCreationTokens)
       : 0;
 
-  // Cost note is hidden in the All view (decided UX): the merged number
-  // mixes Codex's "API equivalent" with Claude's API-exact value, so a
-  // single footnote would be misleading either way.
   const costFootnote =
     source === 'all'
       ? ''

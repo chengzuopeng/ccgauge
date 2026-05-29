@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useT } from '@/lib/i18n/context';
 import { useTabIndicator } from '@/components/use-tab-indicator';
+import { TabIndicator } from '@/components/tab-indicator';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { ThemeSwitcher } from '@/components/theme-switcher';
 import { Logo } from '@/components/logo';
@@ -29,8 +30,7 @@ interface ProviderInfo {
   bg: string;
   displayEn: string;
   displayZh: string;
-  /** Optional path to a brand-logo image (under /public). When set,
-   *  SourceSwitcher renders the image instead of the colored letter chip. */
+
   logoSrc?: string;
 }
 
@@ -67,16 +67,7 @@ export function Nav({ availableProviders, initialSource, providerInfos }: Props)
           className="relative flex-1 min-w-0 flex items-center gap-0.5 overflow-x-auto nav-scroller"
           aria-label="Primary"
         >
-          {/* One underline that glides to the active item (instead of a
-              per-item bar that pops in/out). Inset 8px to match the old
-              left-2/right-2 look; hidden until measured. */}
-          {rect && (
-            <span
-              aria-hidden
-              className="pointer-events-none absolute -bottom-[12px] h-[2px] bg-brand rounded-full transition-[transform,width] duration-200 ease-out-soft"
-              style={{ transform: `translateX(${rect.left + 8}px)`, width: Math.max(0, rect.width - 16) }}
-            />
-          )}
+          <TabIndicator rect={rect} variant="underline" />
           {ITEMS.map((it) => {
             const active = it.exact
               ? pathname === it.href

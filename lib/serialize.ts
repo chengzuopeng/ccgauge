@@ -53,17 +53,14 @@ export interface UsageTableRow {
   source: 'claude' | 'codex';
   model: string;
   cwd: string;
-  /** Display label for the project. For a git worktree this is
-   *  `"<main-repo> (<worktree-name>)"`; otherwise it's the plain
-   *  basename of `cwd`. Precomputed server-side because the worktree
-   *  check is a filesystem read. */
+
   projectLabel: string;
   sessionId: string;
   inputTokens: number;
   outputTokens: number;
   cacheReadTokens: number;
   cacheCreationTokens: number;
-  /** Subset of outputTokens. Display-only; not double-counted in totals/cost. */
+
   reasoningTokens: number;
   totalTokens: number;
   cost: number;
@@ -72,15 +69,9 @@ export interface UsageTableRow {
   costCacheRead: number;
   costCacheWrite: number;
   toolNames: string[];
-  /** Provider-specific reasoning depth (Codex: low/medium/high/minimal). */
+
   effort?: string;
-  /**
-   * The nearest text-bearing user record above this call in the parent chain
-   * (synthetic or not). For child rows that descend from a `Base directory
-   * for this skill: ...` injection this lets the prompt cell show what the
-   * skill block was about — distinct from the turn's actual human prompt.
-   * Empty string when there is no preceding user text in the chain.
-   */
+
   directPrompt?: string;
 }
 
@@ -120,11 +111,10 @@ export interface UsageTurnRow {
   turnId: string;
   timestamp: string;
   endTimestamp: string;
-  /** Elapsed milliseconds between the first and last API call in the turn.
-   *  ≥ 0; equals 0 for single-call turns. */
+
   durationMs: number;
   cwd: string;
-  /** Worktree-aware display label — see {@link UsageTableRow.projectLabel}. */
+
   projectLabel: string;
   sessionId: string;
   models: string[];
@@ -133,7 +123,7 @@ export interface UsageTurnRow {
   outputTokens: number;
   cacheReadTokens: number;
   cacheCreationTokens: number;
-  /** Sum of children reasoningTokens. Subset of outputTokens. */
+
   reasoningTokens: number;
   totalTokens: number;
   cost: number;
@@ -142,7 +132,7 @@ export interface UsageTurnRow {
   costCacheRead: number;
   costCacheWrite: number;
   toolNames: string[];
-  /** Distinct effort levels seen across children (empty if none reported). */
+
   efforts: string[];
   userText: string;
   children: UsageTableRow[];
@@ -157,15 +147,6 @@ export function recordsToTurnRows(
   const userMap = new Map<string, UserRecord>();
   for (const u of users) userMap.set(u.uuid, u);
 
-  // Per-assistant "direct prompt": walk up the parentUuid chain until we hit
-  // a user record with non-empty textPreview (synthetic or human). Memoized.
-  //
-  // - `path` records every node visited on the way up — once we know the
-  //   answer, we back-fill it for all of them so the next assistant rooted
-  //   anywhere in this chain is an O(1) lookup.
-  // - `seen` is a cycle guard for malformed parent links. Should never
-  //   trigger on well-formed JSONL, but the cost is one Set insertion per
-  //   step so it's cheap insurance.
   const directPromptCache = new Map<string, string>();
   function resolveDirectPrompt(startUuid: string): string {
     const cached = directPromptCache.get(startUuid);
@@ -178,14 +159,13 @@ export function recordsToTurnRows(
       seen.add(cur);
       const hit = directPromptCache.get(cur);
       if (hit !== undefined) {
-        // Mid-walk cache hit: adopt the cached answer and back-fill the
-        // nodes we walked through before reaching this point.
+
         answer = hit;
         break;
       }
       path.push(cur);
       const u = userMap.get(cur);
-      // Any text-bearing user record counts — including synthetic ones.
+
       if (u && u.textPreview && u.textPreview.trim()) {
         answer = u.textPreview;
         break;
@@ -300,8 +280,7 @@ export function recordsToTurnRows(
       children,
     });
   }
-  // Default order: newest-started turn first. Matches the table's
-  // "time" column display and its click-to-sort behaviour.
+
   turns.sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1));
   return turns;
 }

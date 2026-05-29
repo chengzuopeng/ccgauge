@@ -9,10 +9,7 @@ export function buildTurnIndex(
 ): Map<string, string> {
   const userTextMap = new Map<string, string>();
   for (const u of users) {
-    // Synthetic user messages (skill metadata, system-reminders) still carry
-    // text in textPreview so per-call displays can show them, but they must
-    // not be treated as turn roots — that's what wrongly split conversations
-    // in the usage table.
+
     if (u.isSynthetic) continue;
     if (u.textPreview && u.textPreview.trim()) userTextMap.set(u.uuid, u.textPreview);
   }
@@ -52,20 +49,6 @@ export function buildTurnIndex(
   return result;
 }
 
-/** Per-turn metadata derived from a (typically filtered) record slice.
- *  A "turn" is one user prompt — i.e. the unit the usage table groups by
- *  and the dashboard's overview chart counts as "Conversations". A
- *  single turn may produce dozens of `AssistantRecord`s (tool-call
- *  loops, reasoning steps, sub-agents) — all collapse to one
- *  `TurnSummary` here.
- *
- *  Each turn is attributed to:
- *  - `firstTimestamp` — the earliest record's timestamp in the slice
- *    (so chronological bucketing / "when did this conversation start"
- *    questions hit the right window);
- *  - `firstModel` / `cwd` / `sessionId` / `source` — taken from the
- *    same earliest record (a session never spans providers and rarely
- *    spans cwds in practice). */
 export interface TurnSummary {
   turnId: string;
   firstTimestamp: string;
@@ -75,11 +58,6 @@ export interface TurnSummary {
   source: ProviderId;
 }
 
-/** Given a filtered record slice plus the full user / parent context
- *  (we need both unfiltered because a turn root may live just outside
- *  the window — same data the dashboard's `buildTurnIndex` consumes),
- *  return one `TurnSummary` per distinct turn root represented in
- *  `records`. */
 export function summarizeTurns(
   records: AssistantRecord[],
   users: UserRecord[],

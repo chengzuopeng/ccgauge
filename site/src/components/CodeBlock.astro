@@ -1,37 +1,21 @@
 ---
-/**
- * Lightweight code-block component with a copy-to-clipboard button.
- *
- * Astro auto-applies syntax highlighting to fenced blocks inside .md/.mdx,
- * but inline `<pre><code>` doesn't get the treatment for free. To keep
- * things simple we render plain monospace text with brand styling — good
- * enough for the short install snippets / config blocks the marketing
- * site needs.
- *
- * Labels (`copyLabel`, `copiedLabel`, `failedLabel`) auto-localize via
- * `useTranslations(Astro.currentLocale)` — callers don't need to thread
- * Chinese strings through every usage. Pass explicit overrides only when
- * a specific block needs a different label (rare).
- */
+
 
 import { useTranslations } from '../i18n/utils';
 import { DEFAULT_LOCALE, type Locale } from '../consts';
 
 interface Props {
   code: string;
-  /** Language label shown top-right; purely decorative. */
+  
   lang?: string;
-  /** Optional override for the copy button text + aria-label. */
+  
   copyLabel?: string;
-  /** Optional override for the text shown after a successful copy. */
+  
   copiedLabel?: string;
-  /** Optional override for the text shown after the copy fails. */
+  
   failedLabel?: string;
 }
 
-// `Astro.currentLocale` is computed from the URL routing config — for
-// pages under `/zh/...` it's `'zh'`, otherwise `'en'` (the default).
-// Cast through `Locale` so the `useTranslations` call type-checks.
 const locale = (Astro.currentLocale ?? DEFAULT_LOCALE) as Locale;
 const t = useTranslations(locale);
 
@@ -78,8 +62,8 @@ const {
 </div>
 
 <script>
-  // Color classes we toggle on the button to signal copy state. Kept
-  // outside the listener so the constants don't get reallocated per click.
+  
+  
   const SUCCESS_CLASS = 'text-brand';
   const FAILURE_CLASS = 'text-danger';
   const STATE_RESET_MS = 1500;
@@ -96,7 +80,7 @@ const {
         if (textEl) textEl.textContent = text;
         btn.classList.remove(SUCCESS_CLASS, FAILURE_CLASS);
         btn.classList.add(klass);
-        // The checkmark only makes sense on success.
+        
         btn.classList.toggle('is-copied', copiedState);
         window.setTimeout(() => {
           if (textEl) textEl.textContent = label;
@@ -104,10 +88,10 @@ const {
         }, STATE_RESET_MS);
       };
 
-      // `navigator.clipboard` is undefined on insecure (non-https,
-      // non-localhost) origins; `writeText` itself can also reject when
-      // the user denies clipboard permission. Cover both by gating on
-      // the API's existence and try/catching the call.
+      
+      
+      
+      
       if (!navigator.clipboard?.writeText) {
         flash(failed, FAILURE_CLASS, false);
         return;

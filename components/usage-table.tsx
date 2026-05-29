@@ -60,8 +60,6 @@ const COLUMNS: ColumnDef[] = [
   { id: 'tools', labelKey: 'usage.col.tools', defaultVisible: false },
 ];
 
-// Bumped when defaults change so existing localStorage entries don't pin
-// users to the old visibility set.
 const STORAGE_KEY = 'ccgauge.usage.cols.v4';
 
 function defaultVisible(): Record<ColumnId, boolean> {
@@ -137,9 +135,7 @@ export function UsageTable({ rows, totalCount, page, pageCount, sort, query }: U
 
   useEffect(() => {
     return () => {
-      // Cancel any pending debounce so navigating away mid-typing doesn't
-      // fire a stale router.push that would yank the user back to /usage
-      // or stomp on whatever URL they're now on.
+
       if (queryDebounceRef.current) {
         window.clearTimeout(queryDebounceRef.current);
         queryDebounceRef.current = null;
@@ -368,7 +364,7 @@ function RowsForTurn({
     turn.models.length === 1
       ? shortenModel(turn.models[0])
       : `${shortenModel(turn.models[0])} +${turn.models.length - 1}`;
-  // Append effort tag (Codex). Single effort → `· high`. Multiple → `· high+1`.
+
   const effortSuffix = turn.efforts.length
     ? turn.efforts.length === 1
       ? ` · ${turn.efforts[0]}`
@@ -431,10 +427,7 @@ function renderTurnCell(
 ): React.ReactNode {
   switch (id) {
     case 'time':
-      // Show the turn's START time — the moment the user actually sent the
-      // prompt — not its end. Easier to find a conversation you remember by
-      // when you kicked it off. (The end time is still available on hover
-      // via the title attribute below.)
+
       return (
         <span
           className="num-mono text-text-secondary whitespace-nowrap text-xs"
@@ -444,9 +437,7 @@ function renderTurnCell(
         </span>
       );
     case 'duration':
-      // Wall-clock elapsed from the first to the last API call in this turn.
-      // 0 for single-call turns is rendered as `0s` rather than blank so the
-      // column reads as "duration", not "is this missing".
+
       return (
         <span
           className="num-mono text-text-secondary whitespace-nowrap text-xs"
@@ -543,25 +534,17 @@ function renderChildCell(
 ): React.ReactNode {
   switch (id) {
     case 'time':
-      // Visual indent for child rows is done via `translate-x` rather than
-      // `padding-left` so the cell's intrinsic content width matches the
-      // parent row exactly. Padding here would feed into `table-layout: auto`
-      // and force the browser to re-balance every column on expand,
-      // producing a visible horizontal jitter across the whole table.
+
       return (
         <span className="num-mono whitespace-nowrap text-xs inline-block translate-x-5">
           {formatDateTime(r.timestamp)}
         </span>
       );
     case 'duration':
-      // Per-call duration isn't in the JSONL; the duration column is a
-      // turn-level metric only.
+
       return <span className="text-xs text-text-tertiary">—</span>;
     case 'prompt': {
-      // Prefer the call's own direct prompt (skill metadata, system reminder,
-      // etc.) when it differs from the turn-level human prompt — that's the
-      // context for THIS specific API call. Fall back to tool names when
-      // there's nothing distinct to show.
+
       const direct = (r.directPrompt ?? '').trim();
       const showDirect = direct && direct !== turnPrompt.trim();
       if (showDirect) {

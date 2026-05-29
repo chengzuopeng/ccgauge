@@ -19,8 +19,6 @@ export function isGranularity(v: unknown): v is Granularity {
   return typeof v === 'string' && (GRANULARITIES as readonly string[]).includes(v);
 }
 
-/** Public so callers (e.g. MCP formatters) can re-bucket records under
- *  the same key scheme to layer extra fields on top of `aggregateByTime`. */
 export function bucketKey(ts: string, gran: Granularity): { key: string; label: string } {
   const d = new Date(ts);
   const yyyy = d.getFullYear();
@@ -55,10 +53,6 @@ export interface AggregateOpts {
   projects?: string[];
 }
 
-/** Precomputed loop bounds. `Date.toISOString()` and array `.includes()`
- *  are individually cheap, but on the weekly_summary path we used to call
- *  them N × M times (N records, M filters). Hoist them once per entry
- *  point instead. */
 interface PreparedOpts {
   source: ProviderId;
   fromIso?: string;
@@ -252,11 +246,7 @@ export function aggregateBySession(
         source: rec.source,
         cwd: rec.cwd,
         projectName: projectNameFromCwd(rec.cwd),
-        // Worktree-aware label so the sessions table shows the same
-        // identifier the usage table does for the same record (e.g.
-        // `ai-self-web (playwright)` instead of just `playwright`).
-        // `resolveProjectLabel` caches per-cwd, so this is one fs.stat
-        // per unique cwd across the whole aggregation.
+
         projectLabel: resolveProjectLabel(rec.cwd),
         startTime: rec.timestamp,
         endTime: rec.timestamp,

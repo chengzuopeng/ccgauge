@@ -6,10 +6,9 @@ export const DEFAULT_LOCALE: Locale = 'en';
 type Dict = Record<string, string>;
 
 const en: Dict = {
-  // brand
+
   'brand.tagline': 'usage dashboard for AI coding CLIs',
 
-  // nav
   'nav.overview': 'Overview',
   'nav.usage': 'Usage',
   'nav.sessions': 'Sessions',
@@ -19,15 +18,12 @@ const en: Dict = {
   'nav.localBadge': 'local',
   'nav.source': 'Data source',
 
-  // sources
   'source.claude': 'Claude',
   'source.codex': 'Codex',
   'source.all': 'All',
 
-  // cost notes
   'cost.footnote.codex': 'Cost shown is the OpenAI API equivalent (subscription plans pay differently).',
 
-  // common
   'common.requests': 'requests',
   'common.tokens': 'tokens',
   'common.cost': 'Cost',
@@ -63,7 +59,6 @@ const en: Dict = {
   'common.allProjectsLink': '← All projects',
   'common.noMatchingRows': 'No matching rows',
 
-  // ranges
   'range.label': 'Date range',
   'range.today': 'Today',
   'range.7d': '7d',
@@ -76,14 +71,12 @@ const en: Dict = {
   'range.to': 'To',
   'range.cancel': 'Cancel',
 
-  // granularity
   'gran.label': 'Granularity',
   'gran.hour': 'Hour',
   'gran.day': 'Day',
   'gran.week': 'Week',
   'gran.month': 'Month',
 
-  // overview
   'overview.title': 'Overview',
   'overview.subtitle': '{count} requests across {files} files · scan in {ms}ms',
   'overview.subtitle.empty': 'Scanned {dirs} directory(ies). Open Claude Code, send a message, then refresh.',
@@ -116,7 +109,6 @@ const en: Dict = {
   'overview.costByModel.title': 'Cost by model',
   'overview.costByModel.desc': 'This month, sorted by spend',
 
-  // activity card (lifetime usage shape)
   'activity.title': 'Activity',
   'activity.subtitle': 'Lifetime stats and when you usually code',
   'activity.sessions': 'Sessions',
@@ -155,7 +147,6 @@ const en: Dict = {
   'activity.ref.encyclopediaBritannica': 'the Encyclopedia Britannica',
   'activity.ref.wikipediaEn': 'all of English Wikipedia',
 
-  // block
   'block.title': 'Active 5h block',
   'block.remaining': 'remaining',
   'block.elapsed': 'Time elapsed {pct}%',
@@ -168,7 +159,6 @@ const en: Dict = {
   'block.emptyDesc': 'Send a message in {cli} to start one.',
   'block.disclaimer': 'Wall-clock progress of the 5h window — not your plan quota.',
 
-  // chart
   'chart.legend.input': 'Input',
   'chart.legend.output': 'Output',
   'chart.legend.cacheRead': 'Cache read',
@@ -180,7 +170,6 @@ const en: Dict = {
   'chart.empty': 'No data in this range',
   'chart.empty.short': 'No data',
 
-  // usage
   'usage.title': 'Usage',
   'usage.subtitle': '{count} turns in selected range',
   'usage.col.calls': 'Calls',
@@ -232,7 +221,6 @@ const en: Dict = {
   'filter.clearAll': 'Clear all',
   'filter.noOptions': 'No options',
 
-  // sessions
   'sessions.title': 'Sessions',
   'sessions.subtitle': '{count} sessions · sorted by most recent activity',
   'sessions.col.session': 'Session',
@@ -246,7 +234,6 @@ const en: Dict = {
   'sessions.untitled': 'Session {hash}',
   'sessions.empty': 'No sessions yet',
 
-  // session detail
   'session.kpi.requests': 'Requests',
   'session.kpi.totalTokens': 'Total tokens',
   'session.kpi.cost': 'Cost',
@@ -261,7 +248,6 @@ const en: Dict = {
   'session.token.cacheR': 'cache r',
   'session.token.cacheW': 'cache w',
 
-  // projects
   'projects.title': 'Projects',
   'projects.subtitle': '{count} projects · sorted by spend',
   'projects.empty': 'No projects yet',
@@ -269,11 +255,9 @@ const en: Dict = {
   'projects.stat.requests': 'Requests',
   'projects.stat.tokens': 'Tokens',
 
-  // project detail
   'project.activity': 'Activity (last 30 days)',
   'project.sessions.title': 'Sessions ({count})',
 
-  // models
   'models.title': 'Models',
   'models.subtitle': '{count} model(s) used in total',
   'models.empty': 'No model usage yet',
@@ -288,7 +272,6 @@ const en: Dict = {
   'models.field.pctOfTotal': '{pct} of total spend · {tokens} tokens',
   'models.eachTrend': 'Combined trend (last 30 days)',
 
-  // settings
   'settings.title': 'Settings',
   'settings.subtitle': 'Data sources, pricing, and behavior',
   'settings.dataSources.title': 'Data sources',
@@ -324,7 +307,6 @@ const en: Dict = {
   'settings.about.line3': 'Cache: scan results are memoized for 5s; click "Rescan" to force a fresh read.',
   'settings.about.line4': 'Stop with Ctrl+C in the terminal that started ccgauge.',
 
-  // indexer
   'settings.indexer.desc': 'Background indexer keeps the cache fresh via file watchers.',
   'settings.indexer.lastIndexedAt': 'Last indexed',
   'settings.indexer.indexDuration': 'Last index time',
@@ -337,7 +319,6 @@ const en: Dict = {
   'common.yes': 'yes',
   'common.no': 'no',
 
-  // language switcher
   'lang.label': 'Language',
   'lang.en': 'English',
   'lang.zh': '中文',
@@ -447,7 +428,6 @@ const zh: Dict = {
   'overview.costByModel.title': '按模型成本分布',
   'overview.costByModel.desc': '本月，按花费排序',
 
-  // activity 卡片（账户级用量画像）
   'activity.title': '活动统计',
   'activity.subtitle': '总览数据 + 每天什么时段最忙',
   'activity.sessions': '会话',

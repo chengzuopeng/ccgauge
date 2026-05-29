@@ -12,14 +12,10 @@ interface ProviderInfo {
   bg: string;
   displayEn: string;
   displayZh: string;
-  /** Optional path to a brand-logo image (under /public). When set,
-   *  rendered as <img> in place of the colored letter chip. */
+
   logoSrc?: string;
 }
 
-/** Tri-state source selector. `'all'` is only an option when both providers
- *  are detected on disk — otherwise the segmented control collapses (or
- *  hides entirely if only one provider is present). */
 type Choice = ProviderId | 'all';
 
 interface Props {
@@ -61,7 +57,6 @@ export function SourceSwitcher({ available, initial, providers }: Props) {
     if (urlChoice && urlChoice !== current) setCurrent(urlChoice);
   }, [urlChoice, current]);
 
-  // Only one provider on disk → hide the switcher entirely; nothing to choose.
   if (available.length < 2) return null;
 
   const select = (id: Choice) => {
@@ -78,8 +73,6 @@ export function SourceSwitcher({ available, initial, providers }: Props) {
     });
   };
 
-  // Order: All · Claude · Codex. "全部" leads so users always see the
-  // broadest-scope option first; per-provider buttons follow.
   const orderedProviders = providers.filter((p) => available.includes(p.id));
 
   return (
@@ -121,8 +114,6 @@ export function SourceSwitcher({ available, initial, providers }: Props) {
   );
 }
 
-/** Brand mark: prefers the provider's logo image if available; otherwise
- *  falls back to the original colored chip with the short-letter label. */
 function ProviderMark({ provider }: { provider: ProviderInfo }) {
   if (provider.logoSrc) {
     return (
@@ -175,9 +166,7 @@ function AllButton({
         aria-hidden
       >
         {providers.slice(0, 2).map((p, i) => {
-          // Stacked brand marks visually communicate "both providers
-          // contribute to this view". Use the real logos when available;
-          // fall back to the colored letter chip otherwise.
+
           const left = i === 0 ? 0 : 10;
           if (p.logoSrc) {
             return (

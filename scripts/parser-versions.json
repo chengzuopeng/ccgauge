@@ -1,5 +1,4 @@
 {
-  "_comment": "Baseline parser versions checked by scripts/check-parser-versions.mjs. Bump these in lockstep with lib/providers/<name>/index.ts#parserVersion whenever the parser logic changes. Stale cache entries from old parser code are a silent correctness failure mode — this file is the canary.",
   "claude": "claude-v4-sidechain-merge",
-  "codex": "codex-v4-effort"
+  "codex": "codex-v5-last-total-prev"
 }

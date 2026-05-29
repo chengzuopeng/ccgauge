@@ -7,9 +7,9 @@ interface Props {
   screenshotName?: string;
   locale?: Locale;
   alt: string;
-  /** Visual width hint — controls aspect ratio. Defaults to 16:10. */
+  
   ratio?: '16/10' | '16/9' | '4/3';
-  /** Caption shown below the screenshot. Optional. */
+  
   caption?: string;
 }
 
@@ -20,7 +20,7 @@ const ratioClass =
 
 <figure class="mx-auto max-w-5xl" data-reveal>
   <div class="screenshot-card rounded-card border border-border-hi bg-bg-surface shadow-card overflow-hidden">
-    <!-- Mac-style title bar so the screenshot reads as "an app", not "a stray PNG". -->
+    
     <div class="flex items-center gap-1.5 px-4 py-2.5 border-b border-border bg-bg-surface-hi">
       <span class="h-2.5 w-2.5 rounded-full bg-red-400/80"></span>
       <span class="h-2.5 w-2.5 rounded-full bg-yellow-400/80"></span>

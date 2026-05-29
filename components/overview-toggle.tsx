@@ -9,20 +9,10 @@ import {
   USAGE_OVERVIEW_HIDDEN_VALUE,
 } from '@/lib/storage-keys';
 
-/**
- * Toggle visibility of the usage page's overview block (KPI cards + trend
- * chart). State is persisted to localStorage; the matching CSS rule in
- * globals.css hides the block via a data attribute on <html>. The no-flash
- * script in <head> applies that attribute before paint, so no visible flash
- * when state = hidden.
- */
 export function OverviewToggle() {
   const t = useT();
   const [hidden, setHidden] = useState<boolean>(false);
 
-  // Sync the initial state from the data attribute the no-flash script set,
-  // not from localStorage directly — the no-flash script already canonicalised
-  // it and we don't want a redundant read here that could race.
   useEffect(() => {
     setHidden(
       document.documentElement.getAttribute(USAGE_OVERVIEW_DATA_ATTR) ===
@@ -36,7 +26,7 @@ export function OverviewToggle() {
     try {
       localStorage.setItem(USAGE_OVERVIEW_HIDDEN_KEY, next ? '1' : '0');
     } catch {
-      // localStorage may be disabled — toggle still works in-memory for this page.
+
     }
     if (next) {
       document.documentElement.setAttribute(
@@ -69,7 +59,7 @@ export function OverviewToggle() {
 }
 
 function Eye({ open }: { open: boolean }) {
-  // Minimal SVG so we don't drag in an icon library for one button.
+
   return (
     <svg
       width="14"

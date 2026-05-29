@@ -26,7 +26,7 @@ const DIMS: Dim[] = ['model', 'project', 'session'];
 const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 export interface ReportOptions {
-  range: string; // today | 1d | 7d | 30d | 90d | all
+  range: string;
   source: SourceArg;
   by: Dim;
   gran: Granularity;
@@ -39,17 +39,13 @@ export interface ReportOptions {
   showBreakdown?: boolean;
   model?: string;
   project?: string;
-  /** Render as a rich one-screen TUI dashboard instead of the
-   *  CI-friendly text layout. Falls back to the text layout when the
-   *  terminal is narrower than 80 columns. JSON mode (`json: true`)
-   *  is unaffected — it always outputs the same `ReportData`. */
+
   dashboard?: boolean;
-  /** Force output width (otherwise read `process.stdout.columns`).
-   *  Useful for screenshots / fixture tests. */
+
   width?: number;
-  /** Dashboard-only: skip the trend chart to save vertical space. */
+
   compact?: boolean;
-  /** Dashboard-only: skip the top banner. */
+
   banner?: boolean;
 }
 
@@ -68,8 +64,6 @@ export const DEFAULT_REPORT: ReportOptions = {
   banner: true,
 };
 
-// ---------- public entry ----------
-
 export async function runReport(opts: ReportOptions): Promise<string> {
   const filled = normalizeReportOptions(opts);
   const scan = await getCachedScan();
@@ -79,22 +73,13 @@ export async function runReport(opts: ReportOptions): Promise<string> {
   const data = computeReportData(scan, sources, filled);
   if (filled.json) return JSON.stringify(data, null, 2);
   if (filled.dashboard) {
-    // The dashboard needs the same filtered record set the totals /
-    // trend / breakdown are built from — heatmap and footer scope both
-    // read from records directly, so passing the raw `scan.records`
-    // would silently leak rows from outside the selected
-    // range/source/model/project window. Compute once here and hand
-    // it through.
+
     const filteredRecords = filterRecordsForReport(scan, sources, filled);
     return renderDash(scan, data, filled, filteredRecords);
   }
   return renderText(data, filled);
 }
 
-/** Apply the same range/source/model/project filter that
- *  `computeReportData` uses internally, but return the records instead
- *  of aggregated totals. Used by the dashboard renderer so its heatmap
- *  and footer scope stay consistent with the KPI tiles / trend chart. */
 export function filterRecordsForReport(
   scan: ScanResult,
   sources: ProviderId[],
@@ -158,8 +143,6 @@ function invalidOptionMessage(name: string, value: unknown, expected: readonly s
   return `invalid ${name}: ${JSON.stringify(value)}. Expected one of: ${expected.join(', ')}`;
 }
 
-// ---------- data shaping ----------
-
 export interface ReportData {
   generatedAt: string;
   range: string;
@@ -178,9 +161,7 @@ export interface ReportData {
     cost: number;
     saved: number;
     requests: number;
-    /** Distinct user prompts (= dashboard usage-table rows) the LLM
-     *  responded to in this window. One turn fans out to many `requests`
-     *  via tool-use loops, reasoning steps, and sub-agents. */
+
     turns: number;
   };
   trend: Array<{
@@ -188,8 +169,7 @@ export interface ReportData {
     cost: number;
     tokens: number;
     turns: number;
-    /** Per-bucket token-type split. Added for `--dashboard`'s stacked
-     *  vertical bars; the plain `--text` renderer ignores these. */
+
     input: number;
     output: number;
     cacheRead: number;
@@ -203,7 +183,7 @@ export interface ReportData {
     tokens: number;
     cost: number;
     share: number;
-    sub?: string; // e.g. model name shortened, or session id hash
+    sub?: string;
   }>;
 }
 
@@ -217,12 +197,9 @@ function computeReportData(
   const baseOpts: Omit<AggregateOpts, 'source'> = {
     from: dates.from ?? undefined,
     to: dates.until ?? undefined,
-    // `o.model` / `o.project` are substring patterns, not exact matches —
-    // they're applied per-record by `withinSrcAndFilters` below, so we
-    // deliberately leave the aggregator's exact-match filters unset.
+
   };
 
-  // Collect per-source totals + per-bucket trend
   const totals = {
     input: 0,
     output: 0,
@@ -261,14 +238,9 @@ function computeReportData(
     totals.requests += t.requests;
     for (const r of sourceRecs) totals.reasoning += r.usage.reasoning_tokens ?? 0;
 
-    // Turn counts. `summarizeTurns` returns one entry per turn root —
-    // a turn never spans providers, so per-source then sum is correct
-    // (and matches the dashboard's overview chart convention).
     const turnSummaries = summarizeTurns(sourceRecs, scan.userRecords, scan.parentMap);
     totals.turns += turnSummaries.size;
 
-    // Per-bucket turn counts: attribute each turn to its earliest
-    // record's bucket key (same convention as dashboard / MCP).
     const turnsByKey = new Map<string, number>();
     for (const tn of turnSummaries.values()) {
       const { key } = bucketKey(tn.firstTimestamp, o.gran);
@@ -306,7 +278,6 @@ function computeReportData(
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([, v]) => v);
 
-  // Breakdown
   const breakdown = buildBreakdown(scan, sources, baseOpts, o);
 
   return {
@@ -337,7 +308,7 @@ function buildBreakdown(
       const filtered = allRecords.filter((r) => withinSrcAndFilters(r, opts, o));
       const models = aggregateByModel(filtered, opts);
       const provider = getProvider(source);
-      // Group turns by first-record model (one turn → one model attribution).
+
       const turnsByModel = new Map<string, number>();
       for (const tn of summarizeTurns(filtered, scan.userRecords, scan.parentMap).values()) {
         turnsByModel.set(tn.firstModel, (turnsByModel.get(tn.firstModel) ?? 0) + 1);
@@ -350,7 +321,7 @@ function buildBreakdown(
           turns: turnsByModel.get(m.model) ?? 0,
           tokens: m.totalTokens,
           cost: m.cost,
-          share: 0, // filled after total
+          share: 0,
           sub: m.model,
         });
       }
@@ -383,7 +354,7 @@ function buildBreakdown(
     }
     return finalizeShare(rows, o.limit);
   }
-  // sessions
+
   const rows: ReportData['breakdown'] = [];
   for (const source of sources) {
     const opts: AggregateOpts = { ...base, source };
@@ -402,9 +373,7 @@ function buildBreakdown(
         tokens: s.totalTokens,
         cost: s.cost,
         share: 0,
-        // Worktree-aware so the breakdown reads
-        // `ai-self-web (playwright)` instead of just `playwright`,
-        // matching the dashboard's usage / sessions tables.
+
         sub: s.projectLabel,
       });
     }
@@ -483,8 +452,6 @@ function parseReportDate(raw: string, boundary: 'since' | 'until'): Date {
   return date;
 }
 
-// ---------- pretty rendering ----------
-
 type C = (s: string | number) => string;
 
 function makeColors(enabled: boolean) {
@@ -506,7 +473,6 @@ export function renderText(d: ReportData, o: ReportOptions): string {
   const c = makeColors(o.color !== false);
   const lines: string[] = [];
 
-  // Header
   const ts = new Date(d.generatedAt).toLocaleString();
   lines.push('');
   lines.push(`${c.brand(c.bold('ccgauge'))} ${c.bold('report')}`);
@@ -523,7 +489,6 @@ export function renderText(d: ReportData, o: ReportOptions): string {
   );
   lines.push('');
 
-  // Section: Tokens — paired rows so each line reads naturally L → R.
   lines.push(c.brand('▸') + ' ' + c.bold('Tokens'));
   const t = d.totals;
   const tokenRows: Array<[string, string, string, string]> = [
@@ -539,9 +504,7 @@ export function renderText(d: ReportData, o: ReportOptions): string {
     tokenRows.push(['Reasoning', c.dim(formatTokensCompact(t.reasoning)), '', '']);
   }
   tokenRows.push(['Total', c.bold(formatTokensCompact(t.total)), '', '']);
-  // Convos (= turns / user prompts) is the headline activity number;
-  // Requests (raw API calls) sits next to it for the LLM-savvy reader
-  // who wants to know how much tool-loop fan-out is happening.
+
   tokenRows.push([
     'Convos',
     c.bold(t.turns.toLocaleString()),
@@ -551,7 +514,6 @@ export function renderText(d: ReportData, o: ReportOptions): string {
   lines.push(renderPairedKv(tokenRows, c));
   lines.push('');
 
-  // Section: Cost
   lines.push(c.brand('▸') + ' ' + c.bold('Cost'));
   const totalInputForCache = t.input + t.cacheRead + t.cacheWrite;
   const cacheHit = totalInputForCache > 0 ? t.cacheRead / totalInputForCache : 0;
@@ -568,7 +530,6 @@ export function renderText(d: ReportData, o: ReportOptions): string {
   lines.push(renderPairedKv(costRows, c));
   lines.push('');
 
-  // Section: trend
   if (o.showTrend !== false && d.trend.length > 0) {
     lines.push(c.brand('▸') + ' ' + c.bold('Trend') + ' ' + c.dim(`(${o.gran}, by cost)`));
     const maxCost = Math.max(...d.trend.map((b) => b.cost), 1e-9);
@@ -583,7 +544,6 @@ export function renderText(d: ReportData, o: ReportOptions): string {
     lines.push('');
   }
 
-  // Section: breakdown
   if (o.showBreakdown !== false && d.breakdown.length > 0) {
     const dimLabel = d.by[0].toUpperCase() + d.by.slice(1);
     lines.push(
@@ -614,8 +574,7 @@ function renderPairedKv(
   rows: Array<[string, string, string, string]>,
   c: ReturnType<typeof makeColors>,
 ): string {
-  // Each row is [leftLabel, leftValue, rightLabel, rightValue].
-  // The whole table aligns on 4 column widths.
+
   const w = [0, 0, 0, 0];
   for (const r of rows) for (let i = 0; i < 4; i += 1) {
     const cell = r[i];
@@ -667,7 +626,6 @@ function barString(ratio: number, width: number): string {
   return '▇'.repeat(filled) + '─'.repeat(width - filled);
 }
 
-// Strip ANSI SGR escapes (ESC + [...m) when measuring visible length.
 const ESC = String.fromCharCode(27);
 const ANSI_RE = new RegExp(ESC + '\\[[0-9;]*m', 'g');
 function visibleLen(s: string): number {

@@ -14,10 +14,6 @@ export const GET = withApiErrorHandling(async (req: Request) => {
   const scan = await getCachedScan();
   const sources = expandSources(source);
 
-  // For 'all' we return a per-source map instead of merging — each
-  // provider has its own rate-limit window and merging tokens across them
-  // wouldn't reflect either actual budget. Same shape semantics as the
-  // single-source path, just keyed by provider.
   const bySource = sources.map((s) => {
     const records = filterBySource(scan.records, s);
     const windowMs = getProvider(s).capabilities.blockWindowMs;

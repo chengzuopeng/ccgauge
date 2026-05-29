@@ -4,16 +4,6 @@ import {
   USAGE_OVERVIEW_HIDDEN_VALUE,
 } from '@/lib/storage-keys';
 
-/**
- * Inline script that runs before React hydration. It reads the theme from
- * localStorage (or cookie as fallback) and applies the matching class on
- * <html> so the page paints with the correct colors immediately and there
- * is no light/dark flash. Also restores the usage page's "overview hidden"
- * collapse state from localStorage so collapsed users don't see a flash.
- *
- * Any storage key referenced here MUST come from `lib/storage-keys.ts` so
- * the React side can't rename it out from under us.
- */
 export function NoFlashScript() {
   const overviewKey = JSON.stringify(USAGE_OVERVIEW_HIDDEN_KEY);
   const overviewAttr = JSON.stringify(USAGE_OVERVIEW_DATA_ATTR);

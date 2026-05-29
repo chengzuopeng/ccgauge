@@ -1,26 +1,4 @@
 #!/usr/bin/env node
-/**
- * Guard against the "I edited parser code but forgot to bump
- * `parserVersion`" failure mode.
- *
- * The indexer keys its on-disk cache (`~/.ccgauge/cache/index-v2.json`)
- * by `(filePath, parserVersion)`. If the parser logic changes but the
- * version string stays the same, the indexer happily re-uses stale
- * entries computed by the OLD parser — a silent correctness failure
- * that the user only spots when "the numbers look weird".
- *
- * This script reads a baseline from `scripts/parser-versions.json` and
- * asserts every provider's current `parserVersion` matches. To intentionally
- * bump a parser version:
- *
- *   1. Update `parserVersion` in `lib/providers/<name>/index.ts`.
- *   2. Update the matching entry in `scripts/parser-versions.json`.
- *   3. Run `pnpm test` to confirm.
- *
- * Anyone who edits parser code without doing step 2 sees this script
- * fail in `pnpm test`, which (per AGENTS.md release checklist) runs in
- * the release flow.
- */
 
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -29,15 +7,11 @@ import { fileURLToPath } from 'node:url';
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..');
 
-/** Load the baseline declared in scripts/parser-versions.json. */
 function loadBaseline() {
   const path = resolve(here, 'parser-versions.json');
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 
-/** Cheap regex-based parser version lookup — avoids having to import the
- *  TS module (which would need a transpile step). The file format is
- *  trusted (the same file the indexer reads at runtime). */
 function readParserVersionFromAdapter(adapterFile) {
   const src = readFileSync(adapterFile, 'utf8');
   const m = src.match(/parserVersion:\s*['"]([^'"]+)['"]/);

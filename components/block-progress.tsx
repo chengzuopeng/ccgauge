@@ -8,19 +8,13 @@ import { useT, useI18n } from '@/lib/i18n/context';
 interface Props {
   initial: SerializedProgress;
   className?: string;
-  /** Optional small inline tag after the title (e.g. "· Claude"). */
+
   sourceLabel?: string;
-  /** Compact mode shrinks padding + min-height so two cards fit on one
-   *  row at most viewport widths. */
+
   compact?: boolean;
-  /** Replaces the default top-right slot — by default that slot is the
-   *  "live" pill on an active block, nothing on the empty state. The
-   *  All view passes a source-switcher tablist here instead. */
+
   headerRight?: React.ReactNode;
-  /** Full CLI name used in the empty-state hint
-   *  ("Send a message in {cli} to start one."). Defaults to "Claude Code"
-   *  for backwards compatibility, but callers viewing the Codex source
-   *  must pass "Codex CLI" so the hint matches what the user has open. */
+
   cliName?: string;
 }
 
@@ -58,9 +52,6 @@ export function BlockProgress({
       <div className={cardCls}>
         <div className="flex items-center justify-between gap-2">
           {headerLeft}
-          {/* No default right-slot in the empty state; the switcher (if
-              caller passed one) lives here so users can still switch to
-              another provider whose block IS active. */}
           {headerRight}
         </div>
         <div className="text-sm text-text-tertiary mt-4">{t('block.empty')}</div>
@@ -71,10 +62,6 @@ export function BlockProgress({
     );
   }
 
-  // Default right-slot for an active block is the "live" pill; the
-  // visible countdown below already conveys liveness, so a caller-provided
-  // headerRight (e.g. tab switcher) cleanly replaces it without losing
-  // critical info.
   const defaultLivePill = (
     <span className="pill bg-success/10 text-success border border-success/20 whitespace-nowrap">
       <span className="w-1.5 h-1.5 rounded-full bg-success mr-1 animate-pulse" />

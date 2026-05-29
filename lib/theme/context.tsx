@@ -38,13 +38,12 @@ export function ThemeProvider({ initialTheme, children }: { initialTheme: Theme;
     initialTheme === 'system' ? 'dark' : initialTheme,
   );
 
-  // Read localStorage on mount; this is the source of truth for client-side preference.
   useEffect(() => {
     try {
       const ls = localStorage.getItem(LS_KEY) as Theme | null;
       if (ls === 'light' || ls === 'dark' || ls === 'system') {
         if (ls !== initialTheme) {
-          // sync cookie to match localStorage so SSR matches next time
+
           document.cookie = `${THEME_COOKIE}=${ls}; path=/; max-age=${COOKIE_MAX_AGE}; SameSite=Lax`;
         }
         setThemeState(ls);
@@ -64,7 +63,6 @@ export function ThemeProvider({ initialTheme, children }: { initialTheme: Theme;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Watch for system changes when theme = system
   useEffect(() => {
     if (theme !== 'system' || typeof window === 'undefined') return;
     const mq = window.matchMedia('(prefers-color-scheme: light)');

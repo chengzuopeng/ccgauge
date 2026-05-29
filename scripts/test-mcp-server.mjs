@@ -1,11 +1,5 @@
 #!/usr/bin/env node
-// Smoke test: spawn the **CLI entry** (`node bin/cli.mjs mcp`) and drive
-// it through an init handshake + tools/list + a few tools/call
-// round-trips. We deliberately go through the CLI rather than running
-// `dist/mcp/server.mjs` directly so any regression in the CLI's
-// in-process wrapper layer (signal handling, exit-code shaping, or —
-// historically — accidentally `process.exit(0)`-ing right after the
-// handshake) is caught here too.
+
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -60,9 +54,6 @@ child.on('exit', (code) => {
   }
 });
 
-// Surface unexpected JSON-RPC notifications (e.g. server-side errors)
-// for easier debugging.
-
 function rpc(method, params) {
   const id = nextId++;
   const req = { jsonrpc: '2.0', id, method, params };
@@ -83,12 +74,12 @@ function rpc(method, params) {
 function shutdown(code = 0) {
   try {
     child.stdin.end();
-  } catch { /* ignore */ }
+  } catch {  }
   setTimeout(() => process.exit(code), 250);
 }
 
 try {
-  // 1) initialize
+
   const initRes = await rpc('initialize', {
     protocolVersion: '2025-06-18',
     capabilities: {},
@@ -97,10 +88,8 @@ try {
   assert.equal(initRes.serverInfo?.name, 'ccgauge', 'serverInfo.name');
   console.log(`init OK · server=${initRes.serverInfo.name}@${initRes.serverInfo.version}`);
 
-  // initialized notification (no response)
   child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
 
-  // 2) tools/list
   const list = await rpc('tools/list', {});
   const toolNames = list.tools.map((t) => t.name).sort();
   console.log(`tools (${toolNames.length}): ${toolNames.join(', ')}`);
@@ -117,13 +106,11 @@ try {
     assert.ok(toolNames.includes(expected), `missing tool ${expected}`);
   }
 
-  // 3) resources/list
   const resList = await rpc('resources/list', {});
   const resUris = resList.resources.map((r) => r.uri);
   console.log(`resources: ${resUris.join(', ')}`);
   assert.ok(resUris.includes('ccgauge://providers'), 'missing providers resource');
 
-  // 4) call usage_summary (default args = source=all, range=all)
   const sum = await rpc('tools/call', {
     name: 'usage_summary',
     arguments: {},
@@ -137,7 +124,6 @@ try {
     `usage_summary OK · total=${sumPayload.totals.total_tokens.toLocaleString()} tokens, $${sumPayload.totals.cost_usd.toFixed(2)} (claude=$${sumPayload.bySource.claude.cost_usd.toFixed(2)} + codex=$${sumPayload.bySource.codex.cost_usd.toFixed(2)})`,
   );
 
-  // 5) call daily_summary (today, source=all)
   const day = await rpc('tools/call', {
     name: 'daily_summary',
     arguments: { date: 'today' },
@@ -150,7 +136,6 @@ try {
     `daily_summary OK · sessions=${dayPayload.session_count} cost=$${dayPayload.totals.cost_usd.toFixed(2)} projects=${dayPayload.sessions_by_project.length}`,
   );
 
-  // 6) call usage_by_model with source=codex (single source path)
   const byModel = await rpc('tools/call', {
     name: 'usage_by_model',
     arguments: { range: '30d', source: 'codex', limit: 5 },
@@ -164,7 +149,6 @@ try {
     `usage_by_model OK · models=${byModelPayload.models.length} top=${byModelPayload.models[0]?.model ?? '—'}`,
   );
 
-  // 7) call weekly_summary
   const week = await rpc('tools/call', {
     name: 'weekly_summary',
     arguments: { week_offset: 0 },
@@ -175,7 +159,6 @@ try {
     `weekly_summary OK · ${weekPayload.week} sessions=${weekPayload.session_count} cost=$${weekPayload.totals.cost_usd.toFixed(2)}`,
   );
 
-  // 8) read providers resource
   const providers = await rpc('resources/read', { uri: 'ccgauge://providers' });
   const provPayload = JSON.parse(providers.contents[0].text);
   assert.ok(Array.isArray(provPayload.providers), 'providers list missing');
@@ -183,11 +166,6 @@ try {
     `providers resource OK · ${provPayload.providers.map((p) => `${p.id}(${p.assistant_records}rec)`).join(' ')}`,
   );
 
-  // ── regression coverage for the three review fixes ────────────────────
-
-  // 9) top_tools must respect `source` (review #1)
-  // Daily summaries against codex vs claude must NOT return identical
-  // top_tools — otherwise we're mixing provider tool-call stats together.
   const dayCodex = await rpc('tools/call', {
     name: 'daily_summary',
     arguments: { date: 'today', source: 'codex' },
@@ -205,14 +183,7 @@ try {
   const allPayload = JSON.parse(dayAll.content[0].text);
   const allTools = allPayload.top_tools;
   const allCounts = new Map(allTools.map((t) => [t.tool, t.count]));
-  // `top_tools` is truncated to the top-N most-used tools, so the union
-  // of (codex top-N + claude top-N) is generally NOT a subset of (all
-  // top-N): a tool that's #8 in claude-only can land #11 in the merged
-  // view and disappear. That's a fact of truncation, not a sign the
-  // source filter is broken. We only assert the invariant — `all`
-  // count ≥ single-source count — for tools that appear in BOTH the
-  // per-source top-N and the all top-N. The (separate) bothSourcesEqualAll
-  // check below catches the case the source filter actually was a no-op.
+
   for (const t of [...codexTools, ...claudeTools]) {
     const allCount = allCounts.get(t.tool);
     if (allCount === undefined) continue;
@@ -237,7 +208,6 @@ try {
     `top_tools source filter OK · codex=${codexTools.length} claude=${claudeTools.length} all=${allTools.length}`,
   );
 
-  // 10) usage_by_time must surface reasoning_tokens per bucket (review #2)
   const byTime = await rpc('tools/call', {
     name: 'usage_by_time',
     arguments: { range: 'all', source: 'codex', granularity: 'month' },
@@ -247,9 +217,7 @@ try {
     (acc, b) => acc + (b.totals.reasoning_tokens ?? 0),
     0,
   );
-  // Cross-check: usage_summary for the same window should report the same
-  // reasoning total. If buckets sum to 0 but the summary shows a nonzero
-  // figure, the bug is back.
+
   const allCodex = await rpc('tools/call', {
     name: 'usage_summary',
     arguments: { range: 'all', source: 'codex' },
@@ -260,8 +228,7 @@ try {
       bucketReasoningSum > 0,
       `usage_by_time should propagate reasoning_tokens (got 0 across all buckets, but usage_summary has ${summaryReasoning})`,
     );
-    // Allow small drift if a record sits exactly on a bucket boundary;
-    // require the bucket sum to be at least 95% of the summary figure.
+
     assert.ok(
       bucketReasoningSum >= summaryReasoning * 0.95,
       `bucket reasoning sum (${bucketReasoningSum}) too far below summary (${summaryReasoning})`,
@@ -271,13 +238,10 @@ try {
     `usage_by_time reasoning OK · summary=${summaryReasoning.toLocaleString()} buckets=${bucketReasoningSum.toLocaleString()}`,
   );
 
-  // 11) Invalid range / from / to must error, not silently fall back to all-time (review #3)
-  // The MCP SDK turns thrown errors into a tool-result with isError=true
-  // (per spec) rather than a JSON-RPC error. We treat both as "rejected".
   function isRejected(result) {
     if (!result) return false;
     if (result.isError) return true;
-    // Some SDKs put the error message in content[0].text with type="text"
+
     const txt = result.content?.[0]?.text;
     if (typeof txt === 'string' && /invalid|error|rejected/i.test(txt)) return true;
     return false;
@@ -290,7 +254,7 @@ try {
     } catch {
       threw = true;
     }
-    if (threw) return; // JSON-RPC error path
+    if (threw) return;
     assert.ok(
       isRejected(result),
       `${label} should be rejected; got ${JSON.stringify(result).slice(0, 300)}`,

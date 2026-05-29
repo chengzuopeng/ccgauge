@@ -34,7 +34,6 @@ export function Logo({
         </>
       )}
 
-      {/* Gauge system: outer dial, inner guide, ticks, needle, and token bars. */}
       <path
         d="M15 39.5 A17 17 0 0 1 49 39.5"
         stroke={mutedStroke}

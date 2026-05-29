@@ -19,9 +19,6 @@ const items: Array<{ key: 'nav.home' | 'nav.features' | 'nav.cli' | 'nav.mcp' | 
   { key: 'nav.privacy', path: 'privacy' },
 ];
 
-// "Active" = the current URL starts with the item's localePath. Home is a
-// special case — only matches the bare locale root, otherwise EVERY page
-// would highlight Home.
 function isActive(itemPath: string): boolean {
   const fullPath = localePath(locale, itemPath);
   const here = Astro.url.pathname;
@@ -78,7 +75,7 @@ function isActive(itemPath: string): boolean {
     </div>
   </div>
 
-  <!-- Mobile nav (revealed by media query, no JS — content scrolls horizontally) -->
+  
   <nav
     class="md:hidden border-t border-border overflow-x-auto"
     aria-label="Primary"
@@ -102,7 +99,6 @@ function isActive(itemPath: string): boolean {
     </div>
   </nav>
 
-  <!-- Reading progress: the header's bottom border fills as you scroll.
-       `--scroll-progress` (0–1) is driven by the site-wide motion script. -->
+  
   <div class="scroll-progress" data-scroll-progress aria-hidden="true"></div>
 </header>

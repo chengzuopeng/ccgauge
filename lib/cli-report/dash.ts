@@ -22,17 +22,6 @@ import {
   type Palette,
 } from './ansi';
 
-/** Public entry — `runReport(...)` calls into us when `opts.dashboard`
- *  is true. Returns the fully-rendered dashboard string (no trailing
- *  newline; the CLI adds it).
- *
- *  `filteredRecords` is the same record set the totals/trend/breakdown
- *  in `data` were derived from. Heatmap and footer scope read records
- *  directly, so passing the raw `scan.records` here would silently
- *  show activity from outside the selected window. The Active 5h block
- *  in the KPI tile row deliberately keeps `scan` access — block
- *  progress is a "right now" reading and should NOT be cropped by
- *  --range, only by --source. */
 export function renderDash(
   scan: ScanResult,
   data: ReportData,
@@ -41,20 +30,10 @@ export function renderDash(
 ): string {
   const width = opts.width ?? process.stdout.columns ?? 100;
   const useColor = opts.color !== false;
-  // boxen and cli-table3 read the global `chalk.level` to decide how
-  // much colour to emit. In Claude Code / CI / non-TTY parents chalk
-  // often auto-detects level 1 (16 colours), which crushes our 24-bit
-  // brand colours into bright cyan/yellow lookalikes and turns the
-  // boxen border-color hex (`#404046`) into basic black. Force it
-  // here so all three (chalk via `c`, boxen, cli-table3) emit the
-  // same truecolor sequences. The process is a one-shot CLI render,
-  // so the global mutation is safe.
+
   chalk.level = useColor ? 3 : 0;
   const c = makePalette(useColor);
 
-  // Width-based degradation: too narrow → tell the user to widen, but
-  // still print something useful (the trend chart + KPI tiles don't
-  // fit < 80, and trying to render them just makes the output worse).
   if (width < 80) {
     return [
       `[ccgauge] terminal width (${width}) is below the dashboard's 80-column floor.`,
@@ -64,7 +43,7 @@ export function renderDash(
     ].join('\n');
   }
 
-  const inner = width - 4; // 2-char left + right margin
+  const inner = width - 4;
   const lines: string[] = [];
 
   if (opts.banner !== false) {
@@ -88,19 +67,9 @@ export function renderDash(
 
   lines.push(...renderFooter(c, filteredRecords, data, opts));
 
-  // Indent everything 2 spaces for the visual breathing room you see
-  // in the reference screenshot. The right margin "happens" because
-  // every component already padded itself to `inner` width.
   return lines.map((l) => '  ' + l).join('\n');
 }
 
-// ── banner ───────────────────────────────────────────────────────────
-
-/**
- * Top banner. A single accent line + bold title + dim meta, joined
- * with the `figures.line` rule. No box around it — the dashboard's
- * KPI tiles already shoulder the heavy framing.
- */
 function renderBanner(c: Palette, w: number, data: ReportData): string[] {
   const title = `${c.brand(c.bold('ccgauge'))} ${c.dim(figures.line)} ${c.bold('dashboard')}`;
   const meta = c.dim(
@@ -117,14 +86,6 @@ function renderBanner(c: Palette, w: number, data: ReportData): string[] {
   return [`${title}${' '.repeat(fill)}${meta}`];
 }
 
-// ── KPI tiles ────────────────────────────────────────────────────────
-
-/**
- * Source-aware active 5h block lookup. See `pickActiveBlock` in the
- * earlier non-libraryised version for the full rationale — short
- * version is: claude/codex show only that provider; all prefers
- * whichever has an active block (claude > codex fallback).
- */
 function pickActiveBlock(
   records: AssistantRecord[],
   source: ReportData['source'],
@@ -146,7 +107,7 @@ function pickActiveBlock(
 interface TileSpec {
   label: string;
   value: string;
-  /** Optional sparkline or hbar drawn between value and sub. */
+
   spark?: string;
   sub: string;
 }
@@ -161,7 +122,6 @@ function renderKpiTiles(c: Palette, w: number, scan: ScanResult, data: ReportDat
   const cacheIn = t.input + t.cacheRead + t.cacheWrite;
   const cacheHit = cacheIn > 0 ? t.cacheRead / cacheIn : 0;
 
-  // Block reads scan.records (not the filtered set) — see renderDash docstring.
   const activeBlock = pickActiveBlock(scan.records, data.source);
 
   const tiles: TileSpec[] = [
@@ -210,12 +170,9 @@ function renderKpiTiles(c: Palette, w: number, scan: ScanResult, data: ReportDat
   return layoutTiles(tiles, c, w);
 }
 
-/** Lay tiles in a responsive grid. We aim for tile width ~26 inside
- *  the boxen frame (i.e. content area of 22 chars + 2 chars padding +
- *  2 chars borders), then fit as many per row as `width` allows. */
 function layoutTiles(tiles: TileSpec[], c: Palette, w: number): string[] {
-  const tileInner = 22; // chars inside boxen, accounting for its padding-x: 1
-  const tileOuter = tileInner + 4; // + boxen padding (2) + borders (2)
+  const tileInner = 22;
+  const tileOuter = tileInner + 4;
   const gap = 1;
   const perRow = Math.max(1, Math.floor((w + gap) / (tileOuter + gap)));
   const out: string[] = [];
@@ -223,16 +180,13 @@ function layoutTiles(tiles: TileSpec[], c: Palette, w: number): string[] {
     const slice = tiles.slice(i, i + perRow);
     const blocks = slice.map((t) => renderTile(t, tileInner, c));
     out.push(...mergeHorizontally(blocks, gap).split('\n'));
-    if (i + perRow < tiles.length) out.push(''); // gap row between tile rows
+    if (i + perRow < tiles.length) out.push('');
   }
   return out;
 }
 
 function renderTile(t: TileSpec, inner: number, c: Palette): string {
-  // Body: small-caps label (dim alone is enough — bold on top of dim
-  // makes the ANSI sequences nest awkwardly), then the bold value,
-  // a sparkline / hbar slot (always reserved so tiles in a row end
-  // at the same border), then the dim sub line.
+
   const cap = inner;
   const body = [
     c.dim(t.label.toUpperCase()),
@@ -245,20 +199,12 @@ function renderTile(t: TileSpec, inner: number, c: Palette): string {
   return boxen(body, {
     padding: { top: 0, right: 1, bottom: 0, left: 1 },
     borderStyle: 'round',
-    borderColor: '#5a5a64', // gray-600-ish — visible on dark, soft on light
-    width: inner + 4, // padding-x(1+1) + borders(1+1)
+    borderColor: '#5a5a64',
+    width: inner + 4,
     textAlignment: 'left',
   });
 }
 
-/**
- * Merge `blocks` (each a multi-line string) side-by-side, padding the
- * shorter to the max height. `gap` columns of blank space between.
- *
- * Kept inline here (was in ansi.ts) since boxen returns one block per
- * tile and we always want consistent horizontal stacking — no other
- * call site needs this generic merge.
- */
 function mergeHorizontally(blocks: string[], gap: number): string {
   const rows = blocks.map((b) => b.split('\n'));
   const h = Math.max(...rows.map((r) => r.length));
@@ -271,8 +217,6 @@ function mergeHorizontally(blocks: string[], gap: number): string {
   }
   return lines.join('\n');
 }
-
-// ── trend (stacked vertical bars) ────────────────────────────────────
 
 function renderTrend(c: Palette, w: number, data: ReportData): string[] {
   const trend = data.trend;
@@ -336,12 +280,9 @@ function renderTrend(c: Palette, w: number, data: ReportData): string[] {
   return lines;
 }
 
-// ── breakdowns (two cli-table3 columns) ──────────────────────────────
-
 function renderBreakdowns(c: Palette, w: number, data: ReportData): string[] {
   const primary = data.breakdown.slice(0, 8);
 
-  // Two columns, each gets half the available width minus a gap.
   const colW = Math.floor((w - 2) / 2);
   const left = renderBreakdownColumn(
     c,
@@ -370,10 +311,7 @@ function renderBreakdownColumn(
   metric: 'cost' | 'turns',
   scale: number,
 ): string {
-  // The bar column sits in its own cell so cli-table3 can keep the
-  // numeric columns aligned right. We render the bar inline (with the
-  // ratio bar character set) instead of as a separate row, which gives
-  // the breakdown a tighter, more spreadsheet-like feel.
+
   const heading = `${c.brand(figures.pointerSmall)} ${c.bold(title)}`;
 
   if (rows.length === 0) {
@@ -390,8 +328,8 @@ function renderBreakdownColumn(
       c.dim('Cost'),
     ],
     style: {
-      head: [],          // chalk has already coloured the cells
-      border: ['gray'],  // cli-table3 maps this to chalk.gray
+      head: [],
+      border: ['gray'],
       'padding-left': 1,
       'padding-right': 1,
     },
@@ -401,15 +339,11 @@ function renderBreakdownColumn(
       left: '│', 'left-mid': '├', mid: '─', 'mid-mid': '┼',
       right: '│', 'right-mid': '┤', middle: '│',
     },
-    // cli-table3 also takes per-column widths; we leave them undefined
-    // so the lib auto-sizes from content. The container's truncate
-    // ensures we don't overflow `innerWidth` on small terms.
+
     wordWrap: false,
     colAligns: ['right', 'left', 'right', 'right', 'right', 'right'],
   });
 
-  // Reserve room for the bar row under each name. We compute one bar
-  // per row and emit it as a second cell-row beneath the data row.
   rows.forEach((r, i) => {
     const lbl = cliTruncate(r.label, Math.max(8, innerWidth - 40));
     const ratio =
@@ -418,8 +352,7 @@ function renderBreakdownColumn(
         : r.turns / Math.max(1e-9, scale);
     const barW = Math.max(8, Math.min(24, innerWidth - 40));
     const bar = hbar(ratio, barW, c.brand);
-    // The bar lives in the Item column on a second visual line.
-    // cli-table3 supports multi-line cells via \n.
+
     table.push([
       String(i + 1),
       `${lbl}\n${bar}`,
@@ -433,8 +366,6 @@ function renderBreakdownColumn(
   return [heading, '', table.toString()].join('\n');
 }
 
-// ── heatmap (activity by day-of-week × hour-of-day) ──────────────────
-
 function renderHeatmap(c: Palette, w: number, records: AssistantRecord[]): string[] {
   const stats = computeActivityStats(records, { source: 'all' });
   const heat = stats.heatmap;
@@ -447,10 +378,7 @@ function renderHeatmap(c: Palette, w: number, records: AssistantRecord[]): strin
     ];
   }
   const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  // Five intensity steps + an empty slot. We use a single block
-  // character with five descending opacities (via chalk's dim plus
-  // the brand color) so the heatmap reads like a smooth gradient
-  // instead of the noisy ▢▣▤▥▦ mix of glyphs the prior version had.
+
   const intensity = (v: number): string => {
     if (v === 0) return c.dim('·');
     const pct = v / max;
@@ -467,15 +395,13 @@ function renderHeatmap(c: Palette, w: number, records: AssistantRecord[]): strin
     '     ' + Array.from({ length: 24 }, (_, h) => padStart(String(h), 2)).join(' ');
   const lines = [heading, '', c.dim(hourHeader)];
   for (let dow = 0; dow < 7; dow += 1) {
-    const sourceDow = (dow + 1) % 7; // Mon=1..Sun=0
+    const sourceDow = (dow + 1) % 7;
     const row = heat[sourceDow] ?? new Array(24).fill(0);
     const cells = row.map((v) => padStart(intensity(v), 2)).join(' ');
     lines.push(`${c.dim(padEnd(dayLabels[dow], 4))} ${cells}`);
   }
   return lines;
 }
-
-// ── footer ───────────────────────────────────────────────────────────
 
 function renderFooter(
   c: Palette,

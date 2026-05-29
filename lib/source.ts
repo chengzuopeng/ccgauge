@@ -10,9 +10,6 @@ import type { ProviderId } from './providers';
 
 export const SOURCE_COOKIE = 'ccgauge_source';
 
-/** What a page / API route gets after resolving the user's source filter.
- *  `'all'` is only valid when both providers are present on disk; the
- *  resolver downgrades it otherwise. */
 export type EffectiveSource = ProviderId | 'all';
 
 export function isEffectiveSource(v: unknown): v is EffectiveSource {
@@ -24,12 +21,6 @@ export function parseSourceParam(v: string | null | undefined): EffectiveSource 
   return coerceProviderId(v);
 }
 
-/** Resolve effective source for a server component / API route.
- *  Precedence: explicit URL searchParam > cookie > default.
- *
- *  `'all'` is preserved only when both providers are actually present on
- *  the host. If the user has only one provider, `'all'` collapses to the
- *  available single provider — never crash, never silently show empty. */
 export async function resolveSource(searchParam?: string | null): Promise<EffectiveSource> {
   const available = await detectAvailableProviders();
   const canBeAll = available.length >= 2;
@@ -47,7 +38,6 @@ export async function resolveSource(searchParam?: string | null): Promise<Effect
   return preferred;
 }
 
-/** Filter records to the chosen source. `'all'` is a pass-through. */
 export function filterBySource<T extends { source: ProviderId }>(
   records: T[],
   source: EffectiveSource,
@@ -56,8 +46,6 @@ export function filterBySource<T extends { source: ProviderId }>(
   return records.filter((r) => r.source === source);
 }
 
-/** Expand to the concrete provider list. Used to dispatch aggregator calls
- *  one-per-source when `source` is `'all'`. */
 export function expandSources(source: EffectiveSource): ProviderId[] {
   if (source === 'all') return ALL_PROVIDER_IDS.slice();
   return [source];

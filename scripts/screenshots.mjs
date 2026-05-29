@@ -1,15 +1,5 @@
 #!/usr/bin/env node
-/**
- * Take dashboard screenshots for the README.
- *
- *   node scripts/screenshots.mjs
- *
- * Requires the dev server running on http://127.0.0.1:3738.
- * For a production CLI instance, pass CCGAUGE_BASE=http://127.0.0.1:3737.
- * Drops files into docs/screenshots/.
- *
- * Run-once: pnpm dlx playwright install chromium
- */
+
 import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -73,7 +63,7 @@ async function main() {
   const browser = await chromium.launch();
   const context = await browser.newContext({
     viewport: VIEWPORT,
-    deviceScaleFactor: 2, // retina-quality
+    deviceScaleFactor: 2,
   });
 
   const url = new URL(BASE);
@@ -87,10 +77,9 @@ async function main() {
     const page = await context.newPage();
     await page.goto(BASE + s.path, { waitUntil: 'networkidle' });
     await hideDevChrome(page);
-    // Disable caret, just in case
+
     await page.evaluate(() => document.activeElement?.blur?.());
-    // Make sure animations have settled (we already disabled chart animations,
-    // but the live block timer ticks every 1s)
+
     await page.waitForTimeout(800);
 
     const out = `${OUT}/${s.name}`;

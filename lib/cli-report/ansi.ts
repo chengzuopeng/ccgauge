@@ -1,20 +1,3 @@
-// Shared TUI primitives for the dashboard renderer.
-//
-// The simpler `report` text layout has its own private color helper —
-// we don't share with that one because it's tuned for a narrower
-// palette (just brand + 3 accents). Dashboard needs a wider palette
-// (the 4 token-type colors + dim / bold / sparkline accents).
-//
-// What lives here vs in libraries:
-//   - Palette (chalk-backed)                ← here, so token-type colors are one import
-//   - hbar / sparkline / stackedColumn      ← here, no lib equivalent for our needs
-//   - Width / padding / truncate            → string-width + cli-truncate (call directly at use site)
-//   - Boxes / tables                        → boxen + cli-table3 (call directly at use site)
-//
-// Bar / sparkline characters used here:
-//   █ ▇ ▆ ▅ ▄ ▃ ▂ ▁  — descending vertical bar segments (1/8 → 8/8)
-//   ▎▍▌▋▊▉█           — horizontal bar segments (1/8 → 8/8)
-//   ▁▂▃▄▅▆▇█           — sparkline density levels
 
 import chalk, { Chalk, type ChalkInstance } from 'chalk';
 import stringWidth from 'string-width';
@@ -28,49 +11,25 @@ export interface Palette {
   red: (s: string) => string;
   yellow: (s: string) => string;
   cyan: (s: string) => string;
-  /** Token-type colours, aligned with the web dashboard's
-   *  `--chart-{input,cache-create,cache-read,output}` CSS vars. */
+
   input: (s: string) => string;
   cacheWrite: (s: string) => string;
   cacheRead: (s: string) => string;
   output: (s: string) => string;
 }
 
-// 24-bit truecolor codes mirroring the dashboard's chart palette.
 const RGB = {
-  brand: [129, 140, 248] as const, // indigo-400
+  brand: [129, 140, 248] as const,
   green: [34, 197, 94] as const,
   red: [239, 68, 68] as const,
   yellow: [234, 179, 8] as const,
   cyan: [34, 211, 238] as const,
-  input: [96, 165, 250] as const, // blue-400
-  cacheWrite: [167, 139, 250] as const, // purple-400
-  cacheRead: [52, 211, 153] as const, // emerald-400
-  output: [251, 146, 60] as const, // orange-400
+  input: [96, 165, 250] as const,
+  cacheWrite: [167, 139, 250] as const,
+  cacheRead: [52, 211, 153] as const,
+  output: [251, 146, 60] as const,
 };
 
-/**
- * Build a chalk-backed palette honoring the caller's color preference.
- *
- * We always pin the instance to chalk level 3 (truecolor) when colour
- * is on. Why force, not auto-detect?
- *  - Every entry in `RGB` above is a 24-bit colour designed to match the
- *    web dashboard's `--chart-*` CSS vars. If chalk auto-detects only
- *    16-colour support (which it does in many bundled / non-TTY
- *    parents — Claude Code shells, CI matrices, …), it crushes our
- *    palette down to bright-cyan / bright-white / etc., which look
- *    nothing like the intended brand colours.
- *  - boxen / cli-table3 also use chalk under the hood — pinning level
- *    here makes their borders honour our gray hex too.
- *  - The pre-refactor version hardcoded `\x1b[38;2;...m` truecolor
- *    escapes regardless of terminal, so this restores that behaviour
- *    in the rare 16-colour terminal at the cost of a few wasted
- *    escape bytes.
- *
- * When `useColor` is false we still construct a chalk Instance, but
- * with level 0 — every helper then returns plain strings, which keeps
- * CI / `--no-color` output grep-friendly.
- */
 export function makePalette(useColor: boolean): Palette {
   const k: ChalkInstance = new Chalk({ level: useColor ? 3 : 0 });
   const fg = (rgb: readonly [number, number, number]) =>
@@ -91,9 +50,6 @@ export function makePalette(useColor: boolean): Palette {
   };
 }
 
-// ── width / padding (string-width backed) ────────────────────────────
-
-/** Visual width in cells. Handles ANSI escapes, emoji, CJK. */
 export function visibleLen(s: string): number {
   return stringWidth(s);
 }
@@ -116,12 +72,8 @@ export function center(s: string, w: number, fill: string = ' '): string {
   return fill.repeat(l) + s + fill.repeat(r);
 }
 
-// ── horizontal bar / sparkline ───────────────────────────────────────
-
 const HBAR_CHARS = ['', '▏', '▎', '▍', '▌', '▋', '▊', '▉', '█'];
 
-/** Horizontal bar filled `ratio` (0..1) of `width` columns. Sub-cell
- *  precision via the 1/8-step block characters. */
 export function hbar(ratio: number, width: number, color?: (s: string) => string): string {
   if (width <= 0 || !Number.isFinite(ratio) || ratio <= 0) {
     return ' '.repeat(Math.max(0, width));
@@ -139,8 +91,6 @@ export function hbar(ratio: number, width: number, color?: (s: string) => string
 
 const SPARK = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 
-/** N-cell sparkline. `values` may be longer than `width`; sampled by
- *  bucket-averaging. Empty / all-zero input renders as flat baseline. */
 export function sparkline(values: number[], width: number, color?: (s: string) => string): string {
   if (width <= 0) return '';
   if (values.length === 0) return color ? color('─'.repeat(width)) : '─'.repeat(width);
@@ -173,16 +123,8 @@ export function sparkline(values: number[], width: number, color?: (s: string) =
   return color ? color(out) : out;
 }
 
-// ── vertical stacked bars (the trend chart's bread & butter) ─────────
-
 const VBAR_CHARS = ['', '▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 
-/** Render a single column of height `height` rows, partitioned by the
- *  given coloured segments. Returns an array of `height` strings,
- *  ordered TOP TO BOTTOM (so callers can `.join('\n')` rows directly).
- *
- *  Sub-cell precision: 1/8. A segment that takes 2.6 cells renders as
- *  `[█, █, ▅]` bottom-to-top in its colour. */
 export function stackedColumn(
   segments: Array<{ value: number; color?: (s: string) => string }>,
   height: number,
@@ -216,10 +158,7 @@ export function stackedColumn(
         const idx = Math.max(1, Math.round(fillTop));
         ch = VBAR_CHARS[Math.min(8, idx)] || '▁';
       } else {
-        // Segment is sandwiched in the middle of this cell — block chars
-        // can't draw a hollow stripe so we render a full block; the
-        // colour switch on adjacent cells still communicates the
-        // boundary.
+
         ch = '█';
       }
       lines[height - 1 - row] = seg.color ? seg.color(ch) : ch;

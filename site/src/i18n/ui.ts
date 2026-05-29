@@ -1,10 +1,3 @@
-/**
- * Short UI strings shared across pages (nav, footer, button labels, CTAs).
- *
- * Long-form page copy (hero headlines, feature paragraphs, etc.) lives
- * inline in the individual `.astro` files so the page is readable as a
- * single document. Only put a string here if it's reused in 2+ places.
- */
 
 export const ui = {
   en: {

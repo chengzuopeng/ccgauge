@@ -63,15 +63,7 @@ export const claudeAdapter: ProviderAdapter = {
   shortLabel: 'C',
   color: { fg: '#b45309', bg: '#fef3c7' },
   logoSrc: '/claude-logo.webp',
-  // v1 → v3 (no v2 ever shipped on npm): user records now carry an
-  // `isSynthetic` flag so skill metadata + <system-reminder> blocks can
-  // still be displayed as the per-call "prompt" on child rows, but are
-  // skipped as turn-boundary anchors so they don't wrongly split a single
-  // conversation into multiple turns.
-  // v4: extend `isSynthetic` to sub-agent first-user records (every record
-  // in a `subagents/agent-*.jsonl` file has `isSidechain: true`); also
-  // propagate `isSidechain` to all records so the indexer's post-link pass
-  // can stitch sub-agent files into the parent session's turn graph.
+
   parserVersion: 'claude-v4-sidechain-merge',
   capabilities: {
     hasCacheCreation: true,

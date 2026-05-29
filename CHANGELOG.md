@@ -5,6 +5,91 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.1] — 2026-05-29
+
+A polish-and-harden release: motion across the dashboard and marketing
+site, a token-accounting fix in the Codex parser, indexer concurrency
+hardening, and a large code-cleanup pass. No breaking changes — drop-in
+over 1.1.0.
+
+### Highlights
+
+- **Silent live data on the Overview.** The homepage now refreshes its
+  KPIs, the live 5h block, and the cost-by-model chart every 30s via
+  `router.refresh()` — no full page reload, no scroll reset, no
+  loading flash. Pauses while the tab is hidden.
+- **Motion pass.** A coherent "instruments powering on" animation layer:
+  a single sliding indicator glides under the active tab (top nav,
+  segmented pickers, the trend metric toggle) instead of bars popping
+  in/out; dashboard cards stagger in on first paint; cost-by-model bars
+  grow from the left. All entrance animations honor
+  `prefers-reduced-motion` and do **not** replay on the 30s auto-refresh.
+- **Codex token double-count fix (parser v5).** A session that emitted a
+  `last_token_usage` event followed by a `total_token_usage` event could
+  count the `last` tranche twice, inflating tokens and cost. The parser
+  now advances its running total after a `last`-only event so the
+  subsequent `total` event dedups correctly. `parserVersion` bumped
+  `codex-v4-effort → codex-v5-last-total-prev` (stale on-disk caches
+  re-parse automatically).
+
+### Added
+
+- **`<TabIndicator>` + `useTabIndicator` hook** — the shared sliding
+  active-tab indicator (measure via `offsetLeft`/`offsetWidth`, animate
+  position + width). Two variants: `pill` (segmented controls) and
+  `underline` (top nav). One primitive drives the nav, both segmented
+  pickers, and the trend metric toggle.
+- **`--ease-out-soft` design token** — the brand easing curve now has a
+  single source in `app/globals.css`; Tailwind's `ease-out-soft` utility
+  and the `@keyframes` entrance animations both reference it.
+
+### Changed
+
+- **`ccgauge report --dashboard` visuals** rebuilt on established
+  libraries (`boxen` rounded-corner KPI tiles, `cli-table3` breakdown
+  tables, `chalk` truecolor, `string-width`/`cli-truncate` for correct
+  CJK/emoji width, `figures` for cross-platform symbols). Truecolor is
+  forced on so 24-bit brand colors survive non-TTY parents. The plain
+  text `report` output is unchanged.
+- **README tightened ~48%** (EN + ZH, exact parity) — punchier hero, a
+  "Why ccgauge stands out" block, a "What's new" callout, and the
+  website link (chengzuopeng.github.io/ccgauge). All functional
+  reference tables preserved.
+- **Marketing site polish** — theme-aware Models screenshot card,
+  system-default theme, localized `CodeBlock`, copy-to-clipboard
+  failure UX, plus the site-wide motion pass.
+- **Codebase-wide comment / verbosity cleanup** — trimmed ~1,900 lines
+  of explanatory comments and dead whitespace across `lib/`,
+  `components/`, `app/`, `scripts/`, and `site/`. No behavior change.
+
+### Fixed
+
+- **Indexer concurrency hardening.** All mutations of the file index
+  (init scan, force-rescan, poll, watcher reconcile) now serialize
+  through one queue so an incremental update can't interleave with a
+  `clear()` + full rescan. `forceRescan()` awaits the memoized first
+  init before touching the map, closing a race that could drop records.
+- **No transient empty snapshot during force-rescan.** `runRescan()`
+  now cancels any pending debounced snapshot-rebuild timer before
+  `files.clear()`, so that timer can't fire mid-rescan and publish a
+  half-empty snapshot.
+- **`isIndexing` status reported synchronously** — flipped before the
+  rescan queues rather than inside the deferred callback, so the
+  Settings page / MCP status no longer shows "idle" while a rescan is
+  pending.
+- **Codex token double-count** (see Highlights — parser v5).
+- **CSV export project filter** now resolves canonical (worktree-
+  collapsed) cwds, matching the Usage page; previously a project filter
+  on a repo with git worktrees silently dropped worktree rows.
+
+### Internal
+
+- New Codex parser v5 regression tests (`last`-only → `total` dedup,
+  calendar of token tranches); `parser-versions.json` bumped in lockstep.
+- De-duplicated the sliding-indicator `<span>` (was copy-pasted across
+  three components) into `<TabIndicator>`; removed a dead `groupRef`
+  alias in `SegmentedPicker`.
+
 ## [1.1.0] — 2026-05-23
 
 Two new user-facing features and a marketing-site routing overhaul.

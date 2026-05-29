@@ -14,11 +14,7 @@ const config: Config = {
           DEFAULT: 'rgb(var(--bg-base) / <alpha-value>)',
           surface: 'rgb(var(--bg-surface) / <alpha-value>)',
           'surface-hi': 'rgb(var(--bg-surface-hi) / <alpha-value>)',
-          // One tier above `surface` for floating overlays (popovers,
-          // dropdowns). The `--bg-elevated` CSS var already exists in
-          // globals.css and `.card-elevated` consumes it via raw CSS;
-          // exposing it as a Tailwind utility lets popover components
-          // compose it inline like any other surface token.
+
           elevated: 'rgb(var(--bg-elevated) / <alpha-value>)',
         },
         border: {
@@ -33,8 +29,7 @@ const config: Config = {
         brand: {
           DEFAULT: 'rgb(var(--brand) / <alpha-value>)',
           hover: 'rgb(var(--brand-hover) / <alpha-value>)',
-          // High-contrast fill for chips with white text. AA-compliant in
-          // both themes. Use as `bg-brand-strong text-white`.
+
           strong: 'rgb(var(--brand-strong) / <alpha-value>)',
         },
         success: 'rgb(var(--success) / <alpha-value>)',
@@ -61,10 +56,10 @@ const config: Config = {
         popover: 'var(--shadow-popover)',
       },
       transitionTimingFunction: {
-        'out-soft': 'cubic-bezier(0.16, 1, 0.3, 1)',
+        'out-soft': 'var(--ease-out-soft)',
       },
       gridTemplateColumns: {
-        // 24 columns: hour-of-day heatmap on the overview activity card.
+
         24: 'repeat(24, minmax(0, 1fr))',
       },
     },
