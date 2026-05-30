@@ -15,6 +15,7 @@ const en: Dict = {
   'nav.projects': 'Projects',
   'nav.models': 'Models',
   'nav.settings': 'Settings',
+  'nav.docs': 'Docs',
   'nav.localBadge': 'local',
   'nav.source': 'Data source',
 
@@ -334,6 +335,7 @@ const zh: Dict = {
   'nav.projects': '项目',
   'nav.models': '模型',
   'nav.settings': '设置',
+  'nav.docs': '文档',
   'nav.localBadge': '本地',
   'nav.source': '数据源',
 

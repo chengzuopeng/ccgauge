@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { useT } from '@/lib/i18n/context';
+import { useI18n } from '@/lib/i18n/context';
 import { useTabIndicator } from '@/components/use-tab-indicator';
 import { TabIndicator } from '@/components/tab-indicator';
 import { LanguageSwitcher } from '@/components/language-switcher';
@@ -22,6 +22,8 @@ const ITEMS = [
 ];
 
 const GITHUB_URL = 'https://github.com/chengzuopeng/ccgauge';
+const DOCS_URL = 'https://chengzuopeng.github.io/ccgauge/';
+const DOCS_URL_ZH = 'https://chengzuopeng.github.io/ccgauge/zh/';
 
 interface ProviderInfo {
   id: ProviderId;
@@ -42,7 +44,8 @@ interface Props {
 
 export function Nav({ availableProviders, initialSource, providerInfos }: Props) {
   const pathname = usePathname();
-  const t = useT();
+  const { t, locale } = useI18n();
+  const docsHref = locale === 'zh' ? DOCS_URL_ZH : DOCS_URL;
   const activeItem = ITEMS.find((it) =>
     it.exact ? pathname === it.href : pathname === it.href || pathname.startsWith(it.href + '/'),
   );
@@ -58,9 +61,6 @@ export function Nav({ availableProviders, initialSource, providerInfos }: Props)
         >
           <Logo className="w-7 h-7" />
           <span className="hidden xs:inline sm:inline">ccgauge</span>
-          <span className="text-xs text-text-tertiary font-normal hidden lg:inline">
-            {t('brand.tagline')}
-          </span>
         </Link>
         <nav
           ref={navRef}
@@ -91,6 +91,37 @@ export function Nav({ availableProviders, initialSource, providerInfos }: Props)
               </Link>
             );
           })}
+          {/* Docs — external link to the marketing/docs site, opens in a
+              new tab. Follows the in-app language (zh → /zh/). No
+              `data-tab` so the sliding underline never sits on it (it
+              navigates away, it's not an in-app route). */}
+          <a
+            href={docsHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              'relative inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 text-sm rounded-button font-medium whitespace-nowrap shrink-0',
+              'transition-colors duration-150',
+              'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hi/60',
+            )}
+          >
+            {t('nav.docs')}
+            <svg
+              width="11"
+              height="11"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden
+              className="opacity-70"
+            >
+              <path d="M7 17 17 7" />
+              <path d="M8 7h9v9" />
+            </svg>
+          </a>
         </nav>
         <div className="flex items-center gap-2 shrink-0">
           <SourceSwitcher
