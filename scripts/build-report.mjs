@@ -20,7 +20,11 @@ await build({
   },
   external: [],
   sourcemap: false,
-  minify: false,
+  // Minify — same as the MCP bundle. The dashboard pulls in boxen /
+  // cli-table3 / chalk, so the un-minified bundle is ~307 KB; minified
+  // it's ~166 KB. The output is consumed only by `node`, never read by
+  // a human, so there's no debuggability cost.
+  minify: true,
   legalComments: 'none',
   logLevel: 'warning',
 });

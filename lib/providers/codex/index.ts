@@ -27,7 +27,7 @@ export const codexAdapter: ProviderAdapter = {
   displayName: { en: 'Codex', zh: 'Codex' },
   shortLabel: 'X',
   color: { fg: '#047857', bg: '#d1fae5' },
-  logoSrc: '/codex-logo.png',
+  logoSrc: '/codex-logo.webp',
 
   parserVersion: 'codex-v5-last-total-prev',
   capabilities: {

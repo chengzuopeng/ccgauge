@@ -57,7 +57,7 @@
   ],
   "scripts": {
     "dev": "next dev -p 3738",
-    "build": "next build && node scripts/build-mcp.mjs && node scripts/build-report.mjs && node scripts/postbuild.mjs",
+    "build": "next build && node scripts/build-mcp.mjs && node scripts/build-report.mjs && node scripts/postbuild.mjs && node scripts/smoke-standalone.mjs",
     "build:mcp": "node scripts/build-mcp.mjs",
     "build:report": "node scripts/build-report.mjs",
     "start": "node bin/cli.mjs",
