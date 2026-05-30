@@ -5,6 +5,81 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.2] — 2026-05-30
+
+A packaging + polish release. The published npm tarball shrinks by 66%,
+the nav gets a Docs link, and Claude Opus 4.8 pricing lands. No
+breaking changes — drop-in over 1.1.x.
+
+### Highlights
+
+- **npm package is 66% smaller** — tarball **15.5 MB → 5.3 MB**
+  (unpacked 51.8 MB → 22.2 MB). The bulk was a macOS `sharp` native
+  binary (~16 MB of libvips) that `next build` traced into a nested
+  `node_modules` the old prune never reached — pure dead weight since
+  ccgauge sets `images: { unoptimized: true }` and uses no `next/image`.
+  We also drop other Next internals ccgauge never loads (AMP validator,
+  `next/font` font-metrics + babel bundles) and shrink the Codex logo.
+- **Docs link in the nav** — a new "Docs" entry after Settings opens the
+  documentation site in a new tab. It follows the in-app language:
+  English → `chengzuopeng.github.io/ccgauge/`, Chinese →
+  `…/ccgauge/zh/`.
+- **Claude Opus 4.8 pricing** — added to the built-in table, and the
+  `opus` family fallback now points at 4.8 so unknown future Opus date
+  suffixes price correctly.
+
+### Added
+
+- **Built-in pricing for `claude-opus-4-8`** ($5 / $25 per 1M in/out,
+  $6.25 / $10 cache-write 5m/1h, $0.50 cache-read).
+- **Docs nav link** — locale-aware external link with an external-arrow
+  glyph, opens in a new tab (`rel="noopener noreferrer"`).
+- **`scripts/smoke-standalone.mjs`** — a post-build smoke gate wired
+  into `pnpm build`. It boots the pruned standalone server and hits the
+  key routes; if any page 500s or the server crashes, the build fails.
+  This is the safety net that makes pruning Next internals viable: a
+  future Next upgrade that starts requiring a pruned file is caught at
+  build time instead of shipping a broken package.
+
+### Changed
+
+- **`opus` family pricing fallback** now resolves to `claude-opus-4-8`
+  (was `claude-opus-4-7`).
+- **Nav: removed the tagline** next to the logo ("usage dashboard for
+  AI coding CLIs" / "AI 编程 CLI 的本地用量看板") for a cleaner bar. The
+  string is still used for the page `<meta description>` and the
+  empty-state copy.
+- **Codex logo `png → webp`** — 354 KB / 816² PNG → 23 KB / 512² WebP
+  (matches the Claude logo), a 331 KB drop.
+- **`ccgauge report` bundle is minified** (`dist/report/index.mjs`,
+  307 KB → 166 KB), same as the MCP bundle. The output is machine-read
+  only, so there's no debuggability cost.
+- **`cost_estimator` MCP tool docs** reference Opus 4.8 in their
+  examples.
+
+### Fixed
+
+- **Build prune missed a nested `sharp` / `@img` copy (~16 MB).**
+  `postbuild` only swept the top-level + `.pnpm` `node_modules`; Next's
+  file tracer had copied the platform libvips binary into a real
+  `next/node_modules/@img`. A new recursive sweep removes
+  `@img` / `sharp` / `typescript` wherever they nest, plus the AMP
+  validator, capsize font-metrics, babel bundles, and `next/font`
+  loaders — none of which ccgauge's configuration loads.
+
+### Internal
+
+- `postbuild` prune is now two-pass: top-level / `.pnpm`
+  (pre-materialize) + a recursive `pruneModulesTree` (post-materialize)
+  that only walks `node_modules` trees, never package source. Each
+  Next-internal removal carries a comment naming the standing
+  assumption (no `next/image` optimization, no AMP, no `next/font`)
+  that keeps it safe.
+- The standalone smoke gate is reverse-tested: removing a
+  production-required Next runtime makes every page 500 and the gate
+  exits non-zero, so it provably catches a broken prune rather than
+  silently passing.
+
 ## [1.1.1] — 2026-05-29
 
 A polish-and-harden release: motion across the dashboard and marketing
