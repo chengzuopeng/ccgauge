@@ -1,6 +1,13 @@
 import type { Pricing } from '../types';
 
 export const BUILTIN_PRICING: Record<string, Pricing> = {
+  'claude-opus-4-8': {
+    input: 5,
+    output: 25,
+    cacheCreation5m: 6.25,
+    cacheCreation1h: 10,
+    cacheRead: 0.5,
+  },
   'claude-opus-4-7': {
     input: 5,
     output: 25,
@@ -88,7 +95,7 @@ export const BUILTIN_PRICING: Record<string, Pricing> = {
 };
 
 export const FALLBACK_BY_FAMILY: Record<string, Pricing> = {
-  opus: BUILTIN_PRICING['claude-opus-4-7'],
+  opus: BUILTIN_PRICING['claude-opus-4-8'],
   sonnet: BUILTIN_PRICING['claude-sonnet-4-6'],
   haiku: BUILTIN_PRICING['claude-haiku-4-5'],
 };

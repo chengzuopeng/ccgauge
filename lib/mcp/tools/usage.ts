@@ -231,7 +231,7 @@ export function registerUsageTools(server: McpServer): void {
     {
       title: 'Cost estimator',
       description:
-        'Compute the dollar-equivalent cost of a hypothetical request given token counts. Uses the provider\'s built-in per-1M-token pricing table; does NOT consult the user\'s usage history. Useful for "how much would 5M output tokens of opus 4.7 cost" / pre-purchase what-ifs. NOTE: reasoning tokens (Codex / OpenAI o-series) are already included in `output_tokens` and billed at the output rate — don\'t double-count them.',
+        'Compute the dollar-equivalent cost of a hypothetical request given token counts. Uses the provider\'s built-in per-1M-token pricing table; does NOT consult the user\'s usage history. Useful for "how much would 5M output tokens of opus 4.8 cost" / pre-purchase what-ifs. NOTE: reasoning tokens (Codex / OpenAI o-series) are already included in `output_tokens` and billed at the output rate — don\'t double-count them.',
       inputSchema: {
         source: z
           .enum(['claude', 'codex'])
@@ -239,7 +239,7 @@ export function registerUsageTools(server: McpServer): void {
         model: z
           .string()
           .min(1)
-          .describe('Exact model id (e.g. "claude-opus-4-7-20251205", "gpt-5.2-codex"). Date suffixes are stripped automatically.'),
+          .describe('Exact model id (e.g. "claude-opus-4-8-20260115", "gpt-5.2-codex"). Date suffixes are stripped automatically.'),
         input_tokens: z.number().int().min(0).default(0),
         output_tokens: z
           .number()
