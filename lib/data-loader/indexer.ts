@@ -17,7 +17,7 @@ import {
   savePersistedIndex,
   type PersistedFileEntry,
 } from './index-persist';
-import { linkSidechainParents } from './link-sidechain';
+import { linkSidechainParents, detectSubagentKind } from './link-sidechain';
 import { sanitizeForUser } from '../sanitize';
 
 interface FileEntry {
@@ -421,6 +421,16 @@ class FileIndexer {
       userRecords: dedupedUsers,
       parentMap,
     });
+
+    // Stamp each sidechain record with whether it's a Workflow (ultracode)
+    // sub-agent vs a plain Task sub-agent — derived purely from the file
+    // path, so it's idempotent and cache-safe to (re)compute every
+    // rebuild. Drives the "Workflow" badge on the spawning turn. Only
+    // sidechain records can be sub-agents, so non-sidechain records are
+    // skipped (detectSubagentKind would return null anyway).
+    for (const rec of dedupedAssistants) {
+      if (rec.isSidechain) rec.isWorkflowSubagent = detectSubagentKind(rec.filePath) === 'workflow';
+    }
 
     for (const rec of dedupedAssistants) bySource[rec.source].assistantRecords += 1;
 

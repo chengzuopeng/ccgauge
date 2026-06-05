@@ -7,9 +7,18 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [1.1.3] — 2026-06-05
 
-A critical hotfix. **v1.1.2 fails to start on a clean install** — `npx
-ccgauge` crashes at boot, before serving a single page. If you installed
-1.1.2, upgrade immediately.
+A critical hotfix, plus a Workflow / ultracode badge on the usage page.
+**v1.1.2 fails to start on a clean install** — `npx ccgauge` crashes at
+boot, before serving a single page. If you installed 1.1.2, upgrade
+immediately.
+
+### Added
+
+- **Workflow / ultracode badge on the usage page.** A turn that fans out
+  parallel sub-agents — Claude Code's Workflow tool, e.g. `ultracode`
+  mode — now shows a `Workflow ×N` badge in the usage table's model
+  column, where N is the number of distinct parallel sub-agent transcripts
+  it spawned. Localized (en / zh).
 
 ### Fixed
 
@@ -35,6 +44,14 @@ ccgauge` crashes at boot, before serving a single page. If you installed
   reproducing a clean `npx` install. Reverse-tested: with `babel` removed
   it now fails the build (`server exited early … Cannot find module`),
   exactly the regression that shipped 1.1.2.
+
+- **Workflow / ultracode sub-agent turns weren't folded into the turn
+  that spawned them.** These sub-agent transcripts live under
+  `subagents/workflows/wf_<id>/`, a path the sidechain-linking regex
+  didn't match — so each parallel agent surfaced as its own orphan
+  "(no user text)" row instead of collapsing into the conversation turn
+  that launched the fan-out. The matcher now handles the nested workflow
+  path (case- and separator-tolerant), with regression tests.
 
 ### Internal
 

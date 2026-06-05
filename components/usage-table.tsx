@@ -457,7 +457,23 @@ function renderTurnCell(
         </HoverCard>
       );
     case 'model':
-      return <span className="text-text-primary whitespace-nowrap">{modelLabel}</span>;
+      return (
+        <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+          <span className="text-text-primary">{modelLabel}</span>
+          {turn.hasWorkflowSubagents && (
+            <span
+              className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold leading-none bg-brand/10 text-brand border border-brand/20"
+              title={t('usage.badge.workflowHint', { count: turn.workflowSubagentCount })}
+            >
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M13 2 3 14h7l-1 8 10-12h-7z" />
+              </svg>
+              {t('usage.badge.workflow')}
+              {turn.workflowSubagentCount > 1 ? ` ×${turn.workflowSubagentCount}` : ''}
+            </span>
+          )}
+        </span>
+      );
     case 'project':
       return (
         <span className="block text-text-secondary truncate max-w-[180px]" title={turn.cwd}>

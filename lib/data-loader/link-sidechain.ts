@@ -1,11 +1,50 @@
 
 import type { AssistantRecord, UserRecord } from '../types';
 
-const SUBAGENT_FILE_PATTERN = /\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/subagents\/agent-[^/]+\.jsonl$/i;
+// Claude Code stores sub-agent transcripts under the parent session's
+// `subagents/` dir. Two layouts exist:
+//   - Plain Task sub-agents:  <parentSessionId>/subagents/agent-<id>.jsonl
+//   - Workflow (ultracode) sub-agents, which nest one or more dirs in
+//     between: <parentSessionId>/subagents/workflows/wf_<id>/agent-<id>.jsonl
+// The `(?:[^\\/]+[\\/])*` allows zero or more intermediate segments so
+// BOTH layouts (and any future nesting) resolve back to the parent
+// session. Without it, workflow sub-agents never link to their
+// triggering turn, so every parallel agent shows up as its own
+// "(no user text)" row instead of folding into the one conversation
+// that spawned them.
+//
+// Separators are matched as `[\\/]` (not just `/`) so Windows paths
+// (`...\subagents\...`) work too — ccgauge supports win32.
+const SUBAGENT_FILE_PATTERN = /[\\/]([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})[\\/]subagents[\\/](?:[^\\/]+[\\/])*agent-[^\\/]+\.jsonl$/i;
+
+// The `subagents/workflows/` segment is the single robust discriminator
+// between a Workflow (ultracode) fan-out and a plain Task sub-agent. It's
+// case- and separator-tolerant. We only ever test paths under the
+// controlled `~/.claude/projects` scan root, and this segment can only
+// appear there when Claude Code itself wrote it, so there is no
+// user-content collision vector. Case-insensitive + `[\\/]` guard against
+// hex-casing / Windows-path misses.
+const WORKFLOW_SEGMENT = /[\\/]subagents[\\/]workflows[\\/]/i;
 
 export function extractParentSessionFromSubagentPath(filePath: string): string | null {
   const m = SUBAGENT_FILE_PATTERN.exec(filePath);
   return m ? m[1] : null;
+}
+
+/**
+ * Classify a transcript file path as a Workflow sub-agent, a plain Task
+ * sub-agent, or neither. Gated behind `SUBAGENT_FILE_PATTERN` so the
+ * 'workflow' verdict is only ever returned for paths already validated as
+ * a Claude sub-agent transcript under the scan root.
+ *
+ * Note this labels the on-disk ARTIFACT (a Workflow fan-out), not the
+ * trigger — ultracode is only one of several ways to spawn a workflow
+ * (`/effort ultracode`, the `workflow` keyword, "use a workflow"), and
+ * the trigger is not recoverable from disk.
+ */
+export function detectSubagentKind(filePath: string): 'workflow' | 'task' | null {
+  if (!SUBAGENT_FILE_PATTERN.test(filePath)) return null;
+  return WORKFLOW_SEGMENT.test(filePath) ? 'workflow' : 'task';
 }
 
 interface LinkInputs {

@@ -64,7 +64,7 @@
     "start:next": "next start -p 3737",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-strip-types --no-warnings scripts/test-codex-parser.mjs && node --experimental-strip-types --no-warnings scripts/test-turns.mjs && node --experimental-strip-types --no-warnings scripts/test-source-merge.mjs && node --experimental-strip-types --no-warnings scripts/test-cost-from-usage.mjs && node --experimental-strip-types --no-warnings scripts/test-range.mjs && node scripts/check-parser-versions.mjs && node scripts/check-readme-images.mjs",
+    "test": "node --experimental-strip-types --no-warnings scripts/test-codex-parser.mjs && node --experimental-strip-types --no-warnings scripts/test-turns.mjs && node --experimental-strip-types --no-warnings scripts/test-sidechain.mjs && node --experimental-strip-types --no-warnings scripts/test-source-merge.mjs && node --experimental-strip-types --no-warnings scripts/test-cost-from-usage.mjs && node --experimental-strip-types --no-warnings scripts/test-range.mjs && node scripts/check-parser-versions.mjs && node scripts/check-readme-images.mjs",
     "test:mcp": "node scripts/test-mcp-server.mjs",
     "clean": "node -e \"for (const p of ['.next','node_modules','tsconfig.tsbuildinfo']) require('node:fs').rmSync(p,{recursive:true,force:true})\"",
     "screenshots": "node scripts/screenshots.mjs",

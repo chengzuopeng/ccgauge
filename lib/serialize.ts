@@ -71,6 +71,10 @@ export interface UsageTableRow {
   toolNames: string[];
 
   effort?: string;
+  /** True when this call belongs to a Workflow (ultracode) sub-agent
+   *  transcript — lets the expanded child row tag itself as a
+   *  workflow-spawned agent call. */
+  isWorkflowSubagent?: boolean;
 
   directPrompt?: string;
 }
@@ -134,6 +138,13 @@ export interface UsageTurnRow {
   toolNames: string[];
 
   efforts: string[];
+  /** True when this turn spawned at least one Workflow (ultracode)
+   *  sub-agent. Drives the "Workflow" badge. */
+  hasWorkflowSubagents: boolean;
+  /** Number of DISTINCT Workflow sub-agents this turn fanned out (counted
+   *  by distinct transcript file, not by call — one agent makes many API
+   *  calls). 0 when none. */
+  workflowSubagentCount: number;
   userText: string;
   children: UsageTableRow[];
 }
@@ -178,10 +189,22 @@ export function recordsToTurnRows(
 
   const groups = new Map<string, UsageTableRow[]>();
   const order = new Map<string, AssistantRecord>();
+  // Per-turn set of distinct Workflow sub-agent transcript files, so the
+  // badge count reflects how many parallel agents fanned out (one agent
+  // file emits many API-call records).
+  const workflowFilesByTurn = new Map<string, Set<string>>();
   for (const r of assistants) {
     const turnId = turnIndex.get(r.uuid) ?? r.uuid;
     const c = costOfRecord(r);
     const direct = resolveDirectPrompt(r.uuid);
+    if (r.isWorkflowSubagent) {
+      let set = workflowFilesByTurn.get(turnId);
+      if (!set) {
+        set = new Set<string>();
+        workflowFilesByTurn.set(turnId, set);
+      }
+      set.add(r.filePath);
+    }
     const child: UsageTableRow = {
       uuid: r.uuid,
       timestamp: r.timestamp,
@@ -207,6 +230,7 @@ export function recordsToTurnRows(
       costCacheWrite: c.cacheCreation5m + c.cacheCreation1h,
       toolNames: r.toolNames,
       effort: r.effort,
+      isWorkflowSubagent: r.isWorkflowSubagent || undefined,
       directPrompt: direct || undefined,
     };
     const list = groups.get(turnId);
@@ -276,6 +300,8 @@ export function recordsToTurnRows(
       costCacheWrite,
       toolNames: Array.from(toolSet),
       efforts: Array.from(effortSet),
+      hasWorkflowSubagents: (workflowFilesByTurn.get(turnId)?.size ?? 0) > 0,
+      workflowSubagentCount: workflowFilesByTurn.get(turnId)?.size ?? 0,
       userText: userRec?.textPreview ?? '',
       children,
     });

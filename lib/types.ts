@@ -114,6 +114,12 @@ export interface AssistantRecord {
   effort?: string;
 
   isSidechain?: boolean;
+  /** True when this record came from a Workflow (ultracode) sub-agent
+   *  transcript — i.e. a file under `subagents/workflows/wf_.../`, as
+   *  opposed to a plain Task sub-agent. Stamped at snapshot rebuild via
+   *  `detectSubagentKind`. Lets the usage table badge the spawning turn
+   *  as a parallel-agent fan-out. */
+  isWorkflowSubagent?: boolean;
 }
 
 export interface UserRecord {
