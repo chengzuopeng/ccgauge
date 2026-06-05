@@ -5,6 +5,43 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.3] — 2026-06-05
+
+A critical hotfix. **v1.1.2 fails to start on a clean install** — `npx
+ccgauge` crashes at boot, before serving a single page. If you installed
+1.1.2, upgrade immediately.
+
+### Fixed
+
+- **`npx ccgauge` crashed on every clean machine (1.1.2 regression).**
+  The 1.1.2 size-prune deleted `next/dist/compiled/babel`, assuming it was
+  a build-only transpiler bundle. It is not: Next's standalone production
+  startup requires `babel/code-frame` unconditionally
+  (`node-environment.js` → `patch-error-inspect.js` →
+  `next-devtools/server/shared.js`). The server threw `Cannot find module
+  'next/dist/compiled/babel/code-frame'` at boot and never listened — so
+  every page, logo, and JS chunk failed to load with a 400 and the app
+  died with a `ChunkLoadError`. `babel` + `babel-packages` are restored to
+  the package (tarball 5.3 MB → 5.9 MB — still ~62% below the 15.5 MB it
+  started from). The other prunes (`sharp` / `@img`, AMP validator,
+  capsize font-metrics, `next/font`) are verified safe and stay removed.
+
+- **The build's smoke gate couldn't catch this — now it can.** The
+  post-build `smoke-standalone.mjs` booted the server *inside the repo*,
+  where Node's module resolution falls back to the project's own
+  `node_modules/next` — so a standalone missing its bundled `babel` still
+  started and the gate passed green. The gate now copies the standalone to
+  a temp dir **outside the repo** and boots it there, faithfully
+  reproducing a clean `npx` install. Reverse-tested: with `babel` removed
+  it now fails the build (`server exited early … Cannot find module`),
+  exactly the regression that shipped 1.1.2.
+
+### Internal
+
+- `postbuild.mjs` now carries a standing warning against re-pruning
+  `babel`, documenting the exact startup require chain that depends on it,
+  so the assumption that misfired in 1.1.2 can't be repeated silently.
+
 ## [1.1.2] — 2026-05-30
 
 A packaging + polish release. The published npm tarball shrinks by 66%,
@@ -1263,6 +1300,10 @@ of HTML to the browser.
 - Initial public release as `ccgauge`: local Next.js dashboard for
   Claude Code token usage, cost, and 5-hour block tracking.
 
+[1.1.3]: https://github.com/chengzuopeng/ccgauge/compare/v1.1.2...v1.1.3
+[1.1.2]: https://github.com/chengzuopeng/ccgauge/compare/v1.1.1...v1.1.2
+[1.1.1]: https://github.com/chengzuopeng/ccgauge/compare/v1.1.0...v1.1.1
+[1.1.0]: https://github.com/chengzuopeng/ccgauge/compare/v1.0.5...v1.1.0
 [1.0.5]: https://github.com/chengzuopeng/ccgauge/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/chengzuopeng/ccgauge/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/chengzuopeng/ccgauge/compare/v1.0.2...v1.0.3

@@ -3,18 +3,27 @@
  * Post-build smoke gate for the pruned standalone server.
  *
  * Why this exists: `scripts/postbuild.mjs` aggressively prunes Next.js
- * internals (sharp, AMP validator, capsize font metrics, babel bundles,
- * `next/font` loaders) that ccgauge's configuration never loads. Those
- * removals are safe ONLY as long as our standing assumptions hold (no
- * `next/image` optimization, no AMP, no `next/font`). A Next version
- * bump could silently start requiring one of them at startup — and the
- * build would still succeed, shipping a package that crashes on every
- * user's machine.
+ * internals (sharp, AMP validator, capsize font metrics, `next/font`
+ * loaders) that ccgauge's configuration never loads. Those removals are
+ * safe ONLY as long as our standing assumptions hold (no `next/image`
+ * optimization, no AMP, no `next/font`). A Next version bump could
+ * silently start requiring one of them at startup — and the build would
+ * still succeed, shipping a package that crashes on every user's machine.
  *
- * This script closes that gap: it boots the real pruned standalone
- * server and hits the key routes. If serving is broken, it exits non-
- * zero and FAILS THE BUILD — so a broken prune never reaches `npm
- * publish`. It runs as the last step of `package.json`'s `build`.
+ * This script closes that gap: it boots the real pruned standalone server
+ * and hits the key routes. If serving is broken, it exits non-zero and
+ * FAILS THE BUILD — so a broken prune never reaches `npm publish`. It runs
+ * as the last step of `package.json`'s `build`.
+ *
+ * ⚠️ It boots from a COPY in the system temp dir, NOT in-place under
+ * `<repo>/.next/standalone`. This is the whole point of the gate: Node
+ * resolves bare specifiers like `next/dist/compiled/babel/code-frame` by
+ * walking parent `node_modules`. Booted in-repo, a standalone missing a
+ * dependency would silently fall back to `<repo>/node_modules/next` and
+ * the gate would PASS on a package that crashes for real `npx` users — the
+ * exact failure mode that shipped v1.1.2 broken. A temp dir has no ccgauge
+ * `node_modules` in its parent chain, so this reproduces a clean install
+ * and the standalone must be genuinely self-contained to pass.
  *
  * It works with or without local Claude/Codex data: an empty scan just
  * renders the EmptyState (still HTTP 200), so it's CI-safe.
@@ -23,7 +32,8 @@
 import { spawn } from 'node:child_process';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { existsSync } from 'node:fs';
+import { existsSync, cpSync, rmSync } from 'node:fs';
+import os from 'node:os';
 import getPort from 'get-port';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -56,8 +66,26 @@ const HOST = '127.0.0.1';
 const PORT = await getPort({ port: [47119, 47120, 47121, 0] });
 const READY_TIMEOUT_MS = 60_000;
 
-const child = spawn(process.execPath, [serverJs], {
-  cwd: standalone,
+// Copy the pruned standalone OUT of the repo and boot it there, so Node's
+// parent-dir module resolution can't fall back to the project's own
+// node_modules (see the header comment). This is what makes the gate able
+// to catch a non-self-contained standalone — the v1.1.2 babel regression
+// would have failed here instead of shipping.
+const smokeDir = join(os.tmpdir(), `ccgauge-smoke-${PORT}-${process.pid}`);
+rmSync(smokeDir, { recursive: true, force: true });
+cpSync(standalone, smokeDir, { recursive: true, dereference: false });
+const smokeServerJs = join(smokeDir, 'server.js');
+
+function cleanupSmokeDir() {
+  try {
+    rmSync(smokeDir, { recursive: true, force: true });
+  } catch {
+    // best-effort — temp dir, OS will reap it anyway
+  }
+}
+
+const child = spawn(process.execPath, [smokeServerJs], {
+  cwd: smokeDir,
   env: { ...process.env, PORT: String(PORT), HOSTNAME: HOST, NODE_ENV: 'production' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
@@ -86,7 +114,7 @@ async function waitReady() {
 
 let failed = false;
 try {
-  console.log(`[smoke] booting pruned standalone on ${HOST}:${PORT} …`);
+  console.log(`[smoke] booting pruned standalone from ${smokeDir} on ${HOST}:${PORT} …`);
   await waitReady();
   for (const route of ROUTES) {
     let status = 0;
@@ -111,13 +139,15 @@ try {
   child.kill('SIGTERM');
   await sleep(400);
   if (child.exitCode === null) child.kill('SIGKILL');
+  cleanupSmokeDir();
 }
 
 if (failed) {
   console.error('');
   console.error('[smoke] ✗ pruned standalone failed to serve — the build is BROKEN.');
-  console.error('[smoke]   A pruned Next internal is likely still required at runtime.');
+  console.error('[smoke]   A pruned Next internal is likely still required at runtime,');
+  console.error('[smoke]   or the standalone is not self-contained (missing a bundled dep).');
   console.error('[smoke]   Review scripts/postbuild.mjs `extraTargets` against the current Next version.');
   process.exit(1);
 }
-console.log('[smoke] ✓ pruned standalone serves all key routes');
+console.log('[smoke] ✓ pruned standalone serves all key routes (booted outside the repo)');

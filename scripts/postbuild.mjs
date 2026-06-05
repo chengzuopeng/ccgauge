@@ -57,11 +57,23 @@ const nestedPruned = await pruneModulesTree(
 // removed from this list or the published package breaks at runtime.
 //
 // A `scripts/smoke-standalone.mjs` step runs right after this in the
-// build chain: it boots the pruned standalone and hits the key routes,
-// failing the build if any of these removals broke serving. That smoke
-// gate is what makes pruning Next internals safe — without it, a Next
-// upgrade could silently start requiring one of these and ship a broken
-// package. Do NOT remove the smoke step from `package.json`'s build.
+// build chain: it COPIES the pruned standalone to a temp dir OUTSIDE this
+// repo, boots it there, and hits the key routes — failing the build if any
+// removal broke serving. Running outside the repo is ESSENTIAL: Node's
+// module resolution walks parent dirs, so a gate booted in-repo would fall
+// back to the project's own `node_modules/next` and mask a standalone that
+// is no longer self-contained. Do NOT remove the smoke step, and do NOT
+// let it run in-repo again.
+//
+// ⚠️ DO NOT add `next/dist/compiled/babel` (or `babel-packages`) here.
+// They look like build-only transpiler bundles, but the standalone
+// PRODUCTION startup chain requires babel/code-frame unconditionally:
+//   node-environment.js → patch-error-inspect.js
+//     → next-devtools/server/shared.js → require('.../compiled/babel/code-frame')
+// Pruning babel shipped v1.1.2, which crashed `npx ccgauge` on every clean
+// machine with "Cannot find module 'next/dist/compiled/babel/code-frame'".
+// It slipped past the gate only because the gate then ran in-repo and fell
+// back to the project's babel (now fixed, see above). babel stays.
 const NEXT_DIST = join(standalone, 'node_modules', 'next', 'dist');
 const extraTargets = [
   // AMP validator wasm — ccgauge renders no AMP pages.
@@ -70,11 +82,7 @@ const extraTargets = [
   // which is NOT in the base-server startup chain). We self-host fonts
   // via @fontsource/geist and use no `next/font`.
   { path: join(NEXT_DIST, 'server', 'capsize-font-metrics.json'), label: 'next/dist/server/capsize-font-metrics.json' },
-  // Babel transpiler bundles — App Router production runs on SWC; babel
-  // here is only used by `next/font` loaders / legacy transforms.
-  { path: join(NEXT_DIST, 'compiled', 'babel'), label: 'next/dist/compiled/babel' },
-  { path: join(NEXT_DIST, 'compiled', 'babel-packages'), label: 'next/dist/compiled/babel-packages' },
-  // `next/font` implementation — unused (see above).
+  // `next/font` implementation — unused (self-hosted fonts, see above).
   { path: join(NEXT_DIST, 'compiled', '@next', 'font'), label: 'next/dist/compiled/@next/font' },
 ];
 for (const { path: target, label } of extraTargets) {
