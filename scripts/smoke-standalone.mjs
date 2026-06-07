@@ -63,7 +63,6 @@ const ROUTES = [
 ];
 
 const HOST = '127.0.0.1';
-const PORT = await getPort({ port: [47119, 47120, 47121, 0] });
 const READY_TIMEOUT_MS = 60_000;
 
 // Copy the pruned standalone OUT of the repo and boot it there, so Node's
@@ -71,7 +70,7 @@ const READY_TIMEOUT_MS = 60_000;
 // node_modules (see the header comment). This is what makes the gate able
 // to catch a non-self-contained standalone — the v1.1.2 babel regression
 // would have failed here instead of shipping.
-const smokeDir = join(os.tmpdir(), `ccgauge-smoke-${PORT}-${process.pid}`);
+const smokeDir = join(os.tmpdir(), `ccgauge-smoke-${process.pid}`);
 rmSync(smokeDir, { recursive: true, force: true });
 cpSync(standalone, smokeDir, { recursive: true, dereference: false });
 const smokeServerJs = join(smokeDir, 'server.js');
@@ -84,11 +83,32 @@ function cleanupSmokeDir() {
   }
 }
 
+// Pick the port LAST — right before spawn — so the ~1s standalone copy
+// above doesn't sit between get-port releasing the probe socket and the
+// server binding it. That gap let a busy host grab the port first and the
+// gate would fail with a spurious EADDRINUSE.
+const PORT = await getPort({ port: [47119, 47120, 47121, 0] });
+
 const child = spawn(process.execPath, [smokeServerJs], {
   cwd: smokeDir,
   env: { ...process.env, PORT: String(PORT), HOSTNAME: HOST, NODE_ENV: 'production' },
   stdio: ['ignore', 'pipe', 'pipe'],
 });
+
+// A signal-killed run (CI cancel, Ctrl-C) skips the finally{} below, which
+// would otherwise leak the multi-MB temp copy and an orphaned server still
+// holding the port. Clean both up on the common termination signals.
+for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) {
+  process.once(sig, () => {
+    try {
+      child.kill('SIGKILL');
+    } catch {
+      // already gone
+    }
+    cleanupSmokeDir();
+    process.exit(1);
+  });
+}
 let serverLog = '';
 child.stdout?.on('data', (d) => (serverLog += d));
 child.stderr?.on('data', (d) => (serverLog += d));

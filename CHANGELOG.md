@@ -5,6 +5,22 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.4] — 2026-06-07
+
+A maintenance follow-up to 1.1.3 — hardens the build's smoke gate. No
+user-facing or runtime changes.
+
+### Fixed
+
+- **Build smoke gate could spuriously fail or leak on interruption.** The
+  post-build `smoke-standalone.mjs` picked its port ~1s before binding it
+  (the standalone `cpSync` sits in between), so a busy host could grab the
+  port in that gap and fail the build with a spurious `EADDRINUSE`; and a
+  signal-killed run (CI cancel / Ctrl-C) skipped the cleanup, leaking the
+  multi-MB temp copy and an orphaned server still holding the port. The
+  gate now picks the port immediately before spawn and cleans up the temp
+  dir + child on SIGINT/SIGTERM/SIGHUP.
+
 ## [1.1.3] — 2026-06-05
 
 A critical hotfix, plus a Workflow / ultracode badge on the usage page.
@@ -1317,6 +1333,7 @@ of HTML to the browser.
 - Initial public release as `ccgauge`: local Next.js dashboard for
   Claude Code token usage, cost, and 5-hour block tracking.
 
+[1.1.4]: https://github.com/chengzuopeng/ccgauge/compare/v1.1.3...v1.1.4
 [1.1.3]: https://github.com/chengzuopeng/ccgauge/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/chengzuopeng/ccgauge/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/chengzuopeng/ccgauge/compare/v1.1.0...v1.1.1
