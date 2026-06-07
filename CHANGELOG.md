@@ -7,8 +7,9 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [1.1.4] — 2026-06-07
 
-A maintenance follow-up to 1.1.3 — hardens the build's smoke gate. No
-user-facing or runtime changes.
+A maintenance follow-up to 1.1.3 — hardens the build's smoke gate and adds
+regression coverage for the Workflow badge. No user-facing or runtime
+changes.
 
 ### Fixed
 
@@ -20,6 +21,15 @@ user-facing or runtime changes.
   multi-MB temp copy and an orphaned server still holding the port. The
   gate now picks the port immediately before spawn and cleans up the temp
   dir + child on SIGINT/SIGTERM/SIGHUP.
+
+### Internal
+
+- **Regression test for the Workflow badge count.** Added an N>1 fan-out
+  case to `scripts/test-sidechain.mjs`: three sub-agents (two Workflow
+  files + one Task) fold into a single turn, and the badge count resolves
+  to the two distinct workflow transcript files (the Task one excluded) —
+  the `workflowSubagentCount` path the 1.1.3 feature shipped without
+  coverage.
 
 ## [1.1.3] — 2026-06-05
 

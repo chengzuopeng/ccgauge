@@ -181,4 +181,82 @@ const PROJ = `/Users/x/.claude/projects/-proj/${SESSION}`;
   console.log('✓ end-to-end: a workflow sub-agent folds into the turn that spawned it');
 }
 
+// ── N>1 fan-out: many sub-agents fold into ONE turn; count = distinct
+//    WORKFLOW files ──────────────────────────────────────────────────────
+// The headline 1.1.3 deliverable is the "Workflow ×N" badge. In serialize.ts
+// N is `workflowFilesByTurn.get(turnId).size` over records where
+// `isWorkflowSubagent` (stamped by the indexer via detectSubagentKind). That
+// count reduces to: among the sub-agents that fold into one turn, how many
+// DISTINCT workflow transcript files are there. This test reproduces exactly
+// that reduction with the loadable modules (serialize.ts can't be imported
+// under `node --experimental-strip-types` — it uses extensionless TS imports),
+// covering the multi-file fold + the workflow-vs-Task distinction the badge
+// depends on.
+{
+  const mainFile = `${PROJ}.jsonl`;
+  const wfA = `${PROJ}/subagents/workflows/wf_aaa/agent-1.jsonl`;
+  const wfB = `${PROJ}/subagents/workflows/wf_bbb/agent-2.jsonl`;
+  const taskF = `${PROJ}/subagents/agent-3.jsonl`;
+
+  const uMain = {
+    uuid: 'u-main',
+    textPreview: 'spawn the fan-out',
+    isSynthetic: false,
+    isSidechain: false,
+    sessionId: SESSION,
+    timestamp: '2026-06-05T10:00:00.000Z',
+    filePath: mainFile,
+  };
+  const aMain = {
+    uuid: 'a-main',
+    isSidechain: false,
+    sessionId: SESSION,
+    timestamp: '2026-06-05T10:00:01.000Z',
+    filePath: mainFile,
+  };
+  // Each sub-agent file: a synthetic sidechain seed user (null parent) + a
+  // sidechain assistant.
+  const subagent = (uid, aid, file, ts) => [
+    { uuid: uid, textPreview: 'sub-agent seed', isSynthetic: true, isSidechain: true, sessionId: `s-${uid}`, timestamp: ts, filePath: file },
+    { uuid: aid, isSidechain: true, sessionId: `s-${uid}`, timestamp: ts, filePath: file },
+  ];
+  const [uAu, aAu] = subagent('u-a', 'a-a', wfA, '2026-06-05T10:00:03.000Z');
+  const [uBu, aBu] = subagent('u-b', 'a-b', wfB, '2026-06-05T10:00:03.500Z');
+  const [uTu, aTu] = subagent('u-t', 'a-t', taskF, '2026-06-05T10:00:03.700Z');
+
+  const parentMap = {
+    'u-main': null,
+    'a-main': 'u-main',
+    'u-a': null,
+    'a-a': 'u-a',
+    'u-b': null,
+    'a-b': 'u-b',
+    'u-t': null,
+    'a-t': 'u-t',
+  };
+  const assistants = [aMain, aAu, aBu, aTu];
+  const users = [uMain, uAu, uBu, uTu];
+
+  const stats = linkSidechainParents({ assistantRecords: assistants, userRecords: users, parentMap });
+  assert.equal(stats.relinked, 3, 'all three sub-agent files relinked to the spawning turn');
+  assert.equal(stats.orphans, 0, 'no orphans');
+
+  // All three sub-agents (2 workflow + 1 task) fold into the ONE spawning turn.
+  const index = buildTurnIndex(assistants, users, parentMap);
+  for (const a of ['a-a', 'a-b', 'a-t']) {
+    assert.equal(index.get(a), 'u-main', `${a} folds into the single spawning turn`);
+  }
+
+  // The exact reduction serialize.ts performs for workflowSubagentCount:
+  // distinct filePaths among records the indexer would stamp as workflow.
+  const workflowFiles = new Set(
+    assistants
+      .filter((r) => r.isSidechain && detectSubagentKind(r.filePath) === 'workflow')
+      .map((r) => r.filePath),
+  );
+  assert.equal(workflowFiles.size, 2, 'badge count = 2 distinct workflow files (Task sub-agent excluded)');
+
+  console.log('✓ N>1 fan-out: 3 sub-agents fold into 1 turn; badge count = 2 distinct workflow files');
+}
+
 console.log('\nAll sidechain-linking assertions passed.');
