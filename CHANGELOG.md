@@ -5,6 +5,32 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.5] — 2026-06-11
+
+Adds pricing support for Claude Fable 5 and fixes a turn-grouping regression
+where background-task completions appeared as dozens of standalone rows on the
+usage page instead of folding into the turn that spawned them.
+
+### Added
+
+- **Claude Fable 5 pricing.** Input $10 / output $50 per 1 M tokens, with
+  cache-write multipliers (5 min: ×1.25 → $12.50, 1 h: ×2 → $20) and cache
+  read at $1 per 1 M tokens. `fable` is now a recognized family-fallback key,
+  so future `claude-fable-*` variants resolve automatically without a code
+  change.
+
+### Fixed
+
+- **`<task-notification>` completions split into dozens of standalone rows.**
+  When a turn used the Workflow / ultracode tool to fan out background tasks,
+  each completion notification arrived as a harness-injected `user` message
+  and was incorrectly treated as a new turn root — producing one row per
+  background-task result instead of folding all the work back into the
+  spawning turn. `isSyntheticUserText` now classifies `<task-notification>`
+  messages as synthetic; a `parserVersion` bump (`claude-v5-task-notification-synthetic`)
+  invalidates the persisted index cache so existing transcripts are re-parsed
+  on first load.
+
 ## [1.1.4] — 2026-06-07
 
 A maintenance follow-up to 1.1.3 — hardens the build's smoke gate and adds
