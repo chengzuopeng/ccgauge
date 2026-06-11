@@ -30,7 +30,7 @@ function resolvePricing(model: string): PricingResolution {
       matchedKey: noPrefix,
     };
   }
-  for (const family of ['opus', 'sonnet', 'haiku']) {
+  for (const family of ['fable', 'opus', 'sonnet', 'haiku']) {
     if (model.toLowerCase().includes(family)) {
       return {
         pricing: FALLBACK_BY_FAMILY[family],
