@@ -2,52 +2,66 @@ import type { Pricing } from '@/lib/types';
 import type { PricingResolution } from '../types';
 
 export const BUILTIN_PRICING_OPENAI: Record<string, Pricing> = {
-  'gpt-5': {
-    input: 1.25,
-    output: 10,
-    cacheRead: 0.13,
-    cacheCreation5m: 0,
-    cacheCreation1h: 0,
-  },
-  'gpt-5-mini': {
-    input: 0.25,
-    output: 2,
-    cacheRead: 0.025,
-    cacheCreation5m: 0,
-    cacheCreation1h: 0,
-  },
-  'gpt-5-nano': {
-    input: 0.05,
-    output: 0.4,
-    cacheRead: 0.005,
+  'gpt-5.5': {
+    input: 5,
+    output: 30,
+    cacheRead: 0.5,
     cacheCreation5m: 0,
     cacheCreation1h: 0,
   },
   'gpt-5.4': {
-    input: 1.25,
-    output: 10,
-    cacheRead: 0.13,
+    input: 2.5,
+    output: 15,
+    cacheRead: 0.25,
     cacheCreation5m: 0,
     cacheCreation1h: 0,
   },
-  'gpt-5.5': {
-    input: 1.25,
-    output: 10,
-    cacheRead: 0.13,
+  'gpt-5.4-mini': {
+    input: 0.75,
+    output: 4.5,
+    cacheRead: 0.075,
     cacheCreation5m: 0,
     cacheCreation1h: 0,
   },
-  'gpt-5.5-mini': {
-    input: 0.25,
-    output: 2,
-    cacheRead: 0.025,
+  'gpt-5.4-nano': {
+    input: 0.2,
+    output: 1.25,
+    cacheRead: 0.02,
     cacheCreation5m: 0,
     cacheCreation1h: 0,
   },
-  'gpt-5.5-nano': {
-    input: 0.05,
-    output: 0.4,
-    cacheRead: 0.005,
+  'gpt-5.3-codex': {
+    input: 1.75,
+    output: 14,
+    cacheRead: 0.175,
+    cacheCreation5m: 0,
+    cacheCreation1h: 0,
+  },
+  'gpt-5': {
+    input: 2.5,
+    output: 15,
+    cacheRead: 0.25,
+    cacheCreation5m: 0,
+    cacheCreation1h: 0,
+  },
+  'gpt-5-mini': {
+    input: 0.75,
+    output: 4.5,
+    cacheRead: 0.075,
+    cacheCreation5m: 0,
+    cacheCreation1h: 0,
+  },
+  'gpt-5-nano': {
+    input: 0.2,
+    output: 1.25,
+    cacheRead: 0.02,
+    cacheCreation5m: 0,
+    cacheCreation1h: 0,
+  },
+  'gpt-5-codex': {
+    input: 1.75,
+    output: 14,
+    cacheRead: 0.175,
     cacheCreation5m: 0,
     cacheCreation1h: 0,
   },
@@ -82,7 +96,7 @@ export const BUILTIN_PRICING_OPENAI: Record<string, Pricing> = {
 };
 
 export const FALLBACK_FAMILY_OPENAI: Record<string, Pricing> = {
-  gpt: BUILTIN_PRICING_OPENAI['gpt-5'],
+  gpt: BUILTIN_PRICING_OPENAI['gpt-5.5'],
   o: BUILTIN_PRICING_OPENAI['o3'],
 };
 
