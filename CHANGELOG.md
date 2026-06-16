@@ -5,6 +5,46 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.6] — 2026-06-17
+
+Brings GPT pricing back in line with [OpenAI's official rates](https://openai.com/api/pricing/)
+and trims the settings page model table to the variants people actually run today.
+
+### Fixed
+
+- **GPT-5 family prices were wrong across the board.** Every gpt-5\* entry was
+  carrying the old launch-window numbers (`$1.25 / $10` per 1 M tokens),
+  which under-reported cost on every Codex CLI session run since the
+  rate change. Updated to current official rates:
+  `gpt-5.5` $5 / $30 (cached $0.50), `gpt-5.4` $2.50 / $15 (cached $0.25),
+  and `gpt-5.3-codex` $1.75 / $14 (cached $0.175). The bare-name
+  Codex CLI aliases (`gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `gpt-5-codex`)
+  are mapped to the matching `gpt-5.4` tier so existing transcripts cost
+  out correctly without manual remapping.
+
+### Added
+
+- **`gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.3-codex`, `gpt-5-codex`** as
+  first-class pricing entries, so Codex CLI runs on those exact ids get
+  an `exact` match instead of falling through to family-fallback.
+
+### Changed
+
+- **Settings → Pricing table trimmed to the models in active use.**
+  Codex now shows `gpt-5*` only; the legacy `gpt-4.1`, `o3`, `o4-mini`
+  rows are hidden (their prices are still in the underlying table, so
+  any historical session involving them still costs out accurately).
+  Claude shows only `haiku-4-5`, `sonnet-4-6`, `opus-4-6` and newer,
+  plus the `fable-5` family — older snapshots are kept in the data for
+  the same backward-compat reason but no longer clutter the UI.
+
+### Removed
+
+- **`gpt-5.5-mini` and `gpt-5.5-nano` pricing rows.** These ids never
+  shipped on the OpenAI pricing page; they were placeholder rows from
+  the initial 5.5 announcement and would have masked real usage of the
+  `gpt-5.4-mini` / `gpt-5.4-nano` ids that do exist.
+
 ## [1.1.5] — 2026-06-11
 
 Adds pricing support for Claude Fable 5 and fixes a turn-grouping regression
