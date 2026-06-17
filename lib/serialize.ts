@@ -1,5 +1,5 @@
 import type { BlockProgressInfo } from './blocks/compute';
-import type { AssistantRecord, UserRecord } from './types';
+import type { AssistantRecord, ProviderId, UserRecord } from './types';
 import { costOfRecord } from './pricing/calculate';
 import { buildTurnIndex } from './turns';
 import { resolveProjectLabel } from './project-label';
@@ -113,6 +113,8 @@ export function recordsToTableRows(records: AssistantRecord[]): UsageTableRow[] 
 
 export interface UsageTurnRow {
   turnId: string;
+  /** Provider of this turn (all of a turn's calls share one session/source). */
+  source: ProviderId;
   timestamp: string;
   endTimestamp: string;
 
@@ -279,6 +281,7 @@ export function recordsToTurnRows(
       Number.isFinite(startMs) && Number.isFinite(endMs) ? Math.max(0, endMs - startMs) : 0;
     turns.push({
       turnId,
+      source: first.source,
       timestamp: first.timestamp,
       endTimestamp: last.timestamp,
       durationMs,

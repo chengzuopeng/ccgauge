@@ -95,9 +95,11 @@ interface UsageTableProps {
   pageCount: number;
   sort: { key: SortKey; dir: 'asc' | 'desc' };
   query: string;
+  /** Codex priority/fast service tier active → mark Codex models with ·fast. */
+  codexFastActive: boolean;
 }
 
-export function UsageTable({ rows, totalCount, page, pageCount, sort, query }: UsageTableProps) {
+export function UsageTable({ rows, totalCount, page, pageCount, sort, query, codexFastActive }: UsageTableProps) {
   const t = useT();
   const { locale } = useI18n();
   const router = useRouter();
@@ -287,6 +289,7 @@ export function UsageTable({ rows, totalCount, page, pageCount, sort, query }: U
                     activeColumns={activeColumns}
                     locale={locale}
                     t={t}
+                    codexFastActive={codexFastActive}
                   />
                 );
               })}
@@ -349,6 +352,7 @@ function RowsForTurn({
   activeColumns,
   locale,
   t,
+  codexFastActive,
 }: {
   turn: UsageTurnRow;
   isOpen: boolean;
@@ -359,6 +363,7 @@ function RowsForTurn({
   activeColumns: ColumnDef[];
   locale: Locale;
   t: Translator;
+  codexFastActive: boolean;
 }) {
   const baseModel =
     turn.models.length === 1
@@ -391,7 +396,7 @@ function RowsForTurn({
             key={c.id}
             className={cn('px-3 py-2', c.align === 'right' ? 'text-right' : 'text-left')}
           >
-            {renderTurnCell(c.id, turn, modelLabel, toolsLabel, userText, locale, t)}
+            {renderTurnCell(c.id, turn, modelLabel, toolsLabel, userText, locale, t, codexFastActive)}
           </td>
         ))}
       </tr>
@@ -407,7 +412,7 @@ function RowsForTurn({
                 key={c.id}
                 className={cn('px-3 py-1.5', c.align === 'right' ? 'text-right' : 'text-left')}
               >
-                {renderChildCell(c.id, r, turn.userText, locale, t)}
+                {renderChildCell(c.id, r, turn.userText, locale, t, codexFastActive)}
               </td>
             ))}
           </tr>
@@ -424,6 +429,7 @@ function renderTurnCell(
   userText: string,
   locale: Locale,
   t: Translator,
+  codexFastActive: boolean,
 ): React.ReactNode {
   switch (id) {
     case 'time':
@@ -459,7 +465,14 @@ function renderTurnCell(
     case 'model':
       return (
         <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-          <span className="text-text-primary">{modelLabel}</span>
+          <span className="text-text-primary">
+            {modelLabel}
+            {codexFastActive && turn.source === 'codex' && (
+              <span className="font-semibold text-warning" title={t('usage.badge.fastHint')}>
+                {`·${t('usage.badge.fast')}`}
+              </span>
+            )}
+          </span>
           {turn.hasWorkflowSubagents && (
             <span
               className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-semibold leading-none bg-brand/10 text-brand border border-brand/20"
@@ -547,6 +560,7 @@ function renderChildCell(
   turnPrompt: string,
   locale: Locale,
   t: Translator,
+  codexFastActive: boolean,
 ): React.ReactNode {
   switch (id) {
     case 'time':
@@ -590,6 +604,11 @@ function renderChildCell(
         <span className="whitespace-nowrap">
           {shortenModel(r.model)}
           {r.effort ? ` · ${r.effort}` : ''}
+          {codexFastActive && r.source === 'codex' && (
+            <span className="font-semibold text-warning" title={t('usage.badge.fastHint')}>
+              {`·${t('usage.badge.fast')}`}
+            </span>
+          )}
         </span>
       );
     case 'project':

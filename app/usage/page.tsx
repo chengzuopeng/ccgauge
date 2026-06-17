@@ -19,6 +19,7 @@ import { getServerLocale } from '@/lib/i18n/server';
 import { resolveSource, filterBySource, expandSources } from '@/lib/source';
 import { combineTimeBuckets, combineTotals } from '@/lib/source-merge';
 import { getProvider } from '@/lib/providers';
+import { detectCodexFastTier } from '@/lib/providers/codex/speed';
 import { AutoRefresh } from '@/components/auto-refresh';
 import { OverviewToggle } from '@/components/overview-toggle';
 import {
@@ -220,6 +221,7 @@ export default async function UsagePage({
               pageCount={pageCount}
               sort={{ key: sortKey, dir: sortDir }}
               query={query}
+              codexFastActive={detectCodexFastTier()}
             />
           </Section>
         </>
