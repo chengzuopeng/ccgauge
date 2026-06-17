@@ -12,6 +12,13 @@ const { parseCodexJsonlFile } = await import(join(root, 'lib/providers/codex/par
 const { resolveCodexPricing, BUILTIN_PRICING_OPENAI } = await import(join(root, 'lib/providers/codex/pricing.ts'));
 const { costFromUsage } = await import(join(root, 'lib/pricing/cost-from-usage.ts'));
 const { shortenCodexModel } = await import(join(root, 'lib/providers/codex/shorten-model.ts'));
+const {
+  scaleCodexPricing,
+  codexConfigRequestsFastTier,
+  detectCodexFastTier,
+  codexFastMultiplier,
+  __resetCodexFastTierCacheForTest,
+} = await import(join(root, 'lib/providers/codex/speed.ts'));
 const { parseDateLike, parseLocalDateOnly } = await import(join(root, 'lib/date-utils.ts'));
 const { isUsageRange, normalizeUsageRange, rangeToDates } = await import(join(root, 'lib/range.ts'));
 
@@ -33,7 +40,7 @@ const sumOutput = a.reduce((s, r) => s + r.usage.output_tokens, 0);
 const sumReasoning = a.reduce((s, r) => s + (r.usage.reasoning_tokens ?? 0), 0);
 assert.equal(sumInput, 1500, 'input_tokens after subtracting cached');
 assert.equal(sumCacheRead, 2000, 'cached_input_tokens flows to cache_read');
-assert.equal(sumOutput, 260, 'output + reasoning merged into output_tokens');
+assert.equal(sumOutput, 200, 'output_tokens = raw output only (reasoning already inside it, not re-added)');
 
 assert.equal(sumReasoning, 60, 'reasoning_tokens (display-only) is present per record');
 for (const rec of a) {
@@ -163,7 +170,7 @@ assert.ok(rangeToDates('7d').from instanceof Date);
   const mixInput = mixed.assistant.reduce((s, r) => s + r.usage.input_tokens, 0);
   const mixOutput = mixed.assistant.reduce((s, r) => s + r.usage.output_tokens, 0);
   assert.equal(mixInput, 80, 'only the last_token_usage delta is counted');
-  assert.equal(mixOutput, 35, 'only the last_token_usage delta is counted');
+  assert.equal(mixOutput, 30, 'only the last_token_usage delta is counted (output excludes re-added reasoning)');
   console.log('✓ last_token_usage → total_token_usage refresh does not double-count');
 }
 
@@ -241,6 +248,77 @@ assert.ok(rangeToDates('7d').from instanceof Date);
   assert.equal(stepInput, 1200, '1000 from first total + 200 from last, not doubled');
   assert.equal(stepOutput, 250, '200 from first total + 50 from last, not doubled');
   console.log('✓ total → last → total counts each tranche once');
+}
+
+// --- ccusage parity: cost math (reasoning not billed) + fast/priority tier ---
+{
+  const codexPricing = resolveCodexPricing('gpt-5.3-codex').pricing;
+  assert.ok(codexPricing, 'gpt-5.3-codex pricing present');
+  // Same shape ccusage's snapshot exercises: 100 non-cached input + 110 cache
+  // read + 15 output @ 1.75 / 0.175 / 14 per 1M → 0.00040425. reasoning(2) is a
+  // subset of output and must not add to the bill.
+  const usage = {
+    input_tokens: 100,
+    output_tokens: 15,
+    cache_read_input_tokens: 110,
+    cache_creation_input_tokens: 0,
+    cache_creation_5m: 0,
+    cache_creation_1h: 0,
+    reasoning_tokens: 2,
+  };
+  const std = costFromUsage(usage, codexPricing);
+  assert.equal(std.total.toFixed(8), '0.00040425', 'gpt-5.3-codex standard cost matches ccusage');
+  const stdNoReasoning = costFromUsage({ ...usage, reasoning_tokens: 0 }, codexPricing);
+  assert.equal(std.total, stdNoReasoning.total, 'reasoning_tokens never changes the cost');
+
+  // gpt-5.3-codex fast multiplier is 2 → the whole cost doubles.
+  const fast = costFromUsage(usage, scaleCodexPricing(codexPricing, 2));
+  assert.equal(fast.total.toFixed(7), '0.0008085', 'gpt-5.3-codex fast (x2) matches ccusage snapshot');
+  console.log('✓ codex cost parity with ccusage (standard + fast tier; reasoning not billed)');
+}
+
+{
+  // Ported verbatim from ccusage's speed.rs unit tests.
+  assert.equal(codexConfigRequestsFastTier('service_tier = "fast"'), true, 'explicit fast');
+  assert.equal(codexConfigRequestsFastTier("service_tier = 'priority' # use higher tier"), true, 'priority with comment');
+  assert.equal(codexConfigRequestsFastTier('service_tier_override = "fast"'), false, 'override key must not match');
+  assert.equal(codexConfigRequestsFastTier('service_tier = "breakfast"'), false, 'substring must not match');
+  assert.equal(codexConfigRequestsFastTier('service_tier = "standard"'), false, 'standard is not fast');
+  console.log('✓ service_tier detection matches ccusage (fast/priority only)');
+}
+
+{
+  const dir = mkdtempSync(join(tmpdir(), 'ccgauge-codex-home-'));
+  writeFileSync(join(dir, 'config.toml'), 'model = "gpt-5"\nservice_tier = "fast"\n', 'utf8');
+  const prevHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = dir;
+  __resetCodexFastTierCacheForTest();
+  assert.equal(detectCodexFastTier(), true, 'detects fast tier from CODEX_HOME/config.toml');
+  // Per-model multipliers ported from ccusage's fast-multiplier-overrides.json.
+  assert.equal(codexFastMultiplier('gpt-5.5'), 2.5, 'gpt-5.5 fast multiplier = 2.5');
+  assert.equal(codexFastMultiplier('gpt-5.4'), 2, 'gpt-5.4 fast multiplier = 2');
+  assert.equal(codexFastMultiplier('gpt-5.3-codex'), 2, 'gpt-5.3-codex fast multiplier = 2');
+  assert.equal(codexFastMultiplier('gpt-5'), 2, 'unlisted model defaults to 2');
+  assert.equal(codexFastMultiplier('openai/gpt-5.5-20260101'), 2.5, 'prefix/date normalized to gpt-5.5');
+  // gpt-5.5 on the fast tier bills at 2.5x: 1M output @ $30/M → $75.
+  const p55 = resolveCodexPricing('gpt-5.5').pricing;
+  const fast55 = costFromUsage(
+    {
+      input_tokens: 0,
+      output_tokens: 1_000_000,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+      cache_creation_5m: 0,
+      cache_creation_1h: 0,
+    },
+    scaleCodexPricing(p55, codexFastMultiplier('gpt-5.5')),
+  );
+  assert.equal(fast55.total.toFixed(2), '75.00', 'gpt-5.5 fast: 1M output @ $30/M x2.5 = $75');
+  if (prevHome === undefined) delete process.env.CODEX_HOME;
+  else process.env.CODEX_HOME = prevHome;
+  __resetCodexFastTierCacheForTest();
+  rmSync(dir, { recursive: true, force: true });
+  console.log('✓ per-model fast multipliers match ccusage (gpt-5.5 → 2.5x, default → 2x)');
 }
 
 console.log('\nAll codex parser + pricing assertions passed.');

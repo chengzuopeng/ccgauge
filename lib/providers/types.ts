@@ -44,7 +44,13 @@ export interface ProviderAdapter {
 
   resolvePricing(model: string): PricingResolution;
   shortenModel(model: string): string;
-  costFromUsage(usage: AssistantRecord['usage'], pricing: Pricing | null): CostBreakdown;
+  // `model` lets a provider apply model-specific cost adjustments (e.g. Codex's
+  // per-model fast/priority-tier multiplier). Providers that don't need it ignore it.
+  costFromUsage(
+    usage: AssistantRecord['usage'],
+    pricing: Pricing | null,
+    model?: string,
+  ): CostBreakdown;
 
   costFootnoteKey: string | null;
 }

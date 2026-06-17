@@ -263,8 +263,13 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
           messageId: requestId,
           usage: {
             input_tokens: Math.max(0, deltaInput - deltaCached),
-
-            output_tokens: deltaOutput + deltaReasoning,
+            // Codex's raw `output_tokens` ALREADY includes reasoning tokens
+            // (verified against real ~/.codex data: input + output === total).
+            // Bill the raw output as-is and keep `reasoning_tokens` as a
+            // display-only subset — re-adding it here would double-count the
+            // reasoning at the output rate. Mirrors ccusage, which bills
+            // `output_tokens` and surfaces `reasoning_output_tokens` separately.
+            output_tokens: deltaOutput,
             cache_creation_input_tokens: 0,
             cache_read_input_tokens: deltaCached,
             cache_creation_5m: 0,

@@ -1,9 +1,11 @@
 import path from 'node:path';
 import os from 'node:os';
 import { costFromUsage } from '@/lib/pricing/cost-from-usage';
+import type { AssistantRecord, CostBreakdown, Pricing } from '@/lib/types';
 import { parseCodexJsonlFile } from './parse-codex-jsonl';
 import { resolveCodexPricing } from './pricing';
 import { shortenCodexModel } from './shorten-model';
+import { codexFastMultiplier, scaleCodexPricing } from './speed';
 import type { ProviderAdapter } from '../types';
 
 function getDirs(): string[] {
@@ -22,6 +24,21 @@ function getDirs(): string[] {
   return Array.from(new Set(candidates));
 }
 
+/**
+ * Codex cost = standard per-token cost × the model's fast/priority-tier
+ * multiplier. Scaling the resolved pricing (rather than the final total) keeps
+ * every breakdown line — input, output, cache read, savings — consistent under
+ * the tier, matching ccusage's whole-cost multiplier.
+ */
+function codexCostFromUsage(
+  usage: AssistantRecord['usage'],
+  pricing: Pricing | null,
+  model?: string,
+): CostBreakdown {
+  if (!pricing) return costFromUsage(usage, null);
+  return costFromUsage(usage, scaleCodexPricing(pricing, codexFastMultiplier(model ?? '')));
+}
+
 export const codexAdapter: ProviderAdapter = {
   id: 'codex',
   displayName: { en: 'Codex', zh: 'Codex' },
@@ -29,7 +46,7 @@ export const codexAdapter: ProviderAdapter = {
   color: { fg: '#047857', bg: '#d1fae5' },
   logoSrc: '/codex-logo.webp',
 
-  parserVersion: 'codex-v5-last-total-prev',
+  parserVersion: 'codex-v6-output-excludes-readded-reasoning',
   capabilities: {
     hasCacheCreation: false,
     hasReasoningTokens: true,
@@ -40,6 +57,6 @@ export const codexAdapter: ProviderAdapter = {
   parseFile: parseCodexJsonlFile,
   resolvePricing: resolveCodexPricing,
   shortenModel: shortenCodexModel,
-  costFromUsage,
+  costFromUsage: codexCostFromUsage,
   costFootnoteKey: 'cost.footnote.codex',
 };

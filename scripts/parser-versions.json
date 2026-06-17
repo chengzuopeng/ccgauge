@@ -1,4 +1,4 @@
 {
   "claude": "claude-v5-task-notification-synthetic",
-  "codex": "codex-v5-last-total-prev"
+  "codex": "codex-v6-output-excludes-readded-reasoning"
 }
