@@ -1,10 +1,11 @@
 'use client';
 
-import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { useSearchParams, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useT } from '@/lib/i18n/context';
 import { useTabIndicator } from '@/components/use-tab-indicator';
 import { TabIndicator } from '@/components/tab-indicator';
+import { usePendingNav } from '@/lib/use-pending-nav';
 
 export interface SegmentedOption {
   value: string;
@@ -19,10 +20,10 @@ interface Props {
 }
 
 export function SegmentedPicker({ paramKey, defaultValue, options, ariaLabel }: Props) {
-  const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const t = useT();
+  const { pending, navigate } = usePendingNav();
   const rawCurrent = params.get(paramKey) || defaultValue;
   const current = options.some((o) => o.value === rawCurrent) ? rawCurrent : defaultValue;
   const { containerRef, rect } = useTabIndicator<HTMLDivElement>(current);
@@ -32,7 +33,7 @@ export function SegmentedPicker({ paramKey, defaultValue, options, ariaLabel }: 
   function set(v: string) {
     const next = new URLSearchParams(params.toString());
     next.set(paramKey, v);
-    router.push(`${pathname}?${next.toString()}`);
+    navigate(`${pathname}?${next.toString()}`);
   }
 
   function onKey(e: React.KeyboardEvent<HTMLDivElement>) {
@@ -47,7 +48,13 @@ export function SegmentedPicker({ paramKey, defaultValue, options, ariaLabel }: 
   }
 
   return (
-    <div className="inline-flex rounded-button border border-border bg-bg-surface p-0.5">
+    <div
+      className={cn(
+        'inline-flex rounded-button border border-border bg-bg-surface p-0.5',
+        pending && 'opacity-60 cursor-progress',
+      )}
+      aria-busy={pending}
+    >
       <div
         ref={containerRef}
         role="radiogroup"

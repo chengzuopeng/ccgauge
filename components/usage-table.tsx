@@ -1,7 +1,7 @@
 'use client';
 
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import {
   formatUSDPrecise,
   formatDateTime,
@@ -18,6 +18,7 @@ import type { Locale } from '@/lib/i18n/dict';
 import { HoverCard } from '@/components/hover-card';
 import { ScrollShadows } from '@/components/scroll-shadows';
 import type { SortKey } from '@/lib/usage-query';
+import { usePendingNav } from '@/lib/use-pending-nav';
 
 type ColumnId =
   | 'time'
@@ -102,9 +103,9 @@ interface UsageTableProps {
 export function UsageTable({ rows, totalCount, page, pageCount, sort, query, codexFastActive }: UsageTableProps) {
   const t = useT();
   const { locale } = useI18n();
-  const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
+  const { pending, navigate } = usePendingNav();
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [visible, setVisible] = useState<Record<ColumnId, boolean>>(defaultVisible);
@@ -152,7 +153,7 @@ export function UsageTable({ rows, totalCount, page, pageCount, sort, query, cod
       else sp.set(k, v);
     }
     const qs = sp.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname);
+    navigate(qs ? `${pathname}?${qs}` : pathname);
   }
 
   function setQuery(q: string) {
@@ -252,7 +253,13 @@ export function UsageTable({ rows, totalCount, page, pageCount, sort, query, cod
           </button>
         </div>
       </div>
-      <div className="card overflow-hidden">
+      <div
+        className={cn(
+          'card overflow-hidden transition-opacity',
+          pending && 'opacity-60 cursor-progress pointer-events-none',
+        )}
+        aria-busy={pending}
+      >
         <ScrollShadows>
           <table className="w-full text-sm">
             <thead>

@@ -1,9 +1,10 @@
 'use client';
 
-import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { useSearchParams, usePathname } from 'next/navigation';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useT } from '@/lib/i18n/context';
+import { usePendingNav } from '@/lib/use-pending-nav';
 
 interface MultiSelectProps {
 
@@ -33,10 +34,10 @@ export function MultiSelect({
   ariaLabel,
   searchThreshold = 6,
 }: MultiSelectProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const t = useT();
+  const { pending, navigate } = usePendingNav();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIdx, setActiveIdx] = useState(0);
@@ -89,7 +90,7 @@ export function MultiSelect({
     if (set.size === 0) next.delete(paramKey);
     else next.set(paramKey, Array.from(set).join(','));
     const qs = next.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname);
+    navigate(qs ? `${pathname}?${qs}` : pathname);
   }
 
   function toggle(v: string) {
@@ -131,7 +132,11 @@ export function MultiSelect({
   const showSearch = all.length >= searchThreshold;
 
   return (
-    <div ref={wrapRef} className="relative">
+    <div
+      ref={wrapRef}
+      className={cn('relative', pending && 'opacity-60 cursor-progress')}
+      aria-busy={pending}
+    >
       <button
         ref={triggerRef}
         id={triggerId}

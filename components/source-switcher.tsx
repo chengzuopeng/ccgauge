@@ -79,7 +79,8 @@ export function SourceSwitcher({ available, initial, providers }: Props) {
     <div
       role="group"
       aria-label={t('nav.source')}
-      className="inline-flex items-center rounded-md border border-border bg-bg-surface p-0.5 gap-0.5"
+      className={`inline-flex items-center rounded-md border border-border bg-bg-surface p-0.5 gap-0.5 ${pending ? 'opacity-60 cursor-progress' : ''}`}
+      aria-busy={pending}
       title={t('nav.source')}
     >
       <AllButton

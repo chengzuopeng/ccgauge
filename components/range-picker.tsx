@@ -1,11 +1,12 @@
 'use client';
 
-import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { useSearchParams, usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import type { DateRange } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n/context';
 import { DateRangePicker } from '@/components/date-range-picker';
+import { usePendingNav } from '@/lib/use-pending-nav';
 
 const PRESETS = [
   { value: '1d', tk: 'range.today' },
@@ -56,10 +57,10 @@ function formatDateShort(s: string, locale: string): string {
 }
 
 export function RangePicker({ defaultValue = '7d' }: { defaultValue?: string }) {
-  const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const { t, locale } = useI18n();
+  const { pending, navigate } = usePendingNav();
 
   const rawCurrent = params.get('range') || defaultValue;
   const isPreset = PRESETS.some((o) => o.value === rawCurrent);
@@ -109,7 +110,7 @@ export function RangePicker({ defaultValue = '7d' }: { defaultValue?: string }) 
 
     next.delete('from');
     next.delete('to');
-    router.push(`${pathname}?${next.toString()}`);
+    navigate(`${pathname}?${next.toString()}`);
     setOpen(false);
   }
 
@@ -122,7 +123,7 @@ export function RangePicker({ defaultValue = '7d' }: { defaultValue?: string }) 
     next.set('from', formatLocalIso(from));
     if (to) next.set('to', formatLocalIso(to));
     else next.delete('to');
-    router.push(`${pathname}?${next.toString()}`);
+    navigate(`${pathname}?${next.toString()}`);
     setOpen(false);
   }
 
@@ -141,7 +142,11 @@ export function RangePicker({ defaultValue = '7d' }: { defaultValue?: string }) 
     : '';
 
   return (
-    <div ref={wrapRef} className="flex items-center gap-1">
+    <div
+      ref={wrapRef}
+      className={cn('flex items-center gap-1', pending && 'opacity-60 cursor-progress')}
+      aria-busy={pending}
+    >
       <div
         role="radiogroup"
         aria-label={t('range.label')}
