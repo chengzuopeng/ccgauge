@@ -22,6 +22,10 @@ export function AutoRefresh({ intervalMs = 15_000 }: Props) {
       running.current = true;
       try {
         router.refresh();
+        // Also nudge any data island on the current page to refetch — the
+        // /usage page now renders most of its data via a client-side fetch
+        // that doesn't pick up router.refresh() on its own.
+        window.dispatchEvent(new Event('ccgauge:refresh'));
       } finally {
 
         Promise.resolve().then(() => {
