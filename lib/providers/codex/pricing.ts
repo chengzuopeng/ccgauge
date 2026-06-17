@@ -1,129 +1,20 @@
 import type { Pricing } from '@/lib/types';
 import type { PricingResolution } from '../types';
+// Relative + explicit .js so raw `node --experimental-strip-types` test runs resolve it.
+import { LITELLM_OPENAI_PRICING } from '../../pricing/litellm-pricing.generated.js';
+
+/**
+ * Hand-maintained OpenAI/Codex pricing for models LiteLLM's table does NOT
+ * carry. LiteLLM currently covers every model ccgauge tracks, so this is empty;
+ * it's the documented home for any future bleeding-edge model LiteLLM hasn't
+ * indexed yet. LiteLLM wins for shared keys (snapshot spread LAST). Refresh the
+ * snapshot with `pnpm update-pricing`.
+ */
+const HAND_OPENAI: Record<string, Pricing> = {};
 
 export const BUILTIN_PRICING_OPENAI: Record<string, Pricing> = {
-  'gpt-5.5': {
-    input: 5,
-    output: 30,
-    cacheRead: 0.5,
-    cacheCreation5m: 0,
-    cacheCreation1h: 0,
-  },
-  'gpt-5.4': {
-    input: 2.5,
-    output: 15,
-    cacheRead: 0.25,
-    cacheCreation5m: 0,
-    cacheCreation1h: 0,
-  },
-  'gpt-5.4-mini': {
-    input: 0.75,
-    output: 4.5,
-    cacheRead: 0.075,
-    cacheCreation5m: 0,
-    cacheCreation1h: 0,
-  },
-  'gpt-5.4-nano': {
-    input: 0.2,
-    output: 1.25,
-    cacheRead: 0.02,
-    cacheCreation5m: 0,
-    cacheCreation1h: 0,
-  },
-  'gpt-5.3-codex': {
-    input: 1.75,
-    output: 14,
-    cacheRead: 0.175,
-    cacheCreation5m: 0,
-    cacheCreation1h: 0,
-  },
-  // gpt-5.2 / gpt-5.2-codex bill at the codex tier in ccusage (gpt_5_codex_pricing).
-  // Without these, real Codex logs fall back to the priciest gpt-5.5 tier.
-  'gpt-5.2-codex': {
-    input: 1.75,
-    output: 14,
-    cacheRead: 0.175,
-    cacheCreation5m: 0,
-    cacheCreation1h: 0,
-  },
-  'gpt-5.2': {
-    input: 1.75,
-    output: 14,
-    cacheRead: 0.175,
-    cacheCreation5m: 0,
-    cacheCreation1h: 0,
-  },
-  // gpt-5.1 / gpt-5.1-codex match ccusage's gpt_5_1_pricing (= base gpt-5).
-  'gpt-5.1-codex': {
-    input: 1.25,
-    output: 10,
-    cacheRead: 0.125,
-    cacheCreation5m: 0,
-    cacheCreation1h: 0,
-  },
-  'gpt-5.1': {
-    input: 1.25,
-    output: 10,
-    cacheRead: 0.125,
-    cacheCreation5m: 0,
-    cacheCreation1h: 0,
-  },
-  'gpt-5': {
-    input: 2.5,
-    output: 15,
-    cacheRead: 0.25,
-    cacheCreation5m: 0,
-    cacheCreation1h: 0,
-  },
-  'gpt-5-mini': {
-    input: 0.75,
-    output: 4.5,
-    cacheRead: 0.075,
-    cacheCreation5m: 0,
-    cacheCreation1h: 0,
-  },
-  'gpt-5-nano': {
-    input: 0.2,
-    output: 1.25,
-    cacheRead: 0.02,
-    cacheCreation5m: 0,
-    cacheCreation1h: 0,
-  },
-  'gpt-5-codex': {
-    input: 1.75,
-    output: 14,
-    cacheRead: 0.175,
-    cacheCreation5m: 0,
-    cacheCreation1h: 0,
-  },
-  'gpt-4.1': {
-    input: 2,
-    output: 8,
-    cacheRead: 0.5,
-    cacheCreation5m: 0,
-    cacheCreation1h: 0,
-  },
-  'gpt-4.1-mini': {
-    input: 0.4,
-    output: 1.6,
-    cacheRead: 0.1,
-    cacheCreation5m: 0,
-    cacheCreation1h: 0,
-  },
-  'o3': {
-    input: 2,
-    output: 8,
-    cacheRead: 0.5,
-    cacheCreation5m: 0,
-    cacheCreation1h: 0,
-  },
-  'o4-mini': {
-    input: 1.1,
-    output: 4.4,
-    cacheRead: 0.275,
-    cacheCreation5m: 0,
-    cacheCreation1h: 0,
-  },
+  ...HAND_OPENAI,
+  ...LITELLM_OPENAI_PRICING,
 };
 
 export const FALLBACK_FAMILY_OPENAI: Record<string, Pricing> = {

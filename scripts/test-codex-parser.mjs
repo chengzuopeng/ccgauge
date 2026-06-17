@@ -84,7 +84,7 @@ const c = costFromUsage(
   },
   r.pricing,
 );
-assert.equal(c.total.toFixed(2), '17.50', 'gpt-5 cost: 1M input * 2.5 + 1M output * 15');
+assert.equal(c.total.toFixed(2), '11.25', 'gpt-5 cost: 1M input * 1.25 + 1M output * 10 (LiteLLM)');
 
 assert.equal(shortenCodexModel('gpt-5'), 'GPT-5');
 assert.equal(shortenCodexModel('gpt-5-mini'), 'GPT-5 Mini');
