@@ -5,6 +5,109 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] — 2026-06-17
+
+Two big themes: **Codex billing accuracy** is back in line with
+[ccusage](https://github.com/ccusage/ccusage) (the de-facto reference for
+multi-agent token accounting), and the **usage page no longer freezes** when
+you flip ranges or sources.
+
+On the billing side: Codex transcripts had three independent issues that
+combined to push numbers off by ~20% in either direction. Reasoning tokens
+were being double-counted at the output rate (output already includes them in
+Codex's raw payload — verified against real `~/.codex` rollouts: `input +
+output == total`), the fast / priority service tier was billed at the
+standard rate (it's 2× for most models, 2.5× for `gpt-5.5`), and the most
+commonly used model strings (`gpt-5.2-codex`, `gpt-5.2` — together >65% of
+local Codex requests on the maintainer's machine) had no entry in the price
+table and silently fell back to the priciest gpt-5.5 tier. Costs now match
+ccusage to the cent on identical data; on a high-volume Codex priority-tier
+session the corrected total came in 2.4× higher than before — entirely from
+adding the missing multiplier and pricing keys, not from new spend.
+
+On the usage page: every filter change re-streamed ~300 KB of HTML and
+fully re-hydrated a 25-row table with portal hovercards. Combined with no
+visible click feedback, this looked like the UI was frozen. The page is now
+a thin shell that boots in ~20 KB, and the chart / KPIs / table fetch from
+a new `/api/turns` endpoint with stale-while-revalidate caching. Toggling
+7d ↔ 30d ↔ all is now ~30 ms after the first hit (was ~150 ms every time),
+and every filter control flashes pending state on click so it's obvious
+the input landed.
+
+### Fixed
+
+- **Codex reasoning tokens were billed twice.** The parser added
+  `reasoning_output_tokens` on top of `output_tokens` before applying the
+  output rate, but Codex's raw payload already counts reasoning inside
+  `output_tokens` (every `total = input + output` invariant holds in real
+  rollouts). Output is now billed once; `reasoning_tokens` stays on the
+  record as a display-only subset, mirroring ccusage's
+  `reasoningOutputTokens` column. `parserVersion` bumps to
+  `codex-v6-output-excludes-readded-reasoning` so any indexed snapshot
+  rebuilds with the corrected totals.
+- **Fast / priority service tier was missing.** When
+  `~/.codex/config.toml` sets `service_tier = "fast" | "priority"`, costs
+  scale per model (gpt-5.5 ×2.5, others ×2, ported from ccusage's
+  `fast-multiplier-overrides.json`). Standard-tier sessions are unchanged.
+- **`gpt-5.2`, `gpt-5.2-codex`, `gpt-5.1`, `gpt-5.1-codex` had no pricing
+  rows** and resolved via family-fallback to the priciest gpt-5.5 tier
+  (5 / 30 per 1 M tokens). Real Codex logs use these strings constantly —
+  the maintainer's archive had ~1,600 requests on `gpt-5.2-codex` alone,
+  every one of which was over-billed by ~3×. Added with ccusage's values
+  (gpt-5.2-codex 1.75 / 14, gpt-5.1 1.25 / 10) so they resolve `exact`.
+
+### Added
+
+- **`·fast` marker on the usage page model column** when the active Codex
+  config requests the fast / priority tier. Shows as `GPT-5.5·fast` in
+  amber with a tooltip explaining the 2×+ rate, on Codex rows only.
+  Source-aware: Claude rows stay clean even on mixed (`source=all`) views.
+- **Build-time LiteLLM snapshot for builtin pricing.** New
+  `pnpm update-pricing` script fetches BerriAI/litellm's
+  `model_prices_and_context_window.json`, filters to Anthropic + OpenAI
+  chat models, transforms per-token costs into ccgauge's per-1 M
+  `Pricing` shape (Anthropic `cacheCreation1h = 2× input`, mirroring
+  ccusage's hard-coded multiplier; OpenAI keeps cache-write tiers at 0),
+  and writes a committed `lib/pricing/litellm-pricing.generated.{js,d.ts}`.
+  Runtime stays fully offline — the snapshot IS the pin. The hand-curated
+  layer shrinks to seven legacy Claude bare names that LiteLLM doesn't
+  carry; everything LiteLLM tracks is sourced from there.
+
+### Performance
+
+- **Usage page page-load HTML cut from ~300 KB to ~34 KB**, constant
+  across filters. `force-dynamic` SSR no longer re-streams every record
+  inline as RSC payload; the page now ships a shell only.
+- **Filter changes feed from a JSON endpoint with stale-while-revalidate.**
+  New `/api/turns` returns totals, trend buckets, the paginated turn
+  slice, and the filter dropdown contents (~30 KB). A client-side URL-keyed
+  cache renders the previous payload immediately on revisit, so 7d ↔ 30d
+  toggles drop from ~150 ms each to ~30 ms after the first hit.
+- **Every filter nav now uses `useTransition`** with visible pending
+  feedback (control opacity-60 + `cursor-progress` + `aria-busy`, table
+  card additionally drops pointer events). Range picker, segmented
+  picker, multi-selects, table sort / page / search, source switcher —
+  all share the treatment. Eliminates the "did my click land?" gap.
+- **Scan-derived data is cached on the indexer snapshot.**
+  `allModels` / `allProjects` use a WeakMap on the scan object; new
+  `recordsToTurnRowsCached` is an LRU sub-keyed on
+  `(source, range token, models, projects)`. Using the range *token*
+  instead of the resolved `fromIso/toIso` avoids `Date.now()` drift, so
+  the same scan + same filter combo hits the cache on every revisit.
+
+### Changed
+
+- **GPT-5 base variants (`gpt-5`, `gpt-5-mini`, `gpt-5-nano`, `gpt-5-codex`)
+  now follow LiteLLM**: 1.25 / 10, 0.25 / 2, 0.05 / 0.4, 1.25 / 10
+  respectively (these are the same numbers ccusage uses). The 1.1.6
+  alignment chose openai.com values for them; this release picks one
+  source of truth for the whole table. No real-data impact for the
+  maintainer's transcripts — none of those four ids appears in local
+  Codex logs.
+- **`AutoRefresh` now dispatches a `ccgauge:refresh` window event** so the
+  client-side data island can re-fetch alongside the existing
+  `router.refresh()`. Existing pages without an island are unaffected.
+
 ## [1.1.6] — 2026-06-17
 
 Brings GPT pricing back in line with [OpenAI's official rates](https://openai.com/api/pricing/)

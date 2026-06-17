@@ -1,6 +1,6 @@
 {
   "name": "ccgauge",
-  "version": "1.1.6",
+  "version": "1.2.0",
   "description": "Local web dashboard for Claude Code and OpenAI Codex CLI token usage and cost",
   "keywords": [
     "claude",
