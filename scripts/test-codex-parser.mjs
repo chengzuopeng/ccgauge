@@ -98,6 +98,22 @@ const r3 = resolveCodexPricing('o5-omega');
 assert.equal(r3.matchType, 'family-fallback');
 assert.ok(r3.pricing);
 
+// Models the real Codex logs actually use must resolve EXACTLY — never fall
+// back to the priciest gpt-5.5 tier. gpt-5.2 / gpt-5.2-codex bill at the codex
+// tier (1.75/14); gpt-5.1 / gpt-5.1-codex at the base gpt-5 tier (1.25/10).
+for (const m of ['gpt-5.2-codex', 'gpt-5.2']) {
+  const rr = resolveCodexPricing(m);
+  assert.equal(rr.matchType, 'exact', `${m} resolves exactly (not family-fallback)`);
+  assert.equal(rr.pricing.input, 1.75, `${m} input = 1.75`);
+  assert.equal(rr.pricing.output, 14, `${m} output = 14`);
+}
+for (const m of ['gpt-5.1', 'gpt-5.1-codex']) {
+  const rr = resolveCodexPricing(m);
+  assert.equal(rr.matchType, 'exact', `${m} resolves exactly (not family-fallback)`);
+  assert.equal(rr.pricing.input, 1.25, `${m} input = 1.25`);
+  assert.equal(rr.pricing.output, 10, `${m} output = 10`);
+}
+
 assert.ok('gpt-5' in BUILTIN_PRICING_OPENAI);
 assert.ok('gpt-5-mini' in BUILTIN_PRICING_OPENAI);
 

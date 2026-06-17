@@ -37,6 +37,37 @@ export const BUILTIN_PRICING_OPENAI: Record<string, Pricing> = {
     cacheCreation5m: 0,
     cacheCreation1h: 0,
   },
+  // gpt-5.2 / gpt-5.2-codex bill at the codex tier in ccusage (gpt_5_codex_pricing).
+  // Without these, real Codex logs fall back to the priciest gpt-5.5 tier.
+  'gpt-5.2-codex': {
+    input: 1.75,
+    output: 14,
+    cacheRead: 0.175,
+    cacheCreation5m: 0,
+    cacheCreation1h: 0,
+  },
+  'gpt-5.2': {
+    input: 1.75,
+    output: 14,
+    cacheRead: 0.175,
+    cacheCreation5m: 0,
+    cacheCreation1h: 0,
+  },
+  // gpt-5.1 / gpt-5.1-codex match ccusage's gpt_5_1_pricing (= base gpt-5).
+  'gpt-5.1-codex': {
+    input: 1.25,
+    output: 10,
+    cacheRead: 0.125,
+    cacheCreation5m: 0,
+    cacheCreation1h: 0,
+  },
+  'gpt-5.1': {
+    input: 1.25,
+    output: 10,
+    cacheRead: 0.125,
+    cacheCreation5m: 0,
+    cacheCreation1h: 0,
+  },
   'gpt-5': {
     input: 2.5,
     output: 15,
