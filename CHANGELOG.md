@@ -5,6 +5,30 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] — 2026-06-18
+
+Fixes two stacking / clipping bugs on the usage page that made dropdowns
+appear behind or get cut off by surrounding content.
+
+### Fixed
+
+- **Filter dropdowns on /usage were painted under the KPI cards.** The
+  custom-range picker (and by extension the model / project filter dropdowns)
+  showed the calendar / option list dimly behind the body content instead
+  of on top. Root cause: `.dash-stagger > *` applies a transform animation,
+  which makes each direct child its own stacking context — the top bar and
+  the body end up as siblings with implicit z-auto, so DOM order wins and
+  the body covers the top bar's popovers. Lifted the PageShell top bar to
+  `relative z-20` so its popovers always win. Same fix benefits every
+  PageShell-based page (sessions / projects / models / settings / overview).
+- **Usage table "Columns" dropdown got clipped by its Section card** when
+  the table filtered down to ~0–2 rows: the card collapsed to ~200 px while
+  the dropdown is ~328 px tall, so the bottom row of column toggles became
+  unreachable. The panel is now portaled to `<body>` (mirroring HoverCard)
+  and pinned to the trigger's bounding rect via `useLayoutEffect`, with
+  scroll / resize listeners keeping it anchored. Click-outside detection
+  now checks both the trigger and the portaled panel.
+
 ## [1.2.0] — 2026-06-17
 
 Two big themes: **Codex billing accuracy** is back in line with
