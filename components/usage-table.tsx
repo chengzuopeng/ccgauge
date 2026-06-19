@@ -1,6 +1,7 @@
 'use client';
 
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
   formatUSDPrecise,
@@ -110,8 +111,10 @@ export function UsageTable({ rows, totalCount, page, pageCount, sort, query, cod
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [visible, setVisible] = useState<Record<ColumnId, boolean>>(defaultVisible);
   const [colsOpen, setColsOpen] = useState(false);
+  const [colsPos, setColsPos] = useState<{ top: number; right: number } | null>(null);
   const [queryInput, setQueryInput] = useState(query);
-  const colsRef = useRef<HTMLDivElement>(null);
+  const colsTriggerRef = useRef<HTMLButtonElement>(null);
+  const colsPanelRef = useRef<HTMLDivElement>(null);
   const queryDebounceRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -130,11 +133,39 @@ export function UsageTable({ rows, totalCount, page, pageCount, sort, query, cod
 
   useEffect(() => {
     function onClick(e: MouseEvent) {
-      if (colsRef.current && !colsRef.current.contains(e.target as Node)) setColsOpen(false);
+      const target = e.target as Node;
+      // The panel is portaled to <body> so a contains() check against the
+      // trigger alone isn't enough — also exclude clicks inside the panel.
+      if (colsTriggerRef.current?.contains(target)) return;
+      if (colsPanelRef.current?.contains(target)) return;
+      setColsOpen(false);
     }
     document.addEventListener('mousedown', onClick);
     return () => document.removeEventListener('mousedown', onClick);
   }, []);
+
+  // Position the portaled panel under the trigger and keep it pinned as the
+  // user scrolls or resizes. `useLayoutEffect` so the panel appears in place
+  // on the first frame instead of flickering at (0, 0).
+  useLayoutEffect(() => {
+    if (!colsOpen) {
+      setColsPos(null);
+      return;
+    }
+    function place() {
+      const el = colsTriggerRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setColsPos({ top: r.bottom + 4, right: window.innerWidth - r.right });
+    }
+    place();
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+    };
+  }, [colsOpen]);
 
   useEffect(() => {
     return () => {
@@ -209,44 +240,64 @@ export function UsageTable({ rows, totalCount, page, pageCount, sort, query, cod
           <span className="text-xs text-text-tertiary tabular-nums">
             {t('common.rows', { count: totalCount.toLocaleString() })}
           </span>
-          <div ref={colsRef} className="relative">
-            <button onClick={() => setColsOpen((o) => !o)} className="btn">
+          <div className="relative">
+            <button
+              ref={colsTriggerRef}
+              onClick={() => setColsOpen((o) => !o)}
+              className="btn"
+              aria-haspopup="dialog"
+              aria-expanded={colsOpen}
+            >
               {t('usage.columns.button')}
               <span className="ml-1 text-text-tertiary tabular-nums">{visibleCount}</span>
             </button>
-            {colsOpen && (
-              <div className="absolute right-0 mt-1 w-56 card border-border-hi shadow-lg p-2 z-30">
-                <div className="flex items-center justify-between px-1.5 pb-1.5 mb-1 border-b border-border">
-                  <span className="text-xs text-text-tertiary uppercase tracking-wide">
-                    {t('usage.columns.title')}
-                  </span>
-                  <button
-                    onClick={() => setVisible(defaultVisible())}
-                    className="text-xs text-text-tertiary hover:text-text-primary"
-                  >
-                    {t('usage.columns.reset')}
-                  </button>
-                </div>
-                <div className="max-h-72 overflow-auto">
-                  {COLUMNS.map((c) => (
-                    <label
-                      key={c.id}
-                      className="flex items-center gap-2 px-1.5 py-1.5 text-sm rounded hover:bg-bg-surface-hi cursor-pointer"
+            {/*
+              Portaled to <body> so the Section card's `overflow-hidden` can't
+              clip it when the table is short (e.g. filter yields ~0 rows).
+              `useLayoutEffect` keeps it pinned to the trigger as the user
+              scrolls or resizes.
+            */}
+            {colsOpen && colsPos &&
+              typeof document !== 'undefined' &&
+              createPortal(
+                <div
+                  ref={colsPanelRef}
+                  className="fixed w-56 card border-border-hi shadow-lg p-2 z-50"
+                  style={{ top: colsPos.top, right: colsPos.right }}
+                  role="dialog"
+                >
+                  <div className="flex items-center justify-between px-1.5 pb-1.5 mb-1 border-b border-border">
+                    <span className="text-xs text-text-tertiary uppercase tracking-wide">
+                      {t('usage.columns.title')}
+                    </span>
+                    <button
+                      onClick={() => setVisible(defaultVisible())}
+                      className="text-xs text-text-tertiary hover:text-text-primary"
                     >
-                      <input
-                        type="checkbox"
-                        checked={!!visible[c.id]}
-                        onChange={(e) =>
-                          setVisible((prev) => ({ ...prev, [c.id]: e.target.checked }))
-                        }
-                        className="accent-brand"
-                      />
-                      <span className="text-text-secondary">{t(c.labelKey)}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
+                      {t('usage.columns.reset')}
+                    </button>
+                  </div>
+                  <div className="max-h-72 overflow-auto">
+                    {COLUMNS.map((c) => (
+                      <label
+                        key={c.id}
+                        className="flex items-center gap-2 px-1.5 py-1.5 text-sm rounded hover:bg-bg-surface-hi cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={!!visible[c.id]}
+                          onChange={(e) =>
+                            setVisible((prev) => ({ ...prev, [c.id]: e.target.checked }))
+                          }
+                          className="accent-brand"
+                        />
+                        <span className="text-text-secondary">{t(c.labelKey)}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>,
+                document.body,
+              )}
           </div>
           <button onClick={exportCsv} className="btn">
             {t('common.exportCsv')}

@@ -72,7 +72,16 @@ export function PageShell({
   return (
 
     <div className="dash-stagger max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 sm:gap-4">
+      {/*
+        relative z-20: the dash-stagger animation gives every direct child a
+        non-`none` transform, which makes each child its own stacking context.
+        Without an explicit z-index, the top bar (DOM-earlier) loses to the
+        body content (DOM-later), so any popover inside the top bar — the
+        custom-range picker, model / project dropdowns — gets painted under
+        the KPI cards / chart. Lifting the top bar above the body keeps every
+        page's filter popovers on top.
+      */}
+      <div className="relative z-20 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 sm:gap-4">
         <div className="min-w-0">
           <h1 className="text-2xl sm:text-[1.75rem] font-semibold tracking-tight leading-tight truncate">
             {title}
