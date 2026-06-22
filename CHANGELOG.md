@@ -5,6 +5,37 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] — 2026-06-19
+
+Fixes a real footgun in the v1.2.0 Codex fast-tier multiplier: the result of
+reading `~/.codex/config.toml` was memoized at module load, so toggling
+`service_tier` required a full server restart to take effect. The detection
+logic itself is intentionally kept identical to ccusage's
+`adapter/codex/speed.rs` — that's the only practical proxy available, since
+the rollout JSONL doesn't record the active service tier per turn.
+
+### Fixed
+
+- **No more boot-time cache on the fast-tier detection.**
+  `detectCodexFastTier()` now re-reads `config.toml` on every call (a
+  ~few-hundred-byte read per request, negligible). Live verification: with
+  `service_tier="fast"` Codex totals come in at \$256.76; flip to
+  `"default"` mid-session and the next `/api/turns` request reports \$102.70
+  with `codexFastActive=false`; flip back to `"fast"` and it returns to
+  \$256.76 — all without touching the process.
+
+### Known limitation
+
+- **Per-turn fast-mode is unrecoverable from rollout data.** If you toggle
+  `service_tier` over time, historical turns recorded under the previous
+  setting are still billed at the *current* setting's rate. ccusage
+  v20.0.14 has the same behavior. The dashboard reflects "what would my
+  bill be if every Codex turn ran under the active tier", not absolute
+  historical truth — there is no field in the rollout JSONL that records
+  the tier at API-call time (verified by exhaustive inspection of every
+  payload across `token_count` / `session_meta` / `turn_context` events
+  plus `~/.codex/.codex-global-state.json`).
+
 ## [1.2.1] — 2026-06-18
 
 Fixes two stacking / clipping bugs on the usage page that made dropdowns
