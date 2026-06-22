@@ -25,10 +25,11 @@ function getDirs(): string[] {
 }
 
 /**
- * Codex cost = standard per-token cost × the model's fast/priority-tier
- * multiplier. Scaling the resolved pricing (rather than the final total) keeps
- * every breakdown line — input, output, cache read, savings — consistent under
- * the tier, matching ccusage's whole-cost multiplier.
+ * Codex cost = standard per-token cost × the global fast/priority-tier
+ * multiplier. When the active `~/.codex/config.toml` requests
+ * `service_tier = "fast" | "priority"`, every record bills at the per-model
+ * multiplier (gpt-5.5 → 2.5x, others → 2x). Otherwise everything bills at the
+ * standard rate. Mirrors ccusage's `adapter/codex/report.rs` per-report speed.
  */
 function codexCostFromUsage(
   usage: AssistantRecord['usage'],
@@ -36,7 +37,8 @@ function codexCostFromUsage(
   model?: string,
 ): CostBreakdown {
   if (!pricing) return costFromUsage(usage, null);
-  return costFromUsage(usage, scaleCodexPricing(pricing, codexFastMultiplier(model ?? '')));
+  const m = codexFastMultiplier(model ?? '');
+  return costFromUsage(usage, m === 1 ? pricing : scaleCodexPricing(pricing, m));
 }
 
 export const codexAdapter: ProviderAdapter = {

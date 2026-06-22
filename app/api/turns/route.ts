@@ -194,6 +194,8 @@ export const GET = withApiErrorHandling(async (req: Request) => {
     projects,
     allModels,
     allProjects,
+    // Read fresh per request so the dashboard reflects live config.toml edits
+    // without a restart (the old module-level cache was the v1.2.0 staleness bug).
     codexFastActive: detectCodexFastTier(),
     hasAnyRecords: allSourceRecords.length > 0,
   });

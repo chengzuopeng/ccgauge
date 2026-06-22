@@ -97,7 +97,7 @@ interface UsageTableProps {
   pageCount: number;
   sort: { key: SortKey; dir: 'asc' | 'desc' };
   query: string;
-  /** Codex priority/fast service tier active → mark Codex models with ·fast. */
+  /** Codex fast/priority service tier active (read fresh from config.toml) → mark Codex rows with ·fast. */
   codexFastActive: boolean;
 }
 

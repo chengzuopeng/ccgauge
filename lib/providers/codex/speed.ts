@@ -4,25 +4,29 @@ import path from 'node:path';
 import type { Pricing } from '@/lib/types';
 
 /**
- * Codex "fast" / "priority" service tier handling.
+ * Codex fast / priority service tier detection.
  *
- * OpenAI's Codex CLI can run under a priority service tier (configured as
- * `service_tier = "fast"` or `"priority"` in `~/.codex/config.toml`). On that
- * tier OpenAI bills every token at roughly 2x the standard rate. ccusage
- * models this with a per-pricing `fast_multiplier` (defaulting to 2.0) that is
- * applied to the WHOLE Codex cost — see ccusage's
- * `adapter/codex/speed.rs` + `report.rs::calculate_codex_model_cost`.
+ * Detection mirrors ccusage's `adapter/codex/speed.rs`: a Codex install is
+ * "on the fast tier" iff `~/.codex/config.toml` (or `$CODEX_HOME/config.toml`)
+ * has a top-level `service_tier = "fast"` or `"priority"`. When active, every
+ * Codex record is billed at a per-model multiplier (gpt-5.5 → 2.5x, others →
+ * 2x by default). When inactive, every record bills at the standard rate.
  *
- * The multiplier is per-model (ccusage's `fast-multiplier-overrides.json` plus
- * a 2.0 default), applied only when the active Codex config requests the
- * fast/priority tier — otherwise it is 1x. Detection is intentionally
- * conservative: anything other than an explicit `service_tier = fast|priority`
- * leaves cost unchanged.
+ * Why global / not per-turn: the rollout JSONL does NOT record the active
+ * service tier per turn — it's a user-level account setting that changes when
+ * the user toggles it. We adopt ccusage's pragmatic choice: read the CURRENT
+ * config and apply uniformly. The known limitation is that historical turns
+ * recorded under a different tier than the current setting will be billed at
+ * the wrong rate — there's no way to recover that information from the data.
+ *
+ * The earlier v1.2.0 implementation cached the config read at module load,
+ * which meant editing config.toml required restarting the dashboard. v1.2.2
+ * switched to per-turn `effort==='low'` detection, which turned out to be a
+ * misread of the actual signal. This version restores global detection but
+ * reads `config.toml` **on every call** so live edits propagate immediately.
+ * The cost is one ~few-hundred-byte file read per request — negligible.
  */
 
-// Ported from ccusage's `fast-multiplier-overrides.json` ("exact" OpenAI
-// entries). Models without an entry fall back to DEFAULT_FAST_MULTIPLIER —
-// mirroring ccusage, where a model with no explicit `fast_multiplier` uses 2.0.
 const FAST_MULTIPLIER_OVERRIDES: Record<string, number> = {
   'gpt-5.5': 2.5,
   'gpt-5.4': 2,
@@ -30,17 +34,15 @@ const FAST_MULTIPLIER_OVERRIDES: Record<string, number> = {
 };
 const DEFAULT_FAST_MULTIPLIER = 2;
 
-/** Strips an `openai/` prefix and a trailing `-YYYYMMDD`, mirroring resolveCodexPricing. */
 function normalizeCodexModelKey(model: string): string {
   return model.replace(/^openai\//, '').replace(/-\d{8}$/, '');
 }
 
 /**
- * Pure check, ported verbatim from ccusage's
- * `codex_config_requests_fast_service_tier`: a config requests the fast tier
- * iff some line sets `service_tier` (exact key, comments stripped) to `fast`
- * or `priority`. `service_tier_override` / `"breakfast"` / `"standard"` must
- * NOT match.
+ * Pure parser, ported from ccusage's `codex_config_requests_fast_service_tier`.
+ * A config requests the fast tier iff some line sets `service_tier` (exact key,
+ * comments stripped, quotes trimmed) to `"fast"` or `"priority"`.
+ * `service_tier_override = "fast"` / `"breakfast"` / `"standard"` must NOT match.
  */
 export function codexConfigRequestsFastTier(content: string): boolean {
   for (const rawLine of content.split(/\r?\n/)) {
@@ -65,7 +67,12 @@ function codexHomePaths(): string[] {
   return Array.from(new Set(homes));
 }
 
-function computeCodexFastTier(): boolean {
+/**
+ * Whether the active Codex config currently requests the fast / priority
+ * service tier. Re-reads config.toml on every call — no cache — so editing
+ * the file takes effect immediately without restarting the dashboard.
+ */
+export function detectCodexFastTier(): boolean {
   for (const home of codexHomePaths()) {
     try {
       const content = readFileSync(path.join(home, 'config.toml'), 'utf8');
@@ -77,22 +84,10 @@ function computeCodexFastTier(): boolean {
   return false;
 }
 
-let fastTierCache: boolean | undefined;
-
-/** Whether the active Codex config requests the fast/priority service tier. Memoized. */
-export function detectCodexFastTier(): boolean {
-  if (fastTierCache === undefined) fastTierCache = computeCodexFastTier();
-  return fastTierCache;
-}
-
-/** Clears the memoized fast-tier detection. Test-only. */
-export function __resetCodexFastTierCacheForTest(): void {
-  fastTierCache = undefined;
-}
-
 /**
- * The cost multiplier for `model`: 1 when the fast/priority tier is inactive,
- * otherwise the model's override (e.g. gpt-5.5 → 2.5) or 2 by default.
+ * Per-model multiplier when fast tier is active, else 1. Caller decides
+ * whether to consult `detectCodexFastTier()` to scope the call — the cost
+ * path does it once per request and passes the result to many records.
  */
 export function codexFastMultiplier(model: string): number {
   if (!detectCodexFastTier()) return 1;
