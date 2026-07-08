@@ -156,7 +156,7 @@ export function UsageDataIsland({ initial, costFootnote }: Props) {
 
   return (
     <div className={loading ? 'opacity-90' : ''} aria-busy={loading}>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+      <div className="usage-overview-block grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
         <KpiCard label={t('usage.kpi.totalTokens')} value={formatTokensCompact(data.totals.totalTokens, locale)} />
         <KpiCard
           label={t('usage.kpi.totalCost')}
@@ -171,12 +171,12 @@ export function UsageDataIsland({ initial, costFootnote }: Props) {
         title={t('usage.trend')}
         desc={t('usage.trend.gran', { gran: tFn(locale, `gran.${data.gran}`) })}
         right={<GranularityPicker defaultValue={data.gran} />}
-        className="mt-4"
+        className="usage-overview-block mt-4"
       >
         <TokenStackChart data={data.trend} />
       </Section>
 
-      <Section title={t('usage.requests.title')} desc={t('usage.requests.desc')}>
+      <Section title={t('usage.requests.title')} desc={t('usage.requests.desc')} className="mt-4">
         <UsageTable
           rows={data.turns}
           totalCount={data.totalCount}
@@ -194,7 +194,7 @@ export function UsageDataIsland({ initial, costFootnote }: Props) {
 function IslandSkeleton() {
   return (
     <div>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+      <div className="usage-overview-block grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="card p-4">
             <div className="h-3 w-24 rounded bg-bg-surface-hi/40 animate-pulse" />
@@ -202,7 +202,7 @@ function IslandSkeleton() {
           </div>
         ))}
       </div>
-      <div className="card mt-4 h-72 bg-bg-surface-hi/30 animate-pulse" />
+      <div className="usage-overview-block card mt-4 h-72 bg-bg-surface-hi/30 animate-pulse" />
       <div className="card mt-4 p-4 space-y-2">
         {Array.from({ length: 8 }).map((_, i) => (
           <div key={i} className="h-7 rounded bg-bg-surface-hi/40 animate-pulse" />
