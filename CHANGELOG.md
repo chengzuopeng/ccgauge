@@ -5,6 +5,23 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] — 2026-07-08
+
+Two fixes to the `/usage` overview area.
+
+### Fixed
+
+- **The "Overview" toggle now actually hides the overview.** The eye button in
+  the Usage header is meant to collapse the KPI cards *and* the trend chart in
+  one click (its own tooltip reads "KPIs + trend"), leaving just the Requests
+  table. But neither element carried the `.usage-overview-block` class the CSS
+  targets, so the button flipped its state and nothing moved. The KPI grid, the
+  Trend section, and both of their loading skeletons now carry the class, so the
+  toggle collapses and restores the whole overview as intended.
+- **Restored the gap between the trend chart and the Requests table.** The
+  Requests section was missing its top margin and sat flush against the trend
+  card; it now uses `mt-4` to match the vertical rhythm of the rest of the page.
+
 ## [1.2.2] — 2026-06-19
 
 Fixes a real footgun in the v1.2.0 Codex fast-tier multiplier: the result of
