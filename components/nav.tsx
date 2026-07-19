@@ -6,21 +6,43 @@ import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n/context';
 import { useTabIndicator } from '@/components/use-tab-indicator';
 import { TabIndicator } from '@/components/tab-indicator';
+import { HoverCard } from '@/components/hover-card';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { ThemeSwitcher } from '@/components/theme-switcher';
 import { Logo } from '@/components/logo';
 import { SourceSwitcher } from '@/components/source-switcher';
 import type { ProviderId } from '@/lib/providers/types';
 
-const ITEMS = [
+interface NavItem {
+  href: string;
+  tk: string;
+  exact?: boolean;
+}
+
+const PRIMARY: NavItem[] = [
   { href: '/', tk: 'nav.overview', exact: true },
   { href: '/usage', tk: 'nav.usage' },
+];
+
+// Folded into the "Analytics" hover dropdown.
+const ANALYSIS: NavItem[] = [
   { href: '/sessions', tk: 'nav.sessions' },
   { href: '/projects', tk: 'nav.projects' },
   { href: '/models', tk: 'nav.models' },
   { href: '/tools', tk: 'nav.tools' },
-  { href: '/settings', tk: 'nav.settings' },
 ];
+
+const TRAILING: NavItem[] = [{ href: '/settings', tk: 'nav.settings' }];
+
+// Sentinel data-tab for the dropdown trigger, so the sliding underline can
+// park on "Analytics" whenever one of the ANALYSIS sub-routes is active.
+const ANALYSIS_TAB = '/analysis';
+
+function isActive(pathname: string, item: NavItem): boolean {
+  return item.exact
+    ? pathname === item.href
+    : pathname === item.href || pathname.startsWith(item.href + '/');
+}
 
 const GITHUB_URL = 'https://github.com/chengzuopeng/ccgauge';
 const DOCS_URL = 'https://chengzuopeng.github.io/ccgauge/';
@@ -47,11 +69,38 @@ export function Nav({ availableProviders, initialSource, providerInfos }: Props)
   const pathname = usePathname();
   const { t, locale } = useI18n();
   const docsHref = locale === 'zh' ? DOCS_URL_ZH : DOCS_URL;
-  const activeItem = ITEMS.find((it) =>
-    it.exact ? pathname === it.href : pathname === it.href || pathname.startsWith(it.href + '/'),
-  );
-  const activeHref = activeItem?.href ?? '';
+
+  const analysisActive = ANALYSIS.some((it) => isActive(pathname, it));
+  const primaryActive = PRIMARY.find((it) => isActive(pathname, it));
+  const trailingActive = TRAILING.find((it) => isActive(pathname, it));
+  const activeHref = analysisActive
+    ? ANALYSIS_TAB
+    : (primaryActive?.href ?? trailingActive?.href ?? '');
+
   const { containerRef: navRef, rect } = useTabIndicator<HTMLElement>(activeHref);
+
+  const tabClass = (active: boolean) =>
+    cn(
+      'relative px-2.5 sm:px-3 py-1.5 text-sm rounded-button font-medium whitespace-nowrap shrink-0',
+      'transition-colors duration-150',
+      active
+        ? 'text-text-primary'
+        : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hi/60',
+    );
+
+  const renderTab = (it: NavItem) => (
+    <Link
+      key={it.href}
+      href={it.href}
+      prefetch={false}
+      data-tab={it.href}
+      aria-current={isActive(pathname, it) ? 'page' : undefined}
+      className={tabClass(isActive(pathname, it))}
+    >
+      {t(it.tk)}
+    </Link>
+  );
+
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-bg-base/85 backdrop-blur-md supports-[backdrop-filter]:bg-bg-base/70">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 flex items-center gap-2 sm:gap-4">
@@ -69,29 +118,61 @@ export function Nav({ availableProviders, initialSource, providerInfos }: Props)
           aria-label="Primary"
         >
           <TabIndicator rect={rect} variant="underline" />
-          {ITEMS.map((it) => {
-            const active = it.exact
-              ? pathname === it.href
-              : pathname === it.href || pathname.startsWith(it.href + '/');
-            return (
-              <Link
-                key={it.href}
-                href={it.href}
-                prefetch={false}
-                data-tab={it.href}
-                aria-current={active ? 'page' : undefined}
-                className={cn(
-                  'relative px-2.5 sm:px-3 py-1.5 text-sm rounded-button font-medium whitespace-nowrap shrink-0',
-                  'transition-colors duration-150',
-                  active
-                    ? 'text-text-primary'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hi/60',
-                )}
+          {PRIMARY.map(renderTab)}
+          <HoverCard
+            align="left"
+            maxWidth={220}
+            className="shrink-0"
+            content={
+              <div className="py-1.5 min-w-[168px]" role="menu">
+                {ANALYSIS.map((it) => {
+                  const active = isActive(pathname, it);
+                  return (
+                    <Link
+                      key={it.href}
+                      href={it.href}
+                      prefetch={false}
+                      role="menuitem"
+                      aria-current={active ? 'page' : undefined}
+                      className={cn(
+                        'block mx-1.5 px-2.5 py-1.5 text-sm rounded-button transition-colors',
+                        active
+                          ? 'text-text-primary bg-bg-surface-hi font-medium'
+                          : 'text-text-secondary hover:text-text-primary hover:bg-bg-surface-hi/60',
+                      )}
+                    >
+                      {t(it.tk)}
+                    </Link>
+                  );
+                })}
+              </div>
+            }
+          >
+            <button
+              type="button"
+              data-tab={ANALYSIS_TAB}
+              aria-haspopup="menu"
+              aria-current={analysisActive ? 'page' : undefined}
+              className={cn(tabClass(analysisActive), 'inline-flex items-center gap-1')}
+            >
+              {t('nav.analytics')}
+              <svg
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden
+                className="opacity-60"
               >
-                {t(it.tk)}
-              </Link>
-            );
-          })}
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+          </HoverCard>
+          {TRAILING.map(renderTab)}
           {/* Docs — external link to the marketing/docs site, opens in a
               new tab. Follows the in-app language (zh → /zh/). No
               `data-tab` so the sliding underline never sits on it (it
