@@ -10,8 +10,12 @@
  *
  *     lib/pricing/litellm-pricing.generated.ts
  *
- * The generated module is committed — it IS the pinned snapshot. Nothing fetches at
- * build time or runtime (ccgauge stays fully offline). Re-run this manually to bump:
+ * The generated module is committed — it IS the pinned OFFLINE snapshot (the base
+ * layer, always present even with no network). At runtime, `lib/pricing/store.ts`
+ * can additionally fetch the same table and overlay a fresher copy on disk; the
+ * filter + transform math is shared via `lib/pricing/litellm-transform.js` so this
+ * script and the runtime fetcher never drift. Re-run this manually to bump the
+ * committed base:
  *
  *     pnpm update-pricing
  *
@@ -20,75 +24,20 @@
  * raw `node --experimental-strip-types` test runs (which can't resolve
  * extensionless / `.ts` value imports).
  *
- * Mapping (LiteLLM → ccgauge Pricing, per 1M tokens):
- *   input            = input_cost_per_token            × 1e6
- *   output           = output_cost_per_token           × 1e6
- *   cacheRead        = (cache_read_input_token_cost ?? input×0.1) × 1e6
- *   cacheCreation5m  = (cache_creation_input_token_cost ?? 0) × 1e6   (Anthropic ≈1.25×input; OpenAI absent → 0)
- *   cacheCreation1h  = cache_creation present ? input(per1M)×2 : 0     (mirrors ccusage's 2× 1h-cache rule)
+ * Mapping (LiteLLM → ccgauge Pricing, per 1M tokens) lives in litellm-transform.js.
  * `*_above_200k` tiers are dropped — ccgauge's Pricing shape doesn't model them yet.
  */
 
 import { writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
-const LITELLM_URL =
-  'https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json';
+import { LITELLM_URL, transformLiteLLMTable } from '../lib/pricing/litellm-transform.js';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const OUT_JS = join(root, 'lib/pricing/litellm-pricing.generated.js');
 const OUT_DTS = join(root, 'lib/pricing/litellm-pricing.generated.d.ts');
 
-// Modes that aren't chat/completion billing we care about.
-const SKIP_MODES = new Set([
-  'embedding',
-  'image_generation',
-  'audio_transcription',
-  'audio_speech',
-  'moderation',
-  'rerank',
-]);
-
-const round6 = (x) => Math.round(x * 1e6) / 1e6;
-const per1m = (perTok) => round6(perTok * 1e6);
-
-function transform(entry) {
-  const input = per1m(entry.input_cost_per_token);
-  const output = per1m(entry.output_cost_per_token);
-  const hasCacheCreate =
-    typeof entry.cache_creation_input_token_cost === 'number';
-  const cacheRead = per1m(
-    typeof entry.cache_read_input_token_cost === 'number'
-      ? entry.cache_read_input_token_cost
-      : entry.input_cost_per_token * 0.1,
-  );
-  const cacheCreation5m = hasCacheCreate
-    ? per1m(entry.cache_creation_input_token_cost)
-    : 0;
-  const cacheCreation1h = hasCacheCreate ? round6(input * 2) : 0;
-  return { input, output, cacheCreation5m, cacheCreation1h, cacheRead };
-}
-
-function keep(name, entry) {
-  if (!entry || typeof entry !== 'object') return false;
-  if (name.includes('/')) return false; // skip provider-prefixed aliases (anthropic/…, openai/…, bedrock/…)
-  if (name.startsWith('ft:')) return false; // skip fine-tunes
-  const provider = entry.litellm_provider;
-  if (provider !== 'anthropic' && provider !== 'openai') return false;
-  if (typeof entry.input_cost_per_token !== 'number') return false;
-  if (typeof entry.output_cost_per_token !== 'number') return false;
-  if (entry.mode && SKIP_MODES.has(entry.mode)) return false;
-  return true;
-}
-
-function sortedObject(obj) {
-  const out = {};
-  for (const k of Object.keys(obj).sort()) out[k] = obj[k];
-  return out;
-}
-
-function renderRecord(name, record) {
+function renderRecord(record) {
   // Stable, scannable formatting; quoted keys are valid TS.
   return JSON.stringify(record, null, 2);
 }
@@ -99,17 +48,7 @@ async function main() {
   if (!res.ok) throw new Error(`HTTP ${res.status} fetching LiteLLM pricing`);
   const raw = await res.json();
 
-  const claude = {};
-  const openai = {};
-  for (const [name, entry] of Object.entries(raw)) {
-    if (!keep(name, entry)) continue;
-    const priced = transform(entry);
-    if (name.startsWith('claude')) claude[name] = priced;
-    else openai[name] = priced;
-  }
-
-  const claudeSorted = sortedObject(claude);
-  const openaiSorted = sortedObject(openai);
+  const { claude: claudeSorted, openai: openaiSorted } = transformLiteLLMTable(raw);
 
   const header = `// AUTO-GENERATED — DO NOT EDIT BY HAND.
 // Source: BerriAI/litellm model_prices_and_context_window.json
@@ -121,9 +60,9 @@ async function main() {
 `;
 
   const js = `${header}
-export const LITELLM_CLAUDE_PRICING = ${renderRecord('claude', claudeSorted)};
+export const LITELLM_CLAUDE_PRICING = ${renderRecord(claudeSorted)};
 
-export const LITELLM_OPENAI_PRICING = ${renderRecord('openai', openaiSorted)};
+export const LITELLM_OPENAI_PRICING = ${renderRecord(openaiSorted)};
 `;
 
   const dts = `${header}
