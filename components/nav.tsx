@@ -18,6 +18,7 @@ const ITEMS = [
   { href: '/sessions', tk: 'nav.sessions' },
   { href: '/projects', tk: 'nav.projects' },
   { href: '/models', tk: 'nav.models' },
+  { href: '/tools', tk: 'nav.tools' },
   { href: '/settings', tk: 'nav.settings' },
 ];
 
