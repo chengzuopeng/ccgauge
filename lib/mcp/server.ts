@@ -4,6 +4,7 @@ import { registerUsageTools } from './tools/usage';
 import { registerActivityTools } from './tools/activity';
 import { registerProvidersResource } from './resources/providers';
 import { getMcpIndexerReady } from './context';
+import { ensurePricingLoaded } from '@/lib/pricing/store';
 
 const SERVER_NAME = 'ccgauge';
 
@@ -33,6 +34,7 @@ export function createServer(): McpServer {
 }
 
 export async function runStdioServer(): Promise<void> {
+  ensurePricingLoaded();
 
   const log = (...args: unknown[]) => {
     process.stderr.write(`[ccgauge-mcp] ${args.map(String).join(' ')}\n`);

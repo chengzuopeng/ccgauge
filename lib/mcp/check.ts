@@ -1,10 +1,12 @@
 import { getMcpIndexerReady } from './context';
+import { ensurePricingLoaded } from '@/lib/pricing/store';
 
 declare const __SERVER_VERSION__: string;
 const SERVER_VERSION =
   typeof __SERVER_VERSION__ !== 'undefined' ? __SERVER_VERSION__ : 'dev';
 
 export async function printCheck(): Promise<number> {
+  ensurePricingLoaded();
   const out = (s: string) => process.stdout.write(`${s}\n`);
   out(`ccgauge MCP server v${SERVER_VERSION}`);
   out(`bundle:   OK`);

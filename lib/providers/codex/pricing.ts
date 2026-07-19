@@ -4,11 +4,18 @@ import type { PricingResolution } from '../types';
 import { LITELLM_OPENAI_PRICING } from '../../pricing/litellm-pricing.generated.js';
 
 /**
- * Hand-maintained OpenAI/Codex pricing for models LiteLLM's table does NOT
- * carry. LiteLLM currently covers every model ccgauge tracks, so this is empty;
- * it's the documented home for any future bleeding-edge model LiteLLM hasn't
- * indexed yet. LiteLLM wins for shared keys (snapshot spread LAST). Refresh the
- * snapshot with `pnpm update-pricing`.
+ * Static OpenAI/Codex pricing base = hand-maintained gap models + the committed
+ * LiteLLM snapshot. This is the OFFLINE floor: always present, no network.
+ *
+ * At runtime, `lib/pricing/store.ts` may publish a fresher LiteLLM overlay into a
+ * `globalThis` slot; `resolvePricing` reads that slot and falls back to this base.
+ * The provider deliberately does NOT import the store — it reads the slot via a
+ * loose `globalThis` contract — so this module stays resolvable under raw
+ * `node --experimental-strip-types` test runs (which can't resolve aliased /
+ * extensionless value imports) and so there's no import cycle with the store.
+ *
+ * Hand layer covers models LiteLLM does NOT carry (currently none). LiteLLM wins
+ * for shared keys (snapshot spread LAST). Refresh with `pnpm update-pricing`.
  */
 const HAND_OPENAI: Record<string, Pricing> = {};
 
@@ -22,45 +29,62 @@ export const FALLBACK_FAMILY_OPENAI: Record<string, Pricing> = {
   o: BUILTIN_PRICING_OPENAI['o3'],
 };
 
+interface PricingSlotState {
+  openai?: Record<string, Pricing>;
+  openaiFallback?: Record<string, Pricing>;
+}
+
+function slotState(): PricingSlotState | undefined {
+  return (
+    globalThis as unknown as { __ccgaugePricing?: { state?: PricingSlotState } }
+  ).__ccgaugePricing?.state;
+}
+
+function activeOpenAI(): Record<string, Pricing> {
+  return slotState()?.openai ?? BUILTIN_PRICING_OPENAI;
+}
+
+function activeOpenAIFallback(): Record<string, Pricing> {
+  return slotState()?.openaiFallback ?? FALLBACK_FAMILY_OPENAI;
+}
+
 const dateSuffix = /-\d{8}$/;
 const prefixRe = /^(openai)\//;
 
 export function resolveCodexPricing(model: string): PricingResolution {
   if (!model) return { pricing: null, matchType: 'none', matchedKey: null };
-  if (BUILTIN_PRICING_OPENAI[model]) {
-    return {
-      pricing: BUILTIN_PRICING_OPENAI[model],
-      matchType: 'exact',
-      matchedKey: model,
-    };
+  const pricing = activeOpenAI();
+  if (pricing[model]) {
+    return { pricing: pricing[model], matchType: 'exact', matchedKey: model };
   }
   const stripped = model.replace(dateSuffix, '');
-  if (BUILTIN_PRICING_OPENAI[stripped]) {
+  if (pricing[stripped]) {
     return {
-      pricing: BUILTIN_PRICING_OPENAI[stripped],
+      pricing: pricing[stripped],
       matchType: 'date-stripped',
       matchedKey: stripped,
     };
   }
   const noPrefix = stripped.replace(prefixRe, '');
-  if (BUILTIN_PRICING_OPENAI[noPrefix]) {
+  if (pricing[noPrefix]) {
     return {
-      pricing: BUILTIN_PRICING_OPENAI[noPrefix],
+      pricing: pricing[noPrefix],
       matchType: 'prefix-stripped',
       matchedKey: noPrefix,
     };
   }
+  const fallback = activeOpenAIFallback();
   const lower = model.toLowerCase();
   if (lower.startsWith('gpt-') || lower === 'gpt') {
     return {
-      pricing: FALLBACK_FAMILY_OPENAI.gpt,
+      pricing: fallback.gpt ?? null,
       matchType: 'family-fallback',
       matchedKey: 'gpt-(latest)',
     };
   }
   if (/^o\d/.test(lower)) {
     return {
-      pricing: FALLBACK_FAMILY_OPENAI.o,
+      pricing: fallback.o ?? null,
       matchType: 'family-fallback',
       matchedKey: 'o-(latest)',
     };

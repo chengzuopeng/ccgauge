@@ -12,6 +12,7 @@ import {
 } from '@/lib/aggregator';
 import { isUsageRange, rangeToDates } from '@/lib/range';
 import { ALL_PROVIDER_IDS, getProvider, isProviderId } from '@/lib/providers';
+import { ensurePricingLoaded } from '@/lib/pricing/store';
 import type { ProviderId, AssistantRecord, ScanResult } from '@/lib/types';
 import { summarizeTurns } from '@/lib/turns';
 import { formatTokensCompact, formatUSD, formatPct } from '@/lib/utils';
@@ -65,6 +66,7 @@ export const DEFAULT_REPORT: ReportOptions = {
 };
 
 export async function runReport(opts: ReportOptions): Promise<string> {
+  ensurePricingLoaded();
   const filled = normalizeReportOptions(opts);
   const scan = await getCachedScan();
   const sources: ProviderId[] =

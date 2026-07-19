@@ -3,6 +3,12 @@ import { claudeAdapter } from './claude';
 import { codexAdapter } from './codex';
 import type { ProviderAdapter, ProviderId } from './types';
 
+// NOTE: this module is reachable from client components (provider display metadata
+// etc.), so it must NOT import lib/pricing/store (it pulls in node:fs and would
+// poison the client bundle). The providers read the pricing overlay via a loose
+// globalThis slot instead; server-only entry points call `ensurePricingLoaded()`
+// to populate it (instrumentation.ts, MCP entry, CLI entry).
+
 export type { ProviderAdapter, ProviderId, ProviderCapabilities, PricingResolution, PricingMatchType } from './types';
 
 export const PROVIDERS: Record<ProviderId, ProviderAdapter> = {
