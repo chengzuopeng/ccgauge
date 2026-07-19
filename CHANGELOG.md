@@ -5,13 +5,31 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.0] — 2026-07-20
 
-Live pricing: ccgauge can now refresh its model-price table from LiteLLM at
-runtime instead of only shipping a build-time snapshot.
+Two headline features. **Tools & skills**: a new page that answers "which
+tool or skill is eating my tokens?"
+([#1](https://github.com/chengzuopeng/ccgauge/issues/1)). **Live pricing**:
+ccgauge can now refresh its model-price table from LiteLLM at runtime instead
+of only shipping a build-time snapshot.
 
 ### Added
 
+- **Tools & skills page** (`/tools`, under the new Analytics nav dropdown) —
+  ranks every tool, skill, and MCP server by **estimated context footprint**:
+  the size of each tool_result / skill-body payload is attributed to the
+  tool that produced it and converted to tokens at ~4 chars/token. Three
+  breakdown dimensions (by skill / by tool / by MCP server), top-consumer
+  emphasis, and expandable per-row stats (invocations, sessions, avg per
+  call, largest single payload). The numbers are estimates — Anthropic
+  doesn't bill per tool, and the page says so — but the *ranking* is what
+  finds the skill that's quietly costing 80% of your context. Claude source
+  only for now; Codex rollout files don't carry the needed shape.
+- **Skill-body measurement.** A skill invocation's real payload is the
+  synthetic "Base directory for this skill:" message, not the tiny
+  "Launching skill: X" tool_result ack. The parser now measures that body
+  and credits it to the skill by name (claude parserVersion bumped to v6;
+  the persisted index reparses automatically on first load).
 - **Runtime pricing refresh.** On the first page load the web server fetches
   LiteLLM's price table in the background, validates it, and caches it to
   `~/.ccgauge/cache/litellm-pricing.json` (24 h TTL, atomic write). The cached
@@ -29,6 +47,11 @@ runtime instead of only shipping a build-time snapshot.
 
 ### Changed
 
+- **Nav: analytics pages folded into a dropdown.** Sessions / Projects /
+  Models / Tools now live under one "Analytics" item with a hover dropdown
+  (opens on focus too, so touch works). The sliding underline parks on
+  Analytics whenever a sub-route is active, and the active sub-page is
+  highlighted inside the menu.
 - Provider cost resolution now reads a runtime pricing overlay (built-in
   snapshot → on-disk LiteLLM cache) shared by the dashboard, CLI, and MCP server,
   so a refresh flows into cost math everywhere, not just the settings table.
@@ -36,6 +59,16 @@ runtime instead of only shipping a build-time snapshot.
   only optional outbound request is the LiteLLM price fetch (off with
   `CCGAUGE_OFFLINE=1`); your usage data still never leaves the machine.
 - Refreshed the committed LiteLLM snapshot (adds `gpt-5.6*`, `claude-sonnet-5`).
+
+### Fixed
+
+- **Dedup no longer drops tool_use ids from streamed turns.** A streamed
+  assistant turn is split across several JSONL records sharing
+  `messageId::requestId` (thinking / text / tool_use chunks); dedup kept only
+  the earliest record — often the thinking-only chunk — silently discarding
+  96% of tool_use ids. Harmless before, but it would have left the new
+  by-tool attribution ~75% "(unknown)". Dedup now unions tool_use refs
+  across the chunk group (usage/cost math unchanged).
 
 ## [1.2.3] — 2026-07-08
 
