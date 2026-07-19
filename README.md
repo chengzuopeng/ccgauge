@@ -21,7 +21,7 @@ npx ccgauge
 
 ccgauge reads the JSONL session files Claude Code and Codex CLI already store on your disk, computes day / project / model / session breakdowns plus **dollar-equivalent cost**, and opens a unified browser dashboard. Switch providers with one click. Ask your LLM about your usage via the built-in MCP server. Or skip the browser entirely and run `ccgauge report -d` for a rich terminal dashboard.
 
-**No login. No telemetry. No outbound network calls.**
+**No login. No telemetry. Your usage data never leaves your machine** — the only outbound request fetches public model prices from LiteLLM, and `CCGAUGE_OFFLINE=1` turns even that off.
 
 ![Overview — English / Dark](https://raw.githubusercontent.com/chengzuopeng/ccgauge/main/docs/screenshots/overview-en-dark.png)
 

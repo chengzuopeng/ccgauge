@@ -33,7 +33,7 @@ ccgauge 读取 Claude Code 和 Codex CLI 本地已经写下的 JSONL 会话文�
 - 💰 **缓存节省单独成卡。** 直接看本周 Anthropic prompt caching 帮你省了多少美元 —— 不是脚注，是 KPI 大卡。
 - ⏱️ **5 小时窗口实时进度。** 倒计时、进度条、预计总花费 —— 在被限速前就知道窗口什么时候重置。
 - 🤖 **MCP 原生支持。** 连上 Claude Desktop / Cursor / Cline，直接问*「我昨天都做了啥，按项目分一下？」* —— 真实数字、不截图、不复制粘贴。
-- 🔒 **100% 本地、隐私优先。** 只读你已有的 JSONL 文件，零外网调用，MIT 开源，对话内容全程不出本机。
+- 🔒 **本地优先、隐私第一。** 只读你已有的 JSONL 文件，对话内容全程不出本机，MIT 开源。唯一的外网请求是从 LiteLLM 拉取公开的模型价格（设 `CCGAUGE_OFFLINE=1` 可关闭）。
 - 🪜 **Worktree 感知。** 同一个 repo 的所有 worktree 自动合并到同一个项目行 —— 跟你的思维模型一致。
 
 ## v1.1.0 新特性
@@ -72,7 +72,7 @@ ccgauge 读取 Claude Code 和 Codex CLI 本地已经写下的 JSONL 会话文�
 - 内置价格表：12 个 Claude 模型 + gpt-5 系列 + o 系列；未知模型自动回退到同 family 最新单价。
 
 ### 隐私优先
-- 100% 本地：只读 JSONL 文件，零外网调用。
+- 本地优先：只读 JSONL 文件；唯一的外网请求是从 LiteLLM 拉取公开价格，设 `CCGAUGE_OFFLINE=1` 可关闭。
 - 开源，MIT。
 - 后台常驻模式，配套 `start / stop / restart / status / open / logs` 完整生命周期。
 

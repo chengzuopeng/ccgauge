@@ -5,6 +5,38 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Live pricing: ccgauge can now refresh its model-price table from LiteLLM at
+runtime instead of only shipping a build-time snapshot.
+
+### Added
+
+- **Runtime pricing refresh.** On the first page load the web server fetches
+  LiteLLM's price table in the background, validates it, and caches it to
+  `~/.ccgauge/cache/litellm-pricing.json` (24 h TTL, atomic write). The cached
+  overlay layers on top of the committed snapshot, so a newly-released model
+  (e.g. `gpt-5.6`, `claude-sonnet-5`) is priced correctly without waiting for a
+  ccgauge release. The fetch is single-flighted, 5 s-timeout-bounded, and never
+  blocks a request; a bad/short upstream table is rejected and the built-in
+  snapshot stays in place.
+- **"Refresh prices" button** on the Settings pricing panel, plus a source line
+  showing whether prices are the built-in snapshot or a cached LiteLLM copy and
+  when it was fetched.
+- **`CCGAUGE_OFFLINE=1`** (or `CCGAUGE_PRICING_OFFLINE=1`) disables all pricing
+  network access; the CLI and MCP server never fetch regardless — they only read
+  the on-disk overlay.
+
+### Changed
+
+- Provider cost resolution now reads a runtime pricing overlay (built-in
+  snapshot → on-disk LiteLLM cache) shared by the dashboard, CLI, and MCP server,
+  so a refresh flows into cost math everywhere, not just the settings table.
+- Privacy copy updated: the README and Settings "About" note now state that the
+  only optional outbound request is the LiteLLM price fetch (off with
+  `CCGAUGE_OFFLINE=1`); your usage data still never leaves the machine.
+- Refreshed the committed LiteLLM snapshot (adds `gpt-5.6*`, `claude-sonnet-5`).
+
 ## [1.2.3] — 2026-07-08
 
 Two fixes to the `/usage` overview area.
