@@ -221,15 +221,12 @@ export default async function SettingsPage() {
 function isClaudeModelShown(model: string): boolean {
   if (model.startsWith('claude-fable-')) return true;
   if (model === 'claude-haiku-4-5') return true;
-  if (model === 'claude-sonnet-4-6') return true;
-  if (model.startsWith('claude-opus-')) {
-    const m = model.match(/^claude-opus-(\d+)(?:-(\d+))?/);
-    if (!m) return false;
-    const major = Number(m[1]);
-    const minor = m[2] ? Number(m[2]) : 0;
-    return major > 4 || (major === 4 && minor >= 6);
-  }
-  return false;
+  // 8 位日期后缀不剥掉会被正则捕获成 minor（如 sonnet-4-20250514 → minor=20250514 ≥ 6 误放行）
+  const m = model.replace(/-\d{8}$/, '').match(/^claude-(sonnet|opus)-(\d+)(?:-(\d+))?$/);
+  if (!m) return false;
+  const major = Number(m[2]);
+  const minor = m[3] ? Number(m[3]) : 0;
+  return major > 4 || (major === 4 && minor >= 6);
 }
 
 function isCodexModelShown(model: string): boolean {
