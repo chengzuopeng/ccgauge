@@ -1,11 +1,11 @@
 import { getCachedScan, getScannedDirsBySource, getIndexerStatus } from '@/lib/data-loader/scan';
-import { BUILTIN_PRICING } from '@/lib/pricing/builtin';
-import { BUILTIN_PRICING_OPENAI } from '@/lib/providers/codex/pricing';
+import { getClaudePricing, getOpenAIPricing, getPricingMeta } from '@/lib/pricing/store';
 import { listProviders, detectAvailableProviders } from '@/lib/providers';
 import type { ProviderId } from '@/lib/providers';
 import { PageShell, Section } from '@/components/section';
 import { ScanRefresh } from '@/components/scan-refresh';
 import { PricingTable, type PricingRow } from '@/components/pricing-table';
+import { PricingRefresh } from '@/components/pricing-refresh';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { ThemeSwitcher } from '@/components/theme-switcher';
 import { getServerT, getServerLocale } from '@/lib/i18n/server';
@@ -25,8 +25,12 @@ export default async function SettingsPage() {
   const providers = listProviders();
   const indexerStatus = getIndexerStatus();
 
+  const pricingMeta = getPricingMeta();
+  const pricingFetchedLabel = pricingMeta.fetchedAt
+    ? new Date(pricingMeta.fetchedAt).toLocaleString()
+    : null;
   const pricingTablesBySource: Record<ProviderId, PricingRow[]> = {
-    claude: Object.entries(BUILTIN_PRICING)
+    claude: Object.entries(getClaudePricing())
       .filter(([model]) => isClaudeModelShown(model))
       .map(([model, p]) => ({
         model,
@@ -36,7 +40,7 @@ export default async function SettingsPage() {
         cacheCreation1h: p.cacheCreation1h,
         cacheRead: p.cacheRead,
       })),
-    codex: Object.entries(BUILTIN_PRICING_OPENAI)
+    codex: Object.entries(getOpenAIPricing())
       .filter(([model]) => isCodexModelShown(model))
       .map(([model, p]) => ({
         model,
@@ -47,6 +51,9 @@ export default async function SettingsPage() {
         cacheRead: p.cacheRead,
       })),
   };
+  // Anchor the shared refresh control to the first pricing table that actually
+  // renders, so it never vanishes if a provider has no shown rows.
+  const firstPricedId = providers.find((p) => pricingTablesBySource[p.id]?.length)?.id;
 
   return (
     <PageShell title={t('settings.title')} desc={t('settings.subtitle')}>
@@ -197,6 +204,7 @@ export default async function SettingsPage() {
             key={p.id}
             title={`${p.displayName[locale]} · ${t('settings.pricing.title')}`}
             desc={p.costFootnoteKey ? t(p.costFootnoteKey) : t('settings.pricing.desc')}
+            right={p.id === firstPricedId ? <PricingRefresh meta={pricingMeta} fetchedLabel={pricingFetchedLabel} /> : undefined}
           >
             <PricingTable rows={rows} />
           </Section>

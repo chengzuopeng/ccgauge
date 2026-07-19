@@ -8,6 +8,7 @@ import { getServerTheme } from '@/lib/theme/server';
 import { tFn } from '@/lib/i18n/dict';
 import { detectAvailableProviders, listProviders } from '@/lib/providers';
 import { resolveSource } from '@/lib/source';
+import { PricingWarmup } from '@/components/pricing-warmup';
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getServerLocale();
@@ -57,6 +58,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             providerInfos={providerInfos}
           />
           <main>{children}</main>
+          <PricingWarmup />
         </Providers>
       </body>
     </html>
