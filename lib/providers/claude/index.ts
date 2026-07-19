@@ -85,7 +85,7 @@ export const claudeAdapter: ProviderAdapter = {
   color: { fg: '#b45309', bg: '#fef3c7' },
   logoSrc: '/claude-logo.webp',
 
-  parserVersion: 'claude-v5-task-notification-synthetic',
+  parserVersion: 'claude-v6-tool-result-sizes',
   capabilities: {
     hasCacheCreation: true,
     hasReasoningTokens: false,

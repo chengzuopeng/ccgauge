@@ -1,4 +1,4 @@
 {
-  "claude": "claude-v5-task-notification-synthetic",
+  "claude": "claude-v6-tool-result-sizes",
   "codex": "codex-v6-output-excludes-readded-reasoning"
 }

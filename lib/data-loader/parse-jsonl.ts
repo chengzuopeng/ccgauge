@@ -1,12 +1,61 @@
 import { createReadStream } from 'node:fs';
 import readline from 'node:readline';
-import type { AssistantRecord, RawRecord, UserRecord } from '../types';
+import type { AssistantRecord, RawRecord, ToolUseRef, UserRecord } from '../types';
 
 const TEXT_PREVIEW_MAX = 200;
 
 interface CacheCreationBlock {
   ephemeral_5m_input_tokens?: number;
   ephemeral_1h_input_tokens?: number;
+}
+
+function safeStringLen(v: unknown): number {
+  try {
+    return JSON.stringify(v)?.length ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+// Size (chars) of a tool_result / message payload as it lands in context.
+// Strings measure directly; block arrays sum text-block lengths and fall back
+// to serialized length for non-text blocks (images, tool_reference).
+function contentChars(content: unknown): number {
+  if (typeof content === 'string') return content.length;
+  if (Array.isArray(content)) {
+    let n = 0;
+    for (const b of content) {
+      if (b && typeof b === 'object') {
+        const t = (b as Record<string, unknown>).text;
+        n += typeof t === 'string' ? t.length : safeStringLen(b);
+      } else if (typeof b === 'string') {
+        n += b.length;
+      }
+    }
+    return n;
+  }
+  return 0;
+}
+
+function extractUserText(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    for (const c of content as Array<Record<string, unknown>>) {
+      if (c.type === 'text' && typeof c.text === 'string') return c.text;
+    }
+  }
+  return '';
+}
+
+// A skill invocation loads its body as a synthetic user message whose first
+// line is `Base directory for this skill: <path>`. The path basename is the
+// skill slug — self-contained, so no join back to the Skill tool_use needed.
+const SKILL_BASE_RE = /^Base directory for this skill:\s*(\S+)/;
+function skillNameFromText(text: string): string | null {
+  const m = SKILL_BASE_RE.exec(text.trimStart());
+  if (!m) return null;
+  const base = m[1].split(/[\\/]/).filter(Boolean).pop();
+  return base || null;
 }
 
 export async function parseJsonlFile(file: string): Promise<{
@@ -58,11 +107,13 @@ function parseAssistant(raw: RawRecord, file: string): AssistantRecord | null {
 
   const content = Array.isArray(msg.content) ? (msg.content as Array<Record<string, unknown>>) : [];
   const toolNames: string[] = [];
+  const toolUses: ToolUseRef[] = [];
   let hasThinking = false;
   let textPreview = '';
   for (const c of content) {
     if (c.type === 'tool_use' && typeof c.name === 'string') {
       toolNames.push(c.name);
+      if (typeof c.id === 'string') toolUses.push({ id: c.id, name: c.name });
     } else if (c.type === 'thinking') {
       hasThinking = true;
     } else if (c.type === 'text' && typeof c.text === 'string' && !textPreview) {
@@ -92,6 +143,7 @@ function parseAssistant(raw: RawRecord, file: string): AssistantRecord | null {
       cache_creation_1h: Number(cacheCreation?.ephemeral_1h_input_tokens) || 0,
     },
     toolNames,
+    toolUses: toolUses.length ? toolUses : undefined,
     hasThinking,
     textPreview,
     filePath: file,
@@ -102,20 +154,23 @@ function parseAssistant(raw: RawRecord, file: string): AssistantRecord | null {
 function parseUser(raw: RawRecord, file: string): UserRecord | null {
   if (!raw.uuid) return null;
   const msg = raw.message as Record<string, unknown> | undefined;
-  let textPreview = '';
-  if (msg) {
-    const content = msg.content;
-    if (typeof content === 'string') {
-      textPreview = content.slice(0, TEXT_PREVIEW_MAX);
-    } else if (Array.isArray(content)) {
-      for (const c of content as Array<Record<string, unknown>>) {
-        if (c.type === 'text' && typeof c.text === 'string') {
-          textPreview = (c.text as string).slice(0, TEXT_PREVIEW_MAX);
-          break;
-        }
+  const content = msg?.content;
+  const fullText = extractUserText(content);
+  const textPreview = fullText.slice(0, TEXT_PREVIEW_MAX);
+
+  let toolResults: Array<{ toolUseId: string; chars: number }> | undefined;
+  if (Array.isArray(content)) {
+    for (const c of content as Array<Record<string, unknown>>) {
+      if (c.type === 'tool_result' && typeof c.tool_use_id === 'string') {
+        if (!toolResults) toolResults = [];
+        toolResults.push({ toolUseId: c.tool_use_id, chars: contentChars(c.content) });
       }
     }
   }
+
+  let skillInject: { skill: string; chars: number } | undefined;
+  const skill = skillNameFromText(fullText);
+  if (skill) skillInject = { skill, chars: contentChars(content) };
 
   const isSidechain = raw.isSidechain === true;
   const isSynthetic = isSidechain || (!!textPreview && isSyntheticUserText(textPreview));
@@ -129,6 +184,8 @@ function parseUser(raw: RawRecord, file: string): UserRecord | null {
     sessionId: raw.sessionId ?? '',
     cwd: raw.cwd ?? '',
     textPreview,
+    toolResults,
+    skillInject,
     isSynthetic,
     isSidechain: isSidechain ? true : undefined,
     filePath: file,
