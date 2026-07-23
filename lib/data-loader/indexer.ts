@@ -56,6 +56,44 @@ const PERSIST_DEBOUNCE_MS = 2_000;
 const SCAN_DEPTH_LIMIT = 8;
 const MAX_ERROR_HISTORY = 20;
 
+// Cap how many files are parsed at once. A `Promise.all` over the whole file
+// list looks harmless at a few hundred transcripts, but a heavy user can have
+// 20k+ of them — at which point every one of those tasks holds an open read
+// stream (64 KB buffer each) and its fully parsed records at the same time, so
+// the cold index degrades into GC thrash and takes minutes instead of seconds.
+// It also builds an async chain thousands of nodes deep, which overflows the
+// stack inside Next.js dev's recursive async-debug walker (`visitAsyncNode`)
+// and surfaces as an unrelated-looking "Maximum call stack size exceeded".
+// Parsing is IO-bound, so a small multiple of the core count saturates the disk
+// without any of that.
+const SCAN_CONCURRENCY = Math.max(8, Math.min(32, (os.cpus()?.length ?? 4) * 4));
+
+// Run `worker` over `items` with at most `limit` in flight. Each lane pulls the
+// next index and awaits sequentially, so the async chain stays shallow no
+// matter how long `items` is.
+async function forEachLimited<T>(
+  items: T[],
+  limit: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
+  if (items.length === 0) return;
+  let cursor = 0;
+  const lanes: Array<Promise<void>> = [];
+  for (let i = 0; i < Math.min(limit, items.length); i += 1) {
+    lanes.push(
+      (async () => {
+        for (;;) {
+          const idx = cursor;
+          cursor += 1;
+          if (idx >= items.length) return;
+          await worker(items[idx]);
+        }
+      })(),
+    );
+  }
+  await Promise.all(lanes);
+}
+
 class FileIndexer {
 
   private readonly cacheName: string;
@@ -165,8 +203,10 @@ class FileIndexer {
 
     const seenPaths = new Set<string>(fileTasks.map((t) => t.file));
 
-    await Promise.all(
-      fileTasks.map(async ({ file, provider }) => {
+    await forEachLimited(
+      fileTasks,
+      SCAN_CONCURRENCY,
+      async ({ file, provider }) => {
         try {
           const stat = await fs.stat(file);
           const persistedEntry = persistedMap.get(file);
@@ -202,7 +242,7 @@ class FileIndexer {
         } catch (err) {
           this.recordError(`parse ${file}: ${(err as Error).message}`);
         }
-      }),
+      },
     );
 
     for (const tracked of Array.from(this.files.keys())) {
@@ -269,8 +309,10 @@ class FileIndexer {
         for (const f of files) fileTasks.push({ file: f, provider });
       }
       const seenPaths = new Set<string>(fileTasks.map((t) => t.file));
-      await Promise.all(
-        fileTasks.map(async ({ file, provider }) => {
+      await forEachLimited(
+        fileTasks,
+        SCAN_CONCURRENCY,
+        async ({ file, provider }) => {
           try {
             const stat = await fs.stat(file);
             const existing = this.files.get(file);
@@ -291,7 +333,7 @@ class FileIndexer {
           } catch (err) {
             this.recordError(`poll-parse ${file}: ${(err as Error).message}`);
           }
-        }),
+        },
       );
       for (const tracked of Array.from(this.files.keys())) {
         if (!seenPaths.has(tracked)) {
@@ -400,8 +442,12 @@ class FileIndexer {
     }
 
     for (const entry of this.files.values()) {
-      assistant.push(...entry.assistantRecords);
-      user.push(...entry.userRecords);
+      // Appended one by one rather than with `push(...arr)`: the spread passes
+      // every record as a separate argument, so a single long transcript is
+      // enough to blow the argument limit and throw "Maximum call stack size
+      // exceeded" here.
+      for (const rec of entry.assistantRecords) assistant.push(rec);
+      for (const rec of entry.userRecords) user.push(rec);
       for (const [uuid, parent] of entry.parentLinks) parentMap[uuid] = parent;
       recordsParsed += entry.assistantRecords.length + entry.userRecords.length;
       bySource[entry.source].filesScanned += 1;
@@ -409,12 +455,12 @@ class FileIndexer {
         entry.assistantRecords.length + entry.userRecords.length;
     }
 
-    const dedupedAssistants = dedupAssistantRecords(assistant).sort((a, b) =>
-      a.timestamp.localeCompare(b.timestamp),
-    );
-    const dedupedUsers = dedupUserRecords(user).sort((a, b) =>
-      a.timestamp.localeCompare(b.timestamp),
-    );
+    // Plain `<` / `>` instead of `localeCompare`: timestamps are ISO-8601, so
+    // byte order already is chronological order, and localeCompare's ICU
+    // collation costs orders of magnitude more per comparison — measurable
+    // across millions of records. Matches how link-sidechain.ts sorts.
+    const dedupedAssistants = dedupAssistantRecords(assistant).sort(byTimestamp);
+    const dedupedUsers = dedupUserRecords(user).sort(byTimestamp);
 
     linkSidechainParents({
       assistantRecords: dedupedAssistants,
@@ -615,6 +661,10 @@ async function listJsonlFiles(rootDir: string, provider: ProviderAdapter): Promi
   }
   await walk(rootDir, 0);
   return out;
+}
+
+function byTimestamp(a: { timestamp: string }, b: { timestamp: string }): number {
+  return a.timestamp < b.timestamp ? -1 : a.timestamp > b.timestamp ? 1 : 0;
 }
 
 function dedupUserRecords(records: UserRecord[]): UserRecord[] {
