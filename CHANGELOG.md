@@ -5,6 +5,33 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] — 2026-07-24
+
+Performance release: large histories index dramatically faster, and `next dev`
+no longer crashes on them. All three fixes are in `lib/data-loader/indexer.ts`
+and change no behavior — same files parsed, same records, same order.
+Contributed by [@kayorid](https://github.com/kayorid) in
+[#2](https://github.com/chengzuopeng/ccgauge/pull/2) — thanks!
+
+### Fixed
+
+- **Bounded scan concurrency.** The cold index ran `Promise.all` over the
+  entire transcript list; at ~20k files that means as many concurrent read
+  streams plus every parsed record alive at once (GC thrash, minutes-long
+  scans), and the thousands-deep async chain overflowed the stack inside
+  Next.js dev's async-debug walker — surfacing as a baffling, far-from-cause
+  `Maximum call stack size exceeded`. Parsing now runs through a fixed worker
+  pool (`max(8, min(32, cpus × 4))` lanes). Measured by the contributor at
+  ~19k transcripts: dev cold start from >600 s (or a crash) to ~51 s.
+- **No more spread-append in snapshot assembly.** `push(...records)` passes
+  every record as a separate argument, so one long transcript could exceed the
+  engine's argument limit — a second, independent source of the same stack
+  overflow. Replaced with plain loops.
+- **Byte-order timestamp sort.** Snapshot sorting used `localeCompare` on
+  ISO-8601 timestamps; ICU collation is orders of magnitude slower than the
+  byte comparison that already yields chronological order. Now matches the
+  comparator `link-sidechain.ts` always used.
+
 ## [1.3.0] — 2026-07-20
 
 Two headline features. **Tools & skills**: a new page that answers "which
