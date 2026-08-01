@@ -1,4 +1,4 @@
 {
   "claude": "claude-v6-tool-result-sizes",
-  "codex": "codex-v6-output-excludes-readded-reasoning"
+  "codex": "codex-v7-skip-subagent-fork-mirrors"
 }

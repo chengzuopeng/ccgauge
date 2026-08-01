@@ -40,6 +40,34 @@ function asNumber(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+const EMPTY_PARSE: ParsedFile = Object.freeze({
+  assistant: [],
+  user: [],
+  parentLinks: [],
+}) as ParsedFile;
+
+/**
+ * A `thread_spawn` subagent rollout is a MIRROR, not a new ledger: it replays the
+ * parent's history and its `total_token_usage` samples the SAME shared lineage
+ * counter the parent keeps logging, so counting it double-bills. Measured on real
+ * data: 3 concurrent subagents reported 8.54M of "own" delta while the shared
+ * counter advanced 3.13M, and a full day inflated 39.8M → 265.7M (6.7x).
+ *
+ * `forked_from_id` is the discriminator. Guardian / auto-review subagents
+ * (`source.subagent.other`) never set it and DO own an independent counter
+ * starting near 0, so they stay. Older Codex `thread_spawn` rollouts predate the
+ * field and also stay — they had their own counter too.
+ *
+ * KNOWN GAP: user-initiated forks (`thread_source: 'user'` + `forked_from_id`)
+ * replay the source's history too, then DIVERGE into genuinely new spend, so they
+ * can't be dropped wholesale. Their replayed prefix stays double-counted; cutting
+ * it needs cross-file lineage state this per-file parser doesn't have.
+ * See scripts/test-codex-parser.mjs for the derivation.
+ */
+function isSubagentForkMirror(payload: Record<string, unknown>): boolean {
+  return asString(payload.thread_source) === 'subagent' && !!asString(payload.forked_from_id);
+}
+
 function extractMessageText(payload: Record<string, unknown>): string {
   const msg = payload.message;
   if (typeof msg === 'string') return msg;
@@ -65,6 +93,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
   const parentLinks: Array<[string, string | null]> = [];
 
   let sessionId = '';
+  let sessionMetaSeen = false;
   let cliVersion: string | undefined;
   let defaultCwd = '';
   let userIdx = 0;
@@ -100,6 +129,17 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
     if (rawTs) lastValidTs = rawTs;
 
     if (evt.type === 'session_meta') {
+      // Replayed history re-emits the SOURCE thread's session_meta mid-file.
+      // Rebinding identity there stamps our tail with the parent's session id.
+      if (sessionMetaSeen) continue;
+      sessionMetaSeen = true;
+
+      if (isSubagentForkMirror(payload)) {
+        rl.close();
+        stream.destroy();
+        return EMPTY_PARSE;
+      }
+
       sessionId = asString(payload.id);
       defaultCwd = asString(payload.cwd);
       cliVersion = asString(payload.cli_version) || undefined;
@@ -156,6 +196,15 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
 
       if (sub === 'agent_reasoning') {
         turn.hasThinking = true;
+        continue;
+      }
+
+      // Replayed history carries no `turn_context`, so without this every
+      // pre-fork record fell back to the 'gpt-unknown' placeholder.
+      if (sub === 'thread_settings_applied') {
+        const settings = payload.thread_settings as Record<string, unknown> | null | undefined;
+        const m = settings ? asString(settings.model) : '';
+        if (m) turn.model = m;
         continue;
       }
 
