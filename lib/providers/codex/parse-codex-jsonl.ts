@@ -94,6 +94,10 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
 
   let sessionId = '';
   let sessionMetaSeen = false;
+  // Set only for KEPT sub-agent rollouts (guardian / auto-review / legacy
+  // spawns). Folds their turns into the conversation turn that spawned them
+  // instead of listing each review pass as its own top-level row.
+  let subagentLineageRoot = '';
   let cliVersion: string | undefined;
   let defaultCwd = '';
   let userIdx = 0;
@@ -141,6 +145,10 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
       }
 
       sessionId = asString(payload.id);
+      if (asString(payload.thread_source) === 'subagent') {
+        subagentLineageRoot =
+          asString(payload.session_id) || asString(payload.parent_thread_id) || '';
+      }
       defaultCwd = asString(payload.cwd);
       cliVersion = asString(payload.cli_version) || undefined;
 
@@ -180,6 +188,11 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
           cwd: turn.cwd || defaultCwd,
           textPreview: text.slice(0, TEXT_PREVIEW_MAX),
           filePath: file,
+          // Mirrors Claude's parse-jsonl: a sidechain user is synthetic, so it
+          // never roots a turn of its own and the walk continues to the spawner.
+          ...(subagentLineageRoot
+            ? { isSidechain: true, isSynthetic: true, parentSessionId: subagentLineageRoot }
+            : {}),
         });
         parentLinks.push([uuid, null]);
         turn.userUuid = uuid;
@@ -330,6 +343,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
           textPreview: turn.pendingTextPreview,
           filePath: file,
           effort: turn.effort,
+          ...(subagentLineageRoot ? { isSidechain: true } : {}),
         });
         parentLinks.push([uuid, turn.userUuid]);
 

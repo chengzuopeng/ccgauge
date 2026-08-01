@@ -259,4 +259,107 @@ const PROJ = `/Users/x/.claude/projects/-proj/${SESSION}`;
   console.log('✓ N>1 fan-out: 3 sub-agents fold into 1 turn; badge count = 2 distinct workflow files');
 }
 
+// ── Codex sub-agents: parent stated on the record, N turns per file ────
+// Codex rollouts live in a flat `~/.codex/sessions/YYYY/MM/DD/` tree, so the
+// path carries no parent — the parser stamps `parentSessionId` from
+// session_meta instead. And unlike Claude, ONE Codex sub-agent thread holds
+// several independent `user_message` turns (a guardian re-reviews after each
+// approval), each with a null parent, so every one of them must be anchored —
+// anchoring only the first left the other 5 as top-level rows.
+{
+  const rootSession = '019fbb48-bc45-7640-999c-874bb086ae31';
+  const codexDir = '/Users/x/.codex/sessions/2026/08/01';
+  const mainFile = `${codexDir}/rollout-2026-08-01T11-05-34-${rootSession}.jsonl`;
+  const guardFile = `${codexDir}/rollout-2026-08-01T14-08-07-019fbbef-dd7f.jsonl`;
+
+  const uMain = {
+    uuid: 'cx-u-main',
+    textPreview: '已确认，就以 TD 为准。现在请按照 td 文档，帮我完整的实现埋点功能',
+    isSynthetic: false,
+    sessionId: rootSession,
+    timestamp: '2026-08-01T06:06:57.000Z',
+    filePath: mainFile,
+  };
+  const aMain = {
+    uuid: 'cx-a-main',
+    sessionId: rootSession,
+    timestamp: '2026-08-01T06:07:00.000Z',
+    filePath: mainFile,
+  };
+
+  // Six guardian review passes across two files — five in one thread.
+  const pass = (n, ts, file) => [
+    {
+      uuid: `cx-gu-${n}`,
+      textPreview: 'The following is the Codex agent history …',
+      isSynthetic: true,
+      isSidechain: true,
+      parentSessionId: rootSession,
+      sessionId: 'guardian-thread',
+      timestamp: ts,
+      filePath: file,
+    },
+    {
+      uuid: `cx-ga-${n}`,
+      isSidechain: true,
+      sessionId: 'guardian-thread',
+      timestamp: ts,
+      filePath: file,
+    },
+  ];
+  const passes = [
+    pass(1, '2026-08-01T06:08:15.000Z', guardFile),
+    pass(2, '2026-08-01T06:27:34.000Z', guardFile),
+    pass(3, '2026-08-01T06:29:52.000Z', guardFile),
+    pass(4, '2026-08-01T06:30:10.000Z', guardFile),
+    pass(5, '2026-08-01T06:30:50.000Z', guardFile),
+    pass(6, '2026-08-01T06:33:01.000Z', `${codexDir}/rollout-2026-08-01T14-20-35-019fbbfb-45bb.jsonl`),
+  ];
+
+  const users = [uMain, ...passes.map(([u]) => u)];
+  const assistants = [aMain, ...passes.map(([, a]) => a)];
+  const parentMap = { 'cx-u-main': null, 'cx-a-main': 'cx-u-main' };
+  for (const [u, a] of passes) {
+    parentMap[u.uuid] = null;
+    parentMap[a.uuid] = u.uuid;
+  }
+
+  const stats = linkSidechainParents({
+    assistantRecords: assistants,
+    userRecords: users,
+    parentMap,
+  });
+  assert.equal(stats.relinked, 6, 'every guardian turn is anchored, not just the first per file');
+  assert.equal(stats.orphans, 0, 'parent resolved from parentSessionId, not from the path');
+  assert.equal(stats.subagentFiles, 2, 'file count stays per-file even with 5 turns in one file');
+
+  const index = buildTurnIndex(assistants, users, parentMap);
+  assert.equal(index.get('cx-a-main'), 'cx-u-main');
+  for (const [, a] of passes) {
+    assert.equal(index.get(a.uuid), 'cx-u-main', `${a.uuid} folds into the spawning conversation turn`);
+  }
+
+  // A sub-agent whose parent rollout is missing stays an orphan rather than
+  // being mis-anchored onto an unrelated conversation.
+  const orphanMap = { 'cx-orphan-u': null, 'cx-orphan-a': 'cx-orphan-u' };
+  const orphanStats = linkSidechainParents({
+    assistantRecords: [{ uuid: 'cx-orphan-a', isSidechain: true, sessionId: 'g2', timestamp: '2026-08-01T06:08:15.000Z', filePath: guardFile }],
+    userRecords: [{
+      uuid: 'cx-orphan-u',
+      textPreview: 'seed',
+      isSynthetic: true,
+      isSidechain: true,
+      parentSessionId: 'session-not-on-disk',
+      sessionId: 'g2',
+      timestamp: '2026-08-01T06:08:15.000Z',
+      filePath: guardFile,
+    }],
+    parentMap: orphanMap,
+  });
+  assert.equal(orphanStats.orphans, 1, 'unknown parent session → orphan, never a wrong anchor');
+  assert.equal(orphanMap['cx-orphan-u'], null, 'orphan parent link left untouched');
+
+  console.log('✓ codex sub-agents: parentSessionId anchoring, all N turns per file, orphan safety');
+}
+
 console.log('\nAll sidechain-linking assertions passed.');

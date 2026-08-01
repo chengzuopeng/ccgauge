@@ -86,28 +86,33 @@ export function linkSidechainParents({
     list.sort((x, y) => (x.timestamp < y.timestamp ? -1 : x.timestamp > y.timestamp ? 1 : 0));
   }
 
-  const firstSidechainUserByFile = new Map<string, UserRecord>();
-  for (const u of userRecords) {
-    if (!u.isSidechain) continue;
-    const existing = firstSidechainUserByFile.get(u.filePath);
-    if (!existing || u.timestamp < existing.timestamp) {
-      firstSidechainUserByFile.set(u.filePath, u);
-    }
-  }
-
   const stats: LinkSidechainStats = {
     subagentFiles: 0,
     relinked: 0,
     orphans: 0,
     alreadyLinked: 0,
   };
+  const seenFiles = new Set<string>();
 
-  for (const [filePath, firstUser] of firstSidechainUserByFile) {
-    const parentSessionId = extractParentSessionFromSubagentPath(filePath);
+  // Every unparented sidechain user is anchored, not just the first per file.
+  // Claude's later sidechain users are tool results that already carry a parent
+  // (so they short-circuit as `alreadyLinked`), but one Codex sub-agent thread
+  // holds several independent `user_message` turns — anchoring only the first
+  // would leave the rest stranded as top-level rows.
+  for (const u of userRecords) {
+    if (!u.isSidechain) continue;
+
+    // Claude states the spawning session in the transcript PATH; Codex states
+    // it in session_meta, which the parser stamps onto the record.
+    const parentSessionId = extractParentSessionFromSubagentPath(u.filePath) ?? u.parentSessionId;
     if (!parentSessionId) continue;
-    stats.subagentFiles += 1;
 
-    const existingParent = parentMap[firstUser.uuid];
+    if (!seenFiles.has(u.filePath)) {
+      seenFiles.add(u.filePath);
+      stats.subagentFiles += 1;
+    }
+
+    const existingParent = parentMap[u.uuid];
     if (existingParent !== null && existingParent !== undefined) {
       stats.alreadyLinked += 1;
       continue;
@@ -119,7 +124,7 @@ export function linkSidechainParents({
       continue;
     }
 
-    const t0 = firstUser.timestamp;
+    const t0 = u.timestamp;
     let anchor: AssistantRecord | undefined;
     for (let i = parentAssistants.length - 1; i >= 0; i -= 1) {
       if (parentAssistants[i].timestamp <= t0) {
@@ -130,7 +135,7 @@ export function linkSidechainParents({
 
     if (!anchor) anchor = parentAssistants[0];
 
-    parentMap[firstUser.uuid] = anchor.uuid;
+    parentMap[u.uuid] = anchor.uuid;
     stats.relinked += 1;
   }
 

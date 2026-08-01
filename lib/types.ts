@@ -152,6 +152,10 @@ export interface UserRecord {
   isSynthetic?: boolean;
 
   isSidechain?: boolean;
+  /** Lineage root this sub-agent transcript belongs to. Claude derives the
+   *  same thing from the file path; Codex only states it in `session_meta`,
+   *  so the parser stamps it here for `linkSidechainParents` to consume. */
+  parentSessionId?: string;
   filePath: string;
 }
 
