@@ -44,12 +44,6 @@ function asNumber(v: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-const EMPTY_PARSE: ParsedFile = Object.freeze({
-  assistant: [],
-  user: [],
-  parentLinks: [],
-}) as ParsedFile;
-
 /**
  * A `thread_spawn` subagent rollout is a MIRROR, not a new ledger: it replays the
  * parent's history and its `total_token_usage` samples the SAME shared lineage
@@ -146,7 +140,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
       if (isSubagentForkMirror(payload)) {
         rl.close();
         stream.destroy();
-        return EMPTY_PARSE;
+        return { assistant: [], user: [], parentLinks: [] };
       }
 
       sessionId = asString(payload.id);

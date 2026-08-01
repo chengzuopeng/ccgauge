@@ -394,6 +394,28 @@ assert.ok(rangeToDates('7d').from instanceof Date);
   const legacy = await parseCodexJsonlFile(legacyFile);
   assert.equal(legacy.assistant.length, 1, 'legacy thread_spawn without forked_from_id is kept');
 
+  // The empty result must not be a shared singleton: two skipped files handing
+  // back the same array instances means one mutation corrupts every entry.
+  const forkFile2 = join(dir, 'fork2.jsonl');
+  writeFileSync(
+    forkFile2,
+    [
+      JSON.stringify({
+        timestamp: '2026-08-01T06:07:24Z',
+        type: 'session_meta',
+        payload: { ...forkMeta, id: 'sub-thread-2' },
+      }),
+      tokenCount('2026-08-01T06:07:24Z', 13_861_434, 62_397),
+    ].join('\n') + '\n',
+    'utf8',
+  );
+  const a = await parseCodexJsonlFile(forkFile);
+  const b = await parseCodexJsonlFile(forkFile2);
+  assert.equal(a.assistant.length + b.assistant.length, 0, 'both files are skipped');
+  assert.notEqual(a.assistant, b.assistant, 'skipped files get their own arrays');
+  assert.notEqual(a.user, b.user, 'skipped files get their own arrays');
+  assert.notEqual(a.parentLinks, b.parentLinks, 'skipped files get their own arrays');
+
   rmSync(dir, { recursive: true, force: true });
   console.log('✓ subagent fork mirrors dropped; guardian + legacy spawns kept');
 }
