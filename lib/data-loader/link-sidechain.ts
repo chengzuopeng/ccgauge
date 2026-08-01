@@ -93,14 +93,22 @@ export function linkSidechainParents({
     alreadyLinked: 0,
   };
   const seenFiles = new Set<string>();
+  // The path regex is per-FILE, but this runs per-RECORD now, and one
+  // transcript holds thousands. Cache it so a big Claude history pays the same
+  // number of regex executions it did when this loop was once-per-file.
+  const pathParentByFile = new Map<string, string | null>();
 
   // Anchor one unparented sub-agent record onto the spawning turn: the parent
   // thread's last assistant record at or before `rec.timestamp`.
   function anchor(rec: { uuid: string; timestamp: string; filePath: string; parentSessionId?: string }) {
     // Claude states the spawning session in the transcript PATH; Codex states
     // it in session_meta, which the parser stamps onto the record.
-    const parentSessionId =
-      extractParentSessionFromSubagentPath(rec.filePath) ?? rec.parentSessionId;
+    let fromPath = pathParentByFile.get(rec.filePath);
+    if (fromPath === undefined) {
+      fromPath = extractParentSessionFromSubagentPath(rec.filePath);
+      pathParentByFile.set(rec.filePath, fromPath);
+    }
+    const parentSessionId = fromPath ?? rec.parentSessionId;
     if (!parentSessionId) return;
 
     if (!seenFiles.has(rec.filePath)) {
