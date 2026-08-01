@@ -415,4 +415,153 @@ const PROJ = `/Users/x/.claude/projects/-proj/${SESSION}`;
   console.log('✓ userless codex sub-agent thread: assistants anchored, no per-call orphan rows');
 }
 
+// ── orphan fallback: an unanchored sub-agent seed still roots a turn ───
+// A sub-agent seed prompt is marked synthetic so it folds into its spawner.
+// When linking can't find that spawner (parent transcript archived, or it
+// produced no records) the seed must root its own turn — otherwise marking it
+// synthetic is strictly worse than not linking at all: the row loses its text.
+{
+  const orphanFile = '/Users/x/.codex/sessions/2026/07/17/rollout-review-sub.jsonl';
+  const seed = {
+    uuid: 'of-user',
+    textPreview: 'Review the diff on branch …',
+    isSynthetic: true,
+    isSidechain: true,
+    parentSessionId: 'root-not-on-disk',
+    sessionId: 'review-thread',
+    timestamp: '2026-07-17T07:53:12.000Z',
+    filePath: orphanFile,
+  };
+  const asst = {
+    uuid: 'of-asst',
+    isSidechain: true,
+    parentSessionId: 'root-not-on-disk',
+    sessionId: 'review-thread',
+    timestamp: '2026-07-17T07:53:20.000Z',
+    filePath: orphanFile,
+  };
+  const parentMap = { 'of-user': null, 'of-asst': 'of-user' };
+
+  const stats = linkSidechainParents({
+    assistantRecords: [asst],
+    userRecords: [seed],
+    parentMap,
+  });
+  assert.equal(stats.relinked, 0, 'nothing to anchor onto');
+  assert.equal(stats.orphans, 1, 'seed reported as orphan');
+
+  const index = buildTurnIndex([asst], [seed], parentMap);
+  assert.equal(
+    index.get('of-asst'),
+    'of-user',
+    'unanchored seed roots its own turn, so the row keeps its text',
+  );
+
+  // Same records, but now the spawner IS present: the seed goes back to being
+  // synthetic and the turn folds — the synthetic bypass must not be sticky.
+  const rootAsst = {
+    uuid: 'of-root-asst',
+    sessionId: 'root-not-on-disk',
+    timestamp: '2026-07-17T07:53:00.000Z',
+    filePath: '/Users/x/.codex/sessions/2026/07/17/rollout-root.jsonl',
+  };
+  const rootUser = {
+    uuid: 'of-root-user',
+    textPreview: 'kick off the review',
+    isSynthetic: false,
+    sessionId: 'root-not-on-disk',
+    timestamp: '2026-07-17T07:52:50.000Z',
+    filePath: '/Users/x/.codex/sessions/2026/07/17/rollout-root.jsonl',
+  };
+  const map2 = { 'of-root-user': null, 'of-root-asst': 'of-root-user', 'of-user': null, 'of-asst': 'of-user' };
+  linkSidechainParents({
+    assistantRecords: [rootAsst, asst],
+    userRecords: [rootUser, seed],
+    parentMap: map2,
+  });
+  const index2 = buildTurnIndex([rootAsst, asst], [rootUser, seed], map2);
+  assert.equal(
+    index2.get('of-asst'),
+    'of-root-user',
+    'once the spawner exists the same seed folds again (bypass is derived, not sticky)',
+  );
+  console.log('✓ orphan fallback: unanchored seed keeps its text; folds again once the spawner appears');
+}
+
+// ── filter boundary: linking is global, buildTurnIndex is filtered ────
+// lib/serialize.ts and app/page.tsx call buildTurnIndex with the range/source
+// FILTERED records but the UNFILTERED parentMap. A date range that cuts between
+// a spawning turn and its sub-agent leaves the walk with no real user in scope,
+// which used to strip the row's text entirely. The seed is the last-resort root.
+{
+  const rootSession = 'root-boundary';
+  const dir = '/Users/x/.codex/sessions/2026/08/01';
+  const uMain = {
+    uuid: 'fb-u-main',
+    textPreview: '已确认，就以 TD 为准',
+    isSynthetic: false,
+    sessionId: rootSession,
+    timestamp: '2026-08-01T06:06:57.000Z',
+    filePath: `${dir}/rollout-root.jsonl`,
+  };
+  const aMain = {
+    uuid: 'fb-a-main',
+    sessionId: rootSession,
+    timestamp: '2026-08-01T06:07:05.000Z',
+    filePath: `${dir}/rollout-root.jsonl`,
+  };
+  const guardUser = {
+    uuid: 'fb-g-user',
+    textPreview: 'The following is the Codex agent history …',
+    isSynthetic: true,
+    isSidechain: true,
+    parentSessionId: rootSession,
+    sessionId: 'guardian',
+    timestamp: '2026-08-01T06:08:15.000Z',
+    filePath: `${dir}/rollout-guardian.jsonl`,
+  };
+  const guardAsst = {
+    uuid: 'fb-g-asst',
+    isSidechain: true,
+    parentSessionId: rootSession,
+    sessionId: 'guardian',
+    timestamp: '2026-08-01T06:08:20.000Z',
+    filePath: `${dir}/rollout-guardian.jsonl`,
+  };
+
+  const all = { assistants: [aMain, guardAsst], users: [uMain, guardUser] };
+  const parentMap = { 'fb-u-main': null, 'fb-a-main': 'fb-u-main', 'fb-g-user': null, 'fb-g-asst': 'fb-g-user' };
+  linkSidechainParents({ assistantRecords: all.assistants, userRecords: all.users, parentMap });
+  assert.equal(parentMap['fb-g-user'], 'fb-a-main', 'guardian linked while unfiltered');
+
+  // Unfiltered: folds into the real conversation turn.
+  const whole = buildTurnIndex(all.assistants, all.users, parentMap);
+  assert.equal(whole.get('fb-g-asst'), 'fb-u-main', 'in range, guardian folds into the spawning turn');
+
+  // Filtered so the spawning USER falls outside the window (its assistant does
+  // not) — the previous behaviour merged the guardian into a text-less row.
+  const cutUser = buildTurnIndex(all.assistants, [guardUser], parentMap);
+  assert.equal(
+    cutUser.get('fb-g-asst'),
+    'fb-g-user',
+    'spawning user out of range -> guardian roots at its own seed, keeping text',
+  );
+
+  // Filtered so the whole spawning thread is outside the window.
+  const cutAll = buildTurnIndex([guardAsst], [guardUser], parentMap);
+  assert.equal(
+    cutAll.get('fb-g-asst'),
+    'fb-g-user',
+    'spawning thread fully out of range -> still roots at the seed, not a per-call orphan',
+  );
+
+  // The fallback must not drag the spawning thread's own records into the
+  // sub-agent's turn via the memo — aMain still roots at its own user.
+  const both = buildTurnIndex([guardAsst, aMain], all.users, parentMap);
+  assert.equal(both.get('fb-a-main'), 'fb-u-main', 'parent record keeps its own root after a fallback walk');
+  assert.equal(both.get('fb-g-asst'), 'fb-u-main', 'and the guardian still folds when both are in range');
+
+  console.log('✓ filter boundary: seed is the last-resort root; memo never steals the parent thread');
+}
+
 console.log('\nAll sidechain-linking assertions passed.');

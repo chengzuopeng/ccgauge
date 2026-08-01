@@ -8,10 +8,21 @@ export function buildTurnIndex(
   parentMap: Record<string, string | null>,
 ): Map<string, string> {
   const userTextMap = new Map<string, string>();
+  // Sub-agent seed prompts. Synthetic, so they never outrank a real user turn
+  // — the point of marking them is that they fold into the turn that spawned
+  // them. But they're the LAST RESORT root: `buildTurnIndex` runs over the
+  // range/source-filtered records while `parentMap` is unfiltered, so the walk
+  // can leave the filter window (spawning turn outside the range, parent
+  // transcript archived) and find no real user at all. Rooting at the seed
+  // keeps the row's text instead of degrading it to "(no user text)".
+  const seedTextMap = new Map<string, string>();
   for (const u of users) {
-
-    if (u.isSynthetic) continue;
-    if (u.textPreview && u.textPreview.trim()) userTextMap.set(u.uuid, u.textPreview);
+    if (!u.textPreview || !u.textPreview.trim()) continue;
+    if (u.isSynthetic) {
+      if (u.isSidechain) seedTextMap.set(u.uuid, u.textPreview);
+      continue;
+    }
+    userTextMap.set(u.uuid, u.textPreview);
   }
 
   const result = new Map<string, string>();
@@ -21,6 +32,7 @@ export function buildTurnIndex(
     const path: string[] = [];
     let cur: string | null = startUuid;
     let answer: string | null = null;
+    let fallbackIdx = -1;
     let steps = 0;
     const seen = new Set<string>();
     while (cur && steps++ < MAX_PARENT_WALK) {
@@ -28,7 +40,10 @@ export function buildTurnIndex(
       seen.add(cur);
       const m = memo.get(cur);
       if (m) {
-        answer = m;
+        // A cached root only outranks a seed we already passed if it is a real
+        // user turn. A cached "nothing found, rooted at itself" answer must not
+        // — this walk saw a seed that walk never did.
+        if (fallbackIdx === -1 || userTextMap.has(m)) answer = m;
         break;
       }
       path.push(cur);
@@ -36,10 +51,27 @@ export function buildTurnIndex(
         answer = cur;
         break;
       }
+      if (fallbackIdx === -1 && seedTextMap.has(cur)) fallbackIdx = path.length - 1;
       cur = parentMap[cur] ?? null;
     }
-    if (!answer) answer = startUuid;
-    for (const id of path) memo.set(id, answer);
+
+    let memoEnd = path.length;
+    if (!answer) {
+      if (fallbackIdx !== -1) {
+        answer = path[fallbackIdx];
+        // Memoize only up to the seed. Everything past it belongs to the
+        // spawning thread and roots elsewhere; stamping this answer on those
+        // nodes would drag the parent's records into the sub-agent's turn.
+        memoEnd = fallbackIdx + 1;
+      } else {
+        // No root in scope at all (the turn's user message is outside the
+        // filter window). Memoize the whole path, as this has always done, so
+        // the turn's records still collapse into ONE row instead of one row
+        // per API call.
+        answer = startUuid;
+      }
+    }
+    for (let i = 0; i < memoEnd; i += 1) memo.set(path[i], answer);
     return answer;
   }
 
