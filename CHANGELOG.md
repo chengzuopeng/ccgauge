@@ -5,6 +5,58 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] — 2026-08-01
+
+Follow-up to 1.4.0. Codex sub-agents come in more shapes than that release
+accounted for, and its `thread_settings_applied` fallback turned out to
+mis-price a turn. Upgrade if you use Codex; the persisted index reparses
+itself on first load.
+
+### Fixed
+
+- **A turn's model is no longer overwritten by a stale thread default.** The
+  `thread_settings_applied` fallback added in 1.4.0 overwrote the model
+  unconditionally, but that event is *thread*-level and fires between turns
+  while `turn_context` is per-turn and authoritative. In a real history 116 of
+  477 such events disagree with the turn they land in, and records caught in
+  between were stamped with the wrong model — `gpt-5.6-terra` billed as
+  `gpt-5.6-sol` is exactly **2×** (input 5.0/output 30.0 vs 2.5/15.0). It is
+  now a fallback in truth: it only fills in for records that precede any
+  `turn_context`.
+- **Sub-agent threads with no user record no longer explode into one row per
+  API call.** Some Codex sub-agent rollouts deliver the task prompt as a
+  `response_item` rather than a `user_message`, so the transcript contains zero
+  user records. 1.4.0 only ever anchored *user* records, so those threads had
+  nothing to anchor and every single call surfaced as its own "(no user text)"
+  row — 71 of them across two threads in one afternoon. Unparented sub-agent
+  *assistant* records are anchored too now.
+- **A sub-agent row keeps its text when its spawning turn is out of scope.**
+  Sub-agent seed prompts are marked synthetic so they fold into the turn that
+  spawned them, but the turn index runs over the range-filtered records while
+  the parent map is unfiltered — so a date range that cuts between a turn and
+  its sub-agent, or a parent transcript that has been archived, left the row
+  with no text at all. The seed is now the last-resort root: it never outranks
+  a real turn, so folding is unchanged whenever the spawner is in scope.
+
+### Changed
+
+- Codex `parserVersion` → `codex-v10-turn-context-model-precedence`.
+
+### Internal
+
+- The `isSubagentForkMirror` rationale was wrong and is corrected: `thread_spawn`
+  rollouts appear both with and without `forked_from_id` **within one Codex
+  version**, so absence never meant "old Codex". Also documents why no
+  data-level cross-check replaces the flag — a mirror replaying the parent from
+  the start opens its token counter *lower* than a fresh thread does (27,131 vs
+  28,588 observed), so the obvious heuristic classifies them backwards. Both
+  shapes are now pinned by tests.
+- The sub-agent path regex is memoised per transcript. Linking became a
+  per-record loop in 1.4.0, which made a large Claude history pay tens of
+  thousands of extra regex executions per index rebuild.
+- Skipped rollouts each get their own empty parse result instead of sharing one
+  frozen singleton whose inner arrays were never actually frozen.
+
 ## [1.4.0] — 2026-08-01
 
 Codex sub-agent support. Codex 0.146 runs sub-agents as forked threads, one
