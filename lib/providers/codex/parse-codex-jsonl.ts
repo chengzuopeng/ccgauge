@@ -45,22 +45,31 @@ function asNumber(v: unknown): number {
 }
 
 /**
- * A `thread_spawn` subagent rollout is a MIRROR, not a new ledger: it replays the
+ * A forked subagent rollout is a MIRROR, not a new ledger: it replays the
  * parent's history and its `total_token_usage` samples the SAME shared lineage
  * counter the parent keeps logging, so counting it double-bills. Measured on real
  * data: 3 concurrent subagents reported 8.54M of "own" delta while the shared
  * counter advanced 3.13M, and a full day inflated 39.8M → 265.7M (6.7x).
  *
- * `forked_from_id` is the discriminator. Guardian / auto-review subagents
- * (`source.subagent.other`) never set it and DO own an independent counter
- * starting near 0, so they stay. Older Codex `thread_spawn` rollouts predate the
- * field and also stay — they had their own counter too.
+ * `forked_from_id` is the ONLY signal that separates a mirror from a real
+ * subagent thread, and it is weaker than it looks: one Codex version emits
+ * `thread_spawn` rollouts both with and without it. Verified — rollouts
+ * `…T16-03-45` (present) and `…T16-12-34` (absent) are both `thread_spawn`,
+ * both `depth: 1`, both cli_version 0.146.0-alpha.9.2, nine minutes apart. So
+ * absence does NOT mean "old Codex"; it means "this spawn kept its own ledger".
+ *
+ * There is deliberately no data-level cross-check, because none holds: a mirror
+ * that replays from the very start of the parent opens its counter at the same
+ * small value a fresh thread does (`…T16-03-45` opens at 27,131 — a mirror —
+ * versus 28,588 for the real thread in `…T16-12-34`). Distinguishing those two
+ * needs cross-file lineage state this per-file parser does not have. If Codex
+ * ever drops the field on a real mirror, double-counting returns silently;
+ * scripts/test-codex-parser.mjs pins both shapes so the rule can't be
+ * "simplified" on the false assumption that this is a version split.
  *
  * KNOWN GAP: user-initiated forks (`thread_source: 'user'` + `forked_from_id`)
  * replay the source's history too, then DIVERGE into genuinely new spend, so they
- * can't be dropped wholesale. Their replayed prefix stays double-counted; cutting
- * it needs cross-file lineage state this per-file parser doesn't have.
- * See scripts/test-codex-parser.mjs for the derivation.
+ * can't be dropped wholesale. Their replayed prefix stays double-counted.
  */
 function isSubagentForkMirror(payload: Record<string, unknown>): boolean {
   return asString(payload.thread_source) === 'subagent' && !!asString(payload.forked_from_id);

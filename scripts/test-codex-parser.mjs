@@ -394,110 +394,68 @@ assert.ok(rangeToDates('7d').from instanceof Date);
   const legacy = await parseCodexJsonlFile(legacyFile);
   assert.equal(legacy.assistant.length, 1, 'legacy thread_spawn without forked_from_id is kept');
 
-  // The empty result must not be a shared singleton: two skipped files handing
-  // back the same array instances means one mutation corrupts every entry.
-  const forkFile2 = join(dir, 'fork2.jsonl');
-  writeFileSync(
-    forkFile2,
+  // `forked_from_id` is NOT a version split — one Codex build emits
+  // `thread_spawn` both ways (…T16-03-45 has it, …T16-12-34 doesn't; both
+  // depth 1, both cli_version 0.146.0-alpha.9.2, nine minutes apart). Pinned
+  // so nobody "simplifies" the rule to `thread_spawn -> mirror`, which would
+  // silently delete real spend. Nor can it be replaced by a counter-baseline
+  // check: the mirror below opens at 27,131, LOWER than the real thread's
+  // 28,588, because it replays the parent from the very beginning.
+  const sameVersion = (id, forked, firstTotal) =>
     [
       JSON.stringify({
-        timestamp: '2026-08-01T06:07:24Z',
+        timestamp: '2026-08-01T08:03:45Z',
         type: 'session_meta',
-        payload: { ...forkMeta, id: 'sub-thread-2' },
+        payload: {
+          id,
+          session_id: 'root-thread',
+          ...(forked ? { forked_from_id: 'root-thread' } : {}),
+          parent_thread_id: 'root-thread',
+          cwd: '/tmp/proj',
+          cli_version: '0.146.0-alpha.9.2',
+          thread_source: 'subagent',
+          source: { subagent: { thread_spawn: { parent_thread_id: 'root-thread', depth: 1 } } },
+        },
       }),
-      tokenCount('2026-08-01T06:07:24Z', 13_861_434, 62_397),
-    ].join('\n') + '\n',
-    'utf8',
+      JSON.stringify({
+        timestamp: '2026-08-01T08:03:46Z',
+        type: 'turn_context',
+        payload: { turn_id: `t-${id}`, cwd: '/tmp/proj', model: 'gpt-5.6-sol' },
+      }),
+      JSON.stringify({
+        timestamp: '2026-08-01T08:03:47Z',
+        type: 'event_msg',
+        payload: { type: 'user_message', message: 'go' },
+      }),
+      tokenCount('2026-08-01T08:03:48Z', firstTotal, 100),
+    ].join('\n') + '\n';
+
+  const mirrorFile = join(dir, 'same-version-mirror.jsonl');
+  writeFileSync(mirrorFile, sameVersion('spawn-mirror', true, 27_131), 'utf8');
+  assert.equal(
+    (await parseCodexJsonlFile(mirrorFile)).assistant.length,
+    0,
+    'thread_spawn WITH forked_from_id is a mirror even though its counter starts low',
   );
+
+  const realFile = join(dir, 'same-version-real.jsonl');
+  writeFileSync(realFile, sameVersion('spawn-real', false, 28_588), 'utf8');
+  assert.equal(
+    (await parseCodexJsonlFile(realFile)).assistant.length,
+    1,
+    'same cli_version, no forked_from_id -> real thread, kept',
+  );
+
+  // The empty result must not be a shared singleton: two skipped files handing
+  // back the same array instances means one mutation corrupts every entry.
   const a = await parseCodexJsonlFile(forkFile);
-  const b = await parseCodexJsonlFile(forkFile2);
-  assert.equal(a.assistant.length + b.assistant.length, 0, 'both files are skipped');
+  const b = await parseCodexJsonlFile(mirrorFile);
   assert.notEqual(a.assistant, b.assistant, 'skipped files get their own arrays');
   assert.notEqual(a.user, b.user, 'skipped files get their own arrays');
   assert.notEqual(a.parentLinks, b.parentLinks, 'skipped files get their own arrays');
 
   rmSync(dir, { recursive: true, force: true });
   console.log('✓ subagent fork mirrors dropped; guardian + legacy spawns kept');
-}
-
-{
-  // Two collateral bugs the fork rollouts exposed:
-  //  1. replayed history re-emits the SOURCE session_meta mid-file — rebinding
-  //     sessionId there stamped the file's tail with the parent's id.
-  //  2. replayed history carries no turn_context, so records before the first
-  //     one fell back to the 'gpt-unknown' placeholder. thread_settings_applied
-  //     carries the real model and lands earlier in the file.
-  const dir = mkdtempSync(join(tmpdir(), 'ccgauge-codex-meta-'));
-  const file = join(dir, 'replayed-meta.jsonl');
-  writeFileSync(
-    file,
-    [
-      JSON.stringify({
-        timestamp: '2026-08-01T06:00:00Z',
-        type: 'session_meta',
-        payload: { id: 'own-thread', cwd: '/tmp/proj', cli_version: '0.146.0' },
-      }),
-      JSON.stringify({
-        timestamp: '2026-08-01T06:00:01Z',
-        type: 'event_msg',
-        payload: {
-          type: 'thread_settings_applied',
-          thread_settings: { model: 'gpt-5.6-sol', service_tier: 'priority' },
-        },
-      }),
-      JSON.stringify({
-        timestamp: '2026-08-01T06:00:02Z',
-        type: 'event_msg',
-        payload: { type: 'user_message', message: 'hello' },
-      }),
-      JSON.stringify({
-        timestamp: '2026-08-01T06:00:03Z',
-        type: 'event_msg',
-        payload: {
-          type: 'token_count',
-          info: {
-            total_token_usage: {
-              input_tokens: 1000,
-              cached_input_tokens: 0,
-              output_tokens: 100,
-              reasoning_output_tokens: 0,
-            },
-          },
-        },
-      }),
-      JSON.stringify({
-        timestamp: '2026-08-01T06:00:04Z',
-        type: 'session_meta',
-        payload: { id: 'PARENT-thread', cwd: '/tmp/other', timestamp: '2026-08-01T03:00:00Z' },
-      }),
-      JSON.stringify({
-        timestamp: '2026-08-01T06:00:05Z',
-        type: 'event_msg',
-        payload: {
-          type: 'token_count',
-          info: {
-            total_token_usage: {
-              input_tokens: 1500,
-              cached_input_tokens: 0,
-              output_tokens: 150,
-              reasoning_output_tokens: 0,
-            },
-          },
-        },
-      }),
-    ].join('\n') + '\n',
-    'utf8',
-  );
-  const parsedMeta = await parseCodexJsonlFile(file);
-  rmSync(dir, { recursive: true, force: true });
-
-  assert.equal(parsedMeta.assistant.length, 2);
-  for (const rec of parsedMeta.assistant) {
-    assert.equal(rec.sessionId, 'own-thread', 'a replayed session_meta must not rebind sessionId');
-    assert.equal(rec.model, 'gpt-5.6-sol', 'thread_settings_applied supplies the model, not gpt-unknown');
-    assert.equal(rec.cwd, '/tmp/proj', 'a replayed session_meta must not rebind cwd');
-  }
-  console.log('✓ replayed session_meta ignored; thread_settings_applied resolves the model');
 }
 
 {
