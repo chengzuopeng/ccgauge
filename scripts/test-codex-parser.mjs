@@ -478,6 +478,161 @@ assert.ok(rangeToDates('7d').from instanceof Date);
   console.log('✓ replayed session_meta ignored; thread_settings_applied resolves the model');
 }
 
+{
+  // `thread_settings_applied` is thread-level and fires BETWEEN turns, so it
+  // can carry a default that disagrees with the turn actually running — 116 of
+  // 477 such events disagree in real ~/.codex data. It must only fill in for
+  // records that precede any turn_context, never override it: gpt-5.6-terra
+  // billed as gpt-5.6-sol is a 2x error (input 2.5/output 15 vs 5/30).
+  const dir = mkdtempSync(join(tmpdir(), 'ccgauge-codex-model-'));
+  const file = join(dir, 'model-precedence.jsonl');
+  const tc = (ts, input) =>
+    JSON.stringify({
+      timestamp: ts,
+      type: 'event_msg',
+      payload: {
+        type: 'token_count',
+        info: {
+          total_token_usage: {
+            input_tokens: input,
+            cached_input_tokens: 0,
+            output_tokens: 0,
+            reasoning_output_tokens: 0,
+          },
+        },
+      },
+    });
+  writeFileSync(
+    file,
+    [
+      JSON.stringify({
+        timestamp: '2026-07-20T09:00:00Z',
+        type: 'session_meta',
+        payload: { id: 'sess-prec', cwd: '/tmp/proj' },
+      }),
+      // Before any turn_context: the fallback is the only model source.
+      JSON.stringify({
+        timestamp: '2026-07-20T09:00:01Z',
+        type: 'event_msg',
+        payload: { type: 'thread_settings_applied', thread_settings: { model: 'gpt-5.6-sol' } },
+      }),
+      JSON.stringify({
+        timestamp: '2026-07-20T09:00:02Z',
+        type: 'event_msg',
+        payload: { type: 'user_message', message: 'hi' },
+      }),
+      tc('2026-07-20T09:00:03Z', 1000),
+      // turn_context speaks: it owns the model from here on.
+      JSON.stringify({
+        timestamp: '2026-07-20T09:00:04Z',
+        type: 'turn_context',
+        payload: { turn_id: 't-1', cwd: '/tmp/proj', model: 'gpt-5.6-terra', effort: 'high' },
+      }),
+      tc('2026-07-20T09:00:05Z', 2000),
+      // A stale thread-level default lands mid-turn — must be ignored.
+      JSON.stringify({
+        timestamp: '2026-07-20T09:00:06Z',
+        type: 'event_msg',
+        payload: { type: 'thread_settings_applied', thread_settings: { model: 'gpt-5.6-sol' } },
+      }),
+      tc('2026-07-20T09:00:07Z', 3000),
+    ].join('\n') + '\n',
+    'utf8',
+  );
+  const prec = await parseCodexJsonlFile(file);
+  rmSync(dir, { recursive: true, force: true });
+
+  assert.equal(prec.assistant.length, 3);
+  assert.equal(prec.assistant[0].model, 'gpt-5.6-sol', 'pre-turn_context record uses the fallback');
+  assert.equal(prec.assistant[1].model, 'gpt-5.6-terra', 'turn_context sets the model');
+  assert.equal(
+    prec.assistant[2].model,
+    'gpt-5.6-terra',
+    'a later thread_settings_applied must NOT override turn_context (2x pricing bug)',
+  );
+  console.log('✓ turn_context outranks thread_settings_applied; fallback only before it');
+}
+
+{
+  // Two collateral bugs the fork rollouts exposed:
+  //  1. replayed history re-emits the SOURCE session_meta mid-file — rebinding
+  //     sessionId there stamped the file's tail with the parent's id.
+  //  2. replayed history carries no turn_context, so records before the first
+  //     one fell back to the 'gpt-unknown' placeholder. thread_settings_applied
+  //     carries the real model and lands earlier in the file.
+  const dir = mkdtempSync(join(tmpdir(), 'ccgauge-codex-meta-'));
+  const file = join(dir, 'replayed-meta.jsonl');
+  writeFileSync(
+    file,
+    [
+      JSON.stringify({
+        timestamp: '2026-08-01T06:00:00Z',
+        type: 'session_meta',
+        payload: { id: 'own-thread', cwd: '/tmp/proj', cli_version: '0.146.0' },
+      }),
+      JSON.stringify({
+        timestamp: '2026-08-01T06:00:01Z',
+        type: 'event_msg',
+        payload: {
+          type: 'thread_settings_applied',
+          thread_settings: { model: 'gpt-5.6-sol', service_tier: 'priority' },
+        },
+      }),
+      JSON.stringify({
+        timestamp: '2026-08-01T06:00:02Z',
+        type: 'event_msg',
+        payload: { type: 'user_message', message: 'hello' },
+      }),
+      JSON.stringify({
+        timestamp: '2026-08-01T06:00:03Z',
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          info: {
+            total_token_usage: {
+              input_tokens: 1000,
+              cached_input_tokens: 0,
+              output_tokens: 100,
+              reasoning_output_tokens: 0,
+            },
+          },
+        },
+      }),
+      JSON.stringify({
+        timestamp: '2026-08-01T06:00:04Z',
+        type: 'session_meta',
+        payload: { id: 'PARENT-thread', cwd: '/tmp/other', timestamp: '2026-08-01T03:00:00Z' },
+      }),
+      JSON.stringify({
+        timestamp: '2026-08-01T06:00:05Z',
+        type: 'event_msg',
+        payload: {
+          type: 'token_count',
+          info: {
+            total_token_usage: {
+              input_tokens: 1500,
+              cached_input_tokens: 0,
+              output_tokens: 150,
+              reasoning_output_tokens: 0,
+            },
+          },
+        },
+      }),
+    ].join('\n') + '\n',
+    'utf8',
+  );
+  const parsedMeta = await parseCodexJsonlFile(file);
+  rmSync(dir, { recursive: true, force: true });
+
+  assert.equal(parsedMeta.assistant.length, 2);
+  for (const rec of parsedMeta.assistant) {
+    assert.equal(rec.sessionId, 'own-thread', 'a replayed session_meta must not rebind sessionId');
+    assert.equal(rec.model, 'gpt-5.6-sol', 'thread_settings_applied supplies the model, not gpt-unknown');
+    assert.equal(rec.cwd, '/tmp/proj', 'a replayed session_meta must not rebind cwd');
+  }
+  console.log('✓ replayed session_meta ignored; thread_settings_applied resolves the model');
+}
+
 // --- ccusage parity: cost math (reasoning not billed) + fast/priority tier ---
 {
   const codexPricing = resolveCodexPricing('gpt-5.3-codex').pricing;

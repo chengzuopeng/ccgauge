@@ -24,6 +24,10 @@ interface TurnState {
   turnId: string | null;
   cwd: string;
   model: string;
+  /** `turn_context` is the per-turn, authoritative model. Once it has spoken,
+   *  `thread_settings_applied` (thread-level, fires between turns and can carry
+   *  a stale default) must not override it. */
+  modelFromTurnContext: boolean;
   effort?: string;
   userUuid: string | null;
   toolNames: string[];
@@ -112,6 +116,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
     turnId: null,
     cwd: '',
     model: 'gpt-unknown',
+    modelFromTurnContext: false,
     userUuid: null,
     toolNames: [],
     hasThinking: false,
@@ -162,7 +167,10 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
       turn.turnId = asString(payload.turn_id) || turn.turnId;
       turn.cwd = asString(payload.cwd) || defaultCwd;
       const m = asString(payload.model);
-      if (m) turn.model = m;
+      if (m) {
+        turn.model = m;
+        turn.modelFromTurnContext = true;
+      }
       const eff = asString(payload.effort);
       if (eff) turn.effort = eff;
       turn.toolNames = [];
@@ -212,9 +220,13 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
         continue;
       }
 
-      // Replayed history carries no `turn_context`, so without this every
-      // pre-fork record fell back to the 'gpt-unknown' placeholder.
+      // Fallback only: rescues records that precede any `turn_context` (replayed
+      // history carries none, so they fell back to the 'gpt-unknown' placeholder).
+      // It must never outrank turn_context — this event is thread-level and in
+      // real rollouts disagrees with the active turn 116 times out of 477,
+      // which would bill e.g. a gpt-5.6-terra turn at gpt-5.6-sol's 2x rate.
       if (sub === 'thread_settings_applied') {
+        if (turn.modelFromTurnContext) continue;
         const settings = payload.thread_settings as Record<string, unknown> | null | undefined;
         const m = settings ? asString(settings.model) : '';
         if (m) turn.model = m;
