@@ -123,6 +123,11 @@ export interface AssistantRecord {
   effort?: string;
 
   isSidechain?: boolean;
+  /** Lineage root this sub-agent transcript belongs to — see the UserRecord
+   *  field. Needed on assistants too because a Codex sub-agent thread can
+   *  carry NO user record at all (its task prompt is a `response_item`, not a
+   *  `user_message`), leaving its assistants as the only thing to anchor. */
+  parentSessionId?: string;
   /** True when this record came from a Workflow (ultracode) sub-agent
    *  transcript — i.e. a file under `subagents/workflows/wf_.../`, as
    *  opposed to a plain Task sub-agent. Stamped at snapshot rebuild via

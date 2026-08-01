@@ -94,49 +94,61 @@ export function linkSidechainParents({
   };
   const seenFiles = new Set<string>();
 
+  // Anchor one unparented sub-agent record onto the spawning turn: the parent
+  // thread's last assistant record at or before `rec.timestamp`.
+  function anchor(rec: { uuid: string; timestamp: string; filePath: string; parentSessionId?: string }) {
+    // Claude states the spawning session in the transcript PATH; Codex states
+    // it in session_meta, which the parser stamps onto the record.
+    const parentSessionId =
+      extractParentSessionFromSubagentPath(rec.filePath) ?? rec.parentSessionId;
+    if (!parentSessionId) return;
+
+    if (!seenFiles.has(rec.filePath)) {
+      seenFiles.add(rec.filePath);
+      stats.subagentFiles += 1;
+    }
+
+    const existingParent = parentMap[rec.uuid];
+    if (existingParent !== null && existingParent !== undefined) {
+      stats.alreadyLinked += 1;
+      return;
+    }
+
+    const parentAssistants = parentAssistantsBySession.get(parentSessionId);
+    if (!parentAssistants || parentAssistants.length === 0) {
+      stats.orphans += 1;
+      return;
+    }
+
+    let found: AssistantRecord | undefined;
+    for (let i = parentAssistants.length - 1; i >= 0; i -= 1) {
+      if (parentAssistants[i].timestamp <= rec.timestamp) {
+        found = parentAssistants[i];
+        break;
+      }
+    }
+    if (!found) found = parentAssistants[0];
+
+    parentMap[rec.uuid] = found.uuid;
+    stats.relinked += 1;
+  }
+
   // Every unparented sidechain user is anchored, not just the first per file.
   // Claude's later sidechain users are tool results that already carry a parent
   // (so they short-circuit as `alreadyLinked`), but one Codex sub-agent thread
   // holds several independent `user_message` turns — anchoring only the first
   // would leave the rest stranded as top-level rows.
   for (const u of userRecords) {
-    if (!u.isSidechain) continue;
+    if (u.isSidechain) anchor(u);
+  }
 
-    // Claude states the spawning session in the transcript PATH; Codex states
-    // it in session_meta, which the parser stamps onto the record.
-    const parentSessionId = extractParentSessionFromSubagentPath(u.filePath) ?? u.parentSessionId;
-    if (!parentSessionId) continue;
-
-    if (!seenFiles.has(u.filePath)) {
-      seenFiles.add(u.filePath);
-      stats.subagentFiles += 1;
-    }
-
-    const existingParent = parentMap[u.uuid];
-    if (existingParent !== null && existingParent !== undefined) {
-      stats.alreadyLinked += 1;
-      continue;
-    }
-
-    const parentAssistants = parentAssistantsBySession.get(parentSessionId);
-    if (!parentAssistants || parentAssistants.length === 0) {
-      stats.orphans += 1;
-      continue;
-    }
-
-    const t0 = u.timestamp;
-    let anchor: AssistantRecord | undefined;
-    for (let i = parentAssistants.length - 1; i >= 0; i -= 1) {
-      if (parentAssistants[i].timestamp <= t0) {
-        anchor = parentAssistants[i];
-        break;
-      }
-    }
-
-    if (!anchor) anchor = parentAssistants[0];
-
-    parentMap[u.uuid] = anchor.uuid;
-    stats.relinked += 1;
+  // Then any sidechain ASSISTANT still without a parent. A Codex sub-agent
+  // thread can contain no user record at all — its task prompt arrives as a
+  // `response_item` with role "user", not as a `user_message` event — so there
+  // is nothing for the pass above to anchor and every single API call would
+  // otherwise surface as its own "(no user text)" row.
+  for (const a of assistantRecords) {
+    if (a.isSidechain && parentMap[a.uuid] == null) anchor(a);
   }
 
   return stats;

@@ -362,4 +362,57 @@ const PROJ = `/Users/x/.claude/projects/-proj/${SESSION}`;
   console.log('✓ codex sub-agents: parentSessionId anchoring, all N turns per file, orphan safety');
 }
 
+// ── Codex sub-agent threads that carry NO user record ─────────────────
+// Some Codex sub-agent rollouts deliver the task prompt as a `response_item`
+// with role "user" instead of a `user_message` event, so the file yields zero
+// UserRecords. With nothing for the user pass to anchor, every single API call
+// in the thread surfaced as its own "(no user text)" row — 71 of them across
+// two threads on 2026-08-01. Unparented sidechain ASSISTANTS are anchored too.
+{
+  const rootSession = '019fbb48-bc45-7640-999c-874bb086ae31';
+  const codexDir = '/Users/x/.codex/sessions/2026/08/01';
+  const mainFile = `${codexDir}/rollout-2026-08-01T11-05-34-${rootSession}.jsonl`;
+  const subFile = `${codexDir}/rollout-2026-08-01T16-12-34-019fbc61-d063.jsonl`;
+
+  const uMain = {
+    uuid: 'nu-u-main',
+    textPreview: '好，就按你建议，完成全部问题的修复',
+    isSynthetic: false,
+    sessionId: rootSession,
+    timestamp: '2026-08-01T08:03:31.000Z',
+    filePath: mainFile,
+  };
+  const aMain = {
+    uuid: 'nu-a-main',
+    sessionId: rootSession,
+    timestamp: '2026-08-01T08:03:35.000Z',
+    filePath: mainFile,
+  };
+  // Sub-agent thread: assistants only, every one with a null parent.
+  const subAsst = ['08:12:40', '08:13:12', '08:14:31'].map((hhmmss, i) => ({
+    uuid: `nu-sa-${i}`,
+    isSidechain: true,
+    parentSessionId: rootSession,
+    sessionId: '019fbc61-d063',
+    timestamp: `2026-08-01T${hhmmss}.000Z`,
+    filePath: subFile,
+  }));
+
+  const parentMap = { 'nu-u-main': null, 'nu-a-main': 'nu-u-main' };
+  for (const a of subAsst) parentMap[a.uuid] = null;
+
+  const assistants = [aMain, ...subAsst];
+  const users = [uMain];
+  const stats = linkSidechainParents({ assistantRecords: assistants, userRecords: users, parentMap });
+
+  assert.equal(stats.relinked, 3, 'all three userless sub-agent calls anchored');
+  assert.equal(stats.subagentFiles, 1, 'counted as one sub-agent file');
+
+  const index = buildTurnIndex(assistants, users, parentMap);
+  for (const a of subAsst) {
+    assert.equal(index.get(a.uuid), 'nu-u-main', `${a.uuid} folds into the spawning turn`);
+  }
+  console.log('✓ userless codex sub-agent thread: assistants anchored, no per-call orphan rows');
+}
+
 console.log('\nAll sidechain-linking assertions passed.');

@@ -343,7 +343,9 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
           textPreview: turn.pendingTextPreview,
           filePath: file,
           effort: turn.effort,
-          ...(subagentLineageRoot ? { isSidechain: true } : {}),
+          ...(subagentLineageRoot
+            ? { isSidechain: true, parentSessionId: subagentLineageRoot }
+            : {}),
         });
         parentLinks.push([uuid, turn.userUuid]);
 
