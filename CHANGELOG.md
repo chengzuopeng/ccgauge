@@ -5,6 +5,58 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] — 2026-08-01
+
+Codex sub-agent support. Codex 0.146 runs sub-agents as forked threads, one
+rollout file each — a shape the Codex parser had no notion of, so a single
+conversation turn could be billed seven times over and its sub-agents scattered
+across the usage table as look-alike rows. Two fixes: stop counting the mirrors,
+and fold the sub-agents that *are* real spend into the turn that spawned them.
+
+### Fixed
+
+- **Sub-agent fork rollouts no longer double-count.** A `thread_spawn`
+  sub-agent's rollout is a mirror, not a new ledger: it replays the parent's
+  history verbatim and its `total_token_usage` samples the *same* shared lineage
+  counter the parent keeps logging. Parsing each as an independent session
+  re-billed the parent's whole history once per sub-agent — measured on a real
+  day, **39.8M actual vs 265.7M reported (6.7×)**, with two identical
+  19.97M / \$35.13 and 1.73M / \$2.99 rows repeated eight times. Trimming the
+  replayed prefix isn't enough either: three concurrent sub-agents claimed 8.54M
+  of post-fork "own" delta while the shared counter advanced 3.13M. These files
+  are now skipped whole. Guardian / auto-review sub-agents and older
+  `thread_spawn` rollouts own an independent counter and are unaffected.
+- **`gpt-unknown` no longer shows up in the model column.** Replayed history
+  carries no `turn_context`, so most records in a forked rollout fell back to
+  the placeholder — 65 of 87 in a typical file. The real model is in
+  `thread_settings_applied`, which is now read as a fallback.
+- **A replayed `session_meta` no longer rebinds the file's identity.** Replayed
+  history re-emits the source thread's `session_meta` mid-file, which stamped
+  everything after it with the parent's session id and cwd. Only the first
+  `session_meta` binds now.
+
+### Changed
+
+- **Codex sub-agent turns fold into the conversation turn that spawned them**,
+  the way Claude sub-agents already did — they become expandable children of
+  that row instead of separate top-level rows. Two things had to change: the
+  parent session comes from `session_meta` (Codex rollouts sit in a flat
+  date-tree, so there's no parent id in the path to key off), and *every*
+  unparented sub-agent turn is anchored rather than only the first per file —
+  one Codex guardian thread holds several independent turns, since it re-reviews
+  after each approval. Totals are untouched; only the grouping changes.
+
+### Internal
+
+- Codex `parserVersion` → `codex-v8-subagent-sidechain-linking`. The persisted
+  index reparses Codex transcripts automatically on first load; existing
+  histories will show corrected numbers without any manual step.
+- Known gap, documented at the call site: user-initiated forks
+  (`thread_source: 'user'` + `forked_from_id`) replay the source's history too,
+  then diverge into genuinely new spend, so they can't be dropped wholesale.
+  Their replayed prefix stays double-counted — cutting it needs cross-file
+  lineage state the per-file parser doesn't have.
+
 ## [1.3.1] — 2026-07-24
 
 Performance release: large histories index dramatically faster, and `next dev`
