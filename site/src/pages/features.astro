@@ -24,7 +24,9 @@ const sections: Section[] = [
       'Sessions — drill into a single conversation, see model usage and message timeline',
       'Projects — per-cwd spend, worktree-aware: all worktrees of the same repo collapse into one project row, regardless of `git worktree` or `.claude/worktrees/` layout',
       'Models — side-by-side comparison with sparkline trends',
-      'Settings — detected data sources (with real provider logos), indexer health, scan stats',
+      'Tools & skills — every tool, skill and MCP server ranked by estimated context footprint',
+      'Settings — detected data sources (with real provider logos), indexer health, scan stats, and a one-click price refresh',
+      'Sessions / Projects / Models / Tools live under an **Analytics** nav dropdown; Overview, Usage and Settings stay top-level',
     ],
   },
   {
@@ -83,9 +85,32 @@ const sections: Section[] = [
     ],
   },
   {
+    id: 'tools',
+    title: 'Which skill is eating your context?',
+    lead: 'The JSONL never records per-tool token usage, so nobody could answer that — until you attribute each tool_result and skill-body payload back to the tool that produced it. The Tools & skills page ranks every tool, skill and MCP server by estimated context footprint.',
+    bullets: [
+      'Three breakdown dimensions: by skill, by tool, by MCP server',
+      'Expandable per-row stats: invocations, sessions touched, average per call, largest single payload',
+      'Skill bodies are measured from the "Base directory for this skill" injection, not the tiny launch ack — that is where the context actually goes',
+      'Estimated at ~4 chars/token from payload size. The page says so: trust the ranking, not the absolute numbers',
+      'Claude source only — Codex rollouts don\'t carry the shape this needs',
+    ],
+  },
+  {
+    id: 'pricing',
+    title: 'Prices that stay current',
+    lead: 'A model released after your ccgauge version used to cost out wrong. Now the price table refreshes itself from LiteLLM at runtime, on top of the snapshot committed in the package.',
+    bullets: [
+      'Fetched in the background on first page load, validated, and cached to `~/.ccgauge/cache/litellm-pricing.json` for 24 h',
+      'Single-flighted and timeout-bounded — it never blocks a request, and a bad upstream table is rejected in favour of the built-in snapshot',
+      '"Refresh prices" button on Settings, with a line showing whether prices came from the snapshot or a cached LiteLLM copy and when',
+      '`CCGAUGE_OFFLINE=1` disables fetching entirely; `CCGAUGE_PRICING_TTL_MS` tunes the cache lifetime',
+    ],
+  },
+  {
     id: 'privacy',
     title: 'Privacy & polished local UI',
-    lead: '100% local. Reads the JSONL session files your CLI already writes. Zero outbound network calls at runtime. Bound to 127.0.0.1 by default. MIT licensed.',
+    lead: '100% local. Reads the JSONL session files your CLI already writes. Nothing about your usage is ever transmitted; the dashboard\'s one outbound request downloads public model prices, and `CCGAUGE_OFFLINE=1` turns it off. Bound to 127.0.0.1 by default. MIT licensed.',
     bullets: [
       'Light / dark / system theme with no flash on first paint',
       'English + 简体中文 throughout the dashboard, CLI, and MCP responses',
@@ -157,7 +182,7 @@ const screenshots = [
     <div class="pill-brand mb-3">Features</div>
     <h1 class="heading-hero">Every feature ccgauge ships, in one page.</h1>
     <p class="lede mt-5 max-w-3xl">
-      Eight feature areas, all built around the same two ideas: keep your data on your machine,
+      Ten feature areas, all built around the same two ideas: keep your data on your machine,
       and answer the "where is my AI spend going" question in seconds.
     </p>
   </section>

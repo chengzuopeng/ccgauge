@@ -24,7 +24,9 @@ const sections: Section[] = [
       'Sessions — 钻取单次对话，按模型和时间轴展开',
       'Projects — 按 cwd 分布的花费，worktree 感知：同一个 repo 的所有 worktree 自动合并成一行，不管是 `git worktree` 还是 Claude Code 的 `.claude/worktrees/` 布局',
       'Models — 各模型并列对比 + 趋势条',
-      'Settings — 检测到的数据源（带真品牌 logo）、indexer 健康度、扫描统计',
+      'Tools & skills — 所有 tool / skill / MCP server 按预估上下文占用排名',
+      'Settings — 检测到的数据源（带真品牌 logo）、indexer 健康度、扫描统计，以及一键刷新价格',
+      'Sessions / Projects / Models / Tools 收在 **Analytics** 导航下拉里；Overview、Usage、Settings 保持顶层',
     ],
   },
   {
@@ -83,9 +85,32 @@ const sections: Section[] = [
     ],
   },
   {
+    id: 'tools',
+    title: '到底哪个 skill 在吃你的上下文？',
+    lead: 'JSONL 从不记录按工具拆分的 token，所以这个问题一直没人能答 —— 除非把每一份 tool_result 和 skill body 的体积归因回产出它的那个工具。Tools & skills 页就是这么做的：给所有 tool / skill / MCP server 按预估上下文占用排名。',
+    bullets: [
+      '三个拆分维度：按 skill、按 tool、按 MCP server',
+      '每行可展开：调用次数、涉及会话数、单次均值、最大单次 payload',
+      'skill 的体积取自「Base directory for this skill」那条注入，而不是那句几十字节的启动 ack —— 上下文实际耗在前者',
+      '按 payload 体积估算（约 4 字符 1 token），页面上也这么写着：看排名，别看绝对值',
+      '仅 Claude 数据源 —— Codex 的 rollout 不带这个结构',
+    ],
+  },
+  {
+    id: 'pricing',
+    title: '价格表自己保持新鲜',
+    lead: '比你这版 ccgauge 更晚发布的模型，以前算出来是错的。现在价格表会在运行时从 LiteLLM 刷新，叠在包内自带的快照之上。',
+    bullets: [
+      '首次页面加载时后台拉取、校验，缓存到 `~/.ccgauge/cache/litellm-pricing.json`，有效期 24 小时',
+      '单飞 + 超时兜底 —— 从不阻塞请求；上游数据异常会被拒绝，继续用内置快照',
+      'Settings 页有「刷新价格」按钮，并显示当前价格来自快照还是 LiteLLM 缓存、什么时候拉的',
+      '`CCGAUGE_OFFLINE=1` 彻底关闭拉取；`CCGAUGE_PRICING_TTL_MS` 调整缓存时长',
+    ],
+  },
+  {
     id: 'privacy',
     title: '隐私 & 本地化打磨',
-    lead: '100% 本地。只读取 CLI 自己写的 JSONL。运行时零外网调用。默认绑 127.0.0.1。MIT 开源。',
+    lead: '100% 本地。只读取 CLI 自己写的 JSONL。关于你用量的信息永远不外传；仪表盘唯一的外网请求是下载公开的模型价格，设 `CCGAUGE_OFFLINE=1` 即可关闭。默认绑 127.0.0.1。MIT 开源。',
     bullets: [
       '深 / 浅 / 跟随系统三档主题，首屏零闪烁',
       '中文 / 英文界面 + CLI + MCP 响应全语贯通',
@@ -157,7 +182,7 @@ const screenshots = [
     <div class="pill-brand mb-3">功能</div>
     <h1 class="heading-hero">ccgauge 的每个功能，一页讲完。</h1>
     <p class="lede mt-5 max-w-3xl">
-      八大功能块，全都围绕同样的两条原则：你的数据不出本机，"我的 AI 花费到底去哪了"秒级有答案。
+      十大功能块，全都围绕同样的两条原则：你的数据不出本机，"我的 AI 花费到底去哪了"秒级有答案。
     </p>
   </section>
 
