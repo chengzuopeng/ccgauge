@@ -19,6 +19,23 @@ const flags = [
   { flag: '--no-color', default: '—', purpose: 'Disable ANSI colors (auto-disabled when piped)' },
   { flag: '--no-trend', default: '—', purpose: 'Skip the trend chart' },
   { flag: '--no-breakdown', default: '—', purpose: 'Skip the breakdown table' },
+  { flag: '-d, --dashboard', default: 'off', purpose: 'Rich one-screen TUI: KPI tiles, stacked trend, double-column breakdown, 7×24 heatmap' },
+  { flag: '--width <n>', default: 'tty cols', purpose: 'Force output width — useful for screenshots and CI logs' },
+  { flag: '--no-banner', default: '—', purpose: 'Dashboard only: skip the top banner row' },
+  { flag: '--compact', default: '—', purpose: 'Dashboard only: skip the trend chart to save vertical space' },
+];
+
+const commands = [
+  { cmd: 'ccgauge', purpose: 'Start the dashboard in the foreground and open a browser. Alias of `ccgauge start`.' },
+  { cmd: 'ccgauge start -b', purpose: 'Run as a detached background service; state and logs land in `~/.ccgauge/`.' },
+  { cmd: 'ccgauge stop [--force]', purpose: 'Stop the background service, gracefully or by force.' },
+  { cmd: 'ccgauge restart', purpose: 'Stop and start again, accepting the same options as `start`.' },
+  { cmd: 'ccgauge status [--json]', purpose: 'PID, URL, uptime. Exits 3 — systemd-style "not running" — when nothing is up.' },
+  { cmd: 'ccgauge open', purpose: 'Open the already-running dashboard in your browser.' },
+  { cmd: 'ccgauge logs [-f]', purpose: 'Tail the background-service log.' },
+  { cmd: 'ccgauge report', purpose: 'One-shot terminal report. No server. Documented in full below.' },
+  { cmd: 'ccgauge mcp', purpose: 'Start the MCP server on stdio so an LLM can query your usage.' },
+  { cmd: 'ccgauge doctor', purpose: 'One-screen diagnostic: version, env, build artifacts, service state, per-provider scan. Paste it into bug reports.' },
 ];
 
 const examples = [
@@ -28,24 +45,56 @@ const examples = [
   { title: 'JSON output for piping into scripts', code: 'ccgauge report --json | jq .totals' },
   { title: 'Arbitrary date range', code: 'ccgauge report --since 2026-05-01 --until 2026-05-08' },
   { title: 'Minimal — just totals, no chart or breakdown', code: 'ccgauge report --no-trend --no-breakdown' },
+  { title: 'Rich one-screen TUI dashboard', code: 'ccgauge report -d' },
+  { title: 'Background service, then check on it', code: 'ccgauge start -b && ccgauge status' },
 ];
 ---
 
 <BaseLayout
   locale={locale}
   title="CLI reference"
-  description="Full reference for `ccgauge report` — the one-shot, no-server terminal usage summary. Flags, examples, and exit semantics."
+  description="Full ccgauge CLI reference: every subcommand, plus the complete flag list for the one-shot `ccgauge report`."
   ogImage="og-cli.png"
 >
   <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 pt-12 sm:pt-20 pb-8">
     <div class="pill-brand mb-3">CLI</div>
-    <h1 class="heading-hero">
-      <span class="font-mono">ccgauge report</span>
-    </h1>
+    <h1 class="heading-hero">Everything the CLI does.</h1>
     <p class="lede mt-5 max-w-3xl">
-      A formatted, no-server terminal usage report. Reads the same JSONL the dashboard reads,
-      then prints a colored aligned summary in ~0.2 s. Use it locally to spot-check yesterday's
-      spend, or pipe <span class="font-mono">--json</span> into your own scripts.
+      Ten subcommands: run the dashboard in the foreground or as a background service, print a
+      terminal report without starting anything, serve MCP over stdio, or diagnose a bad install.
+      All of them read the same local JSONL.
+    </p>
+  </section>
+
+  <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 py-10">
+    <h2 class="heading-section">Subcommands</h2>
+    <div class="mt-6 overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-border">
+            <th class="text-left py-2 pr-4 label font-normal">Command</th>
+            <th class="text-left py-2 label font-normal">Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          {commands.map((c) => (
+            <tr class="border-b border-border/50">
+              <td class="py-2.5 pr-4 font-mono text-xs text-brand whitespace-nowrap">{c.cmd}</td>
+              <td class="py-2.5 text-text-secondary">{c.purpose}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 py-10">
+    <h2 class="heading-section"><span class="font-mono">ccgauge report</span></h2>
+    <p class="lede mt-3 max-w-3xl">
+      A formatted, no-server terminal usage report in ~0.2 s. Add <span class="font-mono">-d</span>
+      for a one-screen TUI dashboard — KPI tiles, stacked trend, breakdown tables and a 7×24
+      activity heatmap — which falls back to plain text below 80 columns. Pipe
+      <span class="font-mono">--json</span> into your own scripts.
     </p>
   </section>
 

@@ -19,6 +19,23 @@ const flags = [
   { flag: '--no-color', default: '—', purpose: '关闭 ANSI 颜色（管道里自动关）' },
   { flag: '--no-trend', default: '—', purpose: '不打趋势图' },
   { flag: '--no-breakdown', default: '—', purpose: '不打分组表' },
+  { flag: '-d, --dashboard', default: 'off', purpose: '一屏富 TUI：KPI tile、堆叠趋势图、双列 breakdown、7×24 热力图' },
+  { flag: '--width <n>', default: 'tty 列数', purpose: '强制输出宽度 —— 截图和 CI 日志好用' },
+  { flag: '--no-banner', default: '—', purpose: '仅 dashboard：跳过顶部 banner 行' },
+  { flag: '--compact', default: '—', purpose: '仅 dashboard：跳过趋势图，省纵向空间' },
+];
+
+const commands = [
+  { cmd: 'ccgauge', purpose: '前台启动仪表盘并打开浏览器，等价于 `ccgauge start`。' },
+  { cmd: 'ccgauge start -b', purpose: '以后台服务方式常驻，状态和日志写在 `~/.ccgauge/`。' },
+  { cmd: 'ccgauge stop [--force]', purpose: '停止后台服务，优雅停或强杀。' },
+  { cmd: 'ccgauge restart', purpose: '重启后台服务，接受与 `start` 相同的参数。' },
+  { cmd: 'ccgauge status [--json]', purpose: 'PID / URL / 运行时长。没起来时退出码 3（systemd 风格的「未运行」）。' },
+  { cmd: 'ccgauge open', purpose: '在浏览器里打开已经跑着的仪表盘。' },
+  { cmd: 'ccgauge logs [-f]', purpose: '跟踪后台服务日志。' },
+  { cmd: 'ccgauge report', purpose: '一次性终端报告，不起服务。完整说明见下。' },
+  { cmd: 'ccgauge mcp', purpose: '以 stdio 启动 MCP 服务，让 LLM 直接查你的用量。' },
+  { cmd: 'ccgauge doctor', purpose: '一屏诊断：版本、环境、构建产物、服务状态、各数据源扫描结果。报 bug 时直接贴。' },
 ];
 
 const examples = [
@@ -28,23 +45,54 @@ const examples = [
   { title: 'JSON 输出给脚本用', code: 'ccgauge report --json | jq .totals' },
   { title: '任意日期区间', code: 'ccgauge report --since 2026-05-01 --until 2026-05-08' },
   { title: '极简：只看总数', code: 'ccgauge report --no-trend --no-breakdown' },
+  { title: '一屏 TUI 看板', code: 'ccgauge report -d' },
+  { title: '起后台服务并查看状态', code: 'ccgauge start -b && ccgauge status' },
 ];
 ---
 
 <BaseLayout
   locale={locale}
   title="命令行"
-  description="ccgauge report 的完整文档 —— 一次性、无 server 的终端用量报告。参数、示例、退出语义全包。"
+  description="ccgauge CLI 完整文档：全部子命令，以及一次性 `ccgauge report` 的完整参数表。"
   ogImage="og-cli.png"
 >
   <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 pt-12 sm:pt-20 pb-8">
     <div class="pill-brand mb-3">命令行</div>
-    <h1 class="heading-hero">
-      <span class="font-mono">ccgauge report</span>
-    </h1>
+    <h1 class="heading-hero">CLI 的全部能力。</h1>
     <p class="lede mt-5 max-w-3xl">
-      格式化的、无 server 的终端用量报告。读的就是仪表盘读的那份 JSONL，0.2 秒内打出彩色对齐的总结。
-      本地随手查昨天花了多少，或者 <span class="font-mono">--json</span> 走管道接你的脚本。
+      十个子命令：前台或后台跑仪表盘、不起服务直接打终端报告、以 stdio 提供 MCP 服务、
+      或者诊断一个装坏了的环境。它们读的都是同一份本地 JSONL。
+    </p>
+  </section>
+
+  <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 py-10">
+    <h2 class="heading-section">子命令</h2>
+    <div class="mt-6 overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-border">
+            <th class="text-left py-2 pr-4 label font-normal">命令</th>
+            <th class="text-left py-2 label font-normal">作用</th>
+          </tr>
+        </thead>
+        <tbody>
+          {commands.map((c) => (
+            <tr class="border-b border-border/50">
+              <td class="py-2.5 pr-4 font-mono text-xs text-brand whitespace-nowrap">{c.cmd}</td>
+              <td class="py-2.5 text-text-secondary">{c.purpose}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 py-10">
+    <h2 class="heading-section"><span class="font-mono">ccgauge report</span></h2>
+    <p class="lede mt-3 max-w-3xl">
+      格式化的、无 server 的终端用量报告，0.2 秒出结果。加 <span class="font-mono">-d</span>
+      得到一屏 TUI 看板 —— KPI tile、堆叠趋势图、breakdown 表格、7×24 活跃热力图 ——
+      窗口宽度不足 80 列时自动回退纯文本。<span class="font-mono">--json</span> 走管道接你的脚本。
     </p>
   </section>
 
