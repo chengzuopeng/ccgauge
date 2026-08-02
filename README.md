@@ -111,6 +111,7 @@ Dashboard opens at [http://localhost:3737](http://localhost:3737). If the port i
 | `-q, --quiet` | — | Silence Next.js output. |
 | `--dir <path>` | — | Add `<path>/projects` as an extra Claude source. |
 | `--strict-port` | — | Fail if the preferred port is busy. |
+| `--log <path>` | `~/.ccgauge/ccgauge.log` | Background-service log file. |
 
 ### Background mode
 
@@ -224,6 +225,12 @@ Override / extend via environment variables:
 | `CCGAUGE_CODEX_DIR` | Add an extra Codex sessions directory |
 | `CODEX_HOME` | Add `<dir>/sessions` and `<dir>/archived_sessions` |
 | `CCGAUGE_STATE_DIR` | Override background service state / log directory |
+| `CCGAUGE_OFFLINE=1` | Never fetch prices from LiteLLM — use the committed snapshot only |
+| `CCGAUGE_PRICING_OFFLINE=1` | Same as above, scoped name |
+| `CCGAUGE_PRICING_TTL_MS` | Price-cache lifetime in ms (default 24 h) |
+| `CCGAUGE_POLL_FALLBACK` | `1` force the indexer's polling fallback on, `0` off (default: on except for MCP) |
+| `CCGAUGE_MCP_PRETTY=1` | Pretty-print MCP JSON payloads — easier to read while debugging a client |
+| `CCGAUGE_DEBUG` | Verbose indexer diagnostics on stderr |
 
 ## Develop
 
