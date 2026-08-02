@@ -21,7 +21,7 @@ npx ccgauge
 
 ccgauge 读取 Claude Code 和 Codex CLI 本地已经写下的 JSONL 会话文件，按天 / 项目 / 模型 / 会话统计 token 用量与**美元等值花费**，在浏览器里打开统一看板，顶部一键切换数据源。也能让大模型通过内置的 MCP 服务直接查你的用量。不想开浏览器？`ccgauge report -d` 在终端里就有同款看板。
 
-**无登录、无遥测、无任何外网调用。**
+**无登录、无遥测，用量数据永不出本机** —— 唯一的外网请求是从 LiteLLM 拉取公开的模型价格，设 `CCGAUGE_OFFLINE=1` 连这个也关掉。
 
 ![概览 — 中文 / Light](https://raw.githubusercontent.com/chengzuopeng/ccgauge/main/docs/screenshots/overview-zh-light.png)
 
@@ -69,7 +69,7 @@ ccgauge 读取 Claude Code 和 Codex CLI 本地已经写下的 JSONL 会话文�
 ### 成本透明
 - **缓存节省** 单独成卡，量化 Anthropic prompt caching 节省的美元。
 - Codex 成本标注为 **OpenAI API 单价折算估值**，方便订阅用户对比 PAYG。
-- 内置价格表：12 个 Claude 模型 + gpt-5 系列 + o 系列；未知模型自动回退到同 family 最新单价。
+- 内置价格表覆盖 Claude 各家族直到 Claude 5，以及 gpt-5 / gpt-4.1 / o 系列全线，运行时从 LiteLLM 刷新；未知模型自动回退到同 family 最新单价。
 
 ### 隐私优先
 - 本地优先：只读 JSONL 文件；唯一的外网请求是从 LiteLLM 拉取公开价格，设 `CCGAUGE_OFFLINE=1` 可关闭。
@@ -260,7 +260,7 @@ pnpm build             # next build + 打包 MCP + 打包 CLI report
 ## 常见问答
 
 **ccgauge 会上传对话或日志吗？**
-不会。全程跑在本地，只读 Claude Code 和 Codex CLI 已经写下的本地 JSONL 文件，零外网调用，不需要任何 API 凭证。
+不会。用量数据永不出本机：只读 Claude Code 和 Codex CLI 已经写下的本地 JSONL 文件，不需要任何 API 凭证。唯一出网的请求是**下载** —— 从 LiteLLM 拉公开模型价格，不携带任何你的信息。设 `CCGAUGE_OFFLINE=1` 可关闭，回退到仓库内置的价格快照。
 
 **跟 [ccusage](https://github.com/ryoppippi/ccusage) 有什么不同？**
 ccusage 是把用量打成表格的终端工具。ccgauge 是一个完整的 Web 看板：图表、按会话下钻、5h 实时进度、按项目 / 模型分维度统计，并且**开箱覆盖 OpenAI Codex CLI**。还多了一个 MCP 服务让 LLM 用自然语言查你的用量，以及一个终端版 TUI 看板（`ccgauge report -d`）—— 不想开浏览器时用。
@@ -269,7 +269,7 @@ ccusage 是把用量打成表格的终端工具。ccgauge 是一个完整的 Web
 有用。看板始终展示**美元等值**的 API 折算成本，看到"如果按 API 计费这些用量值多少"。订阅计费方式不同，ccgauge 不替代你的账单。
 
 **支持哪些模型？**
-所有 `claude-*` 模型（Opus / Sonnet / Haiku，3.x / 4.x）、gpt-5 系列、gpt-4.1 系列、o 系列（o3 / o4-mini）。未知模型自动回退到同 family 最新一档单价。
+所有 `claude-*` 模型 —— Opus / Sonnet / Haiku / Fable，覆盖 3、4、5 三个代际 —— 以及 gpt-5 系列（含 gpt-5.6 各变体）、gpt-4.1 系列、o 系列（o3 / o4-mini）。未知模型自动回退到同 family 最新一档单价，所以比你这版 ccgauge 更新的模型也能算出合理价格。
 
 ## 许可证
 

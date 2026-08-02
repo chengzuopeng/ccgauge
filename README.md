@@ -33,7 +33,7 @@ ccgauge reads the JSONL session files Claude Code and Codex CLI already store on
 - 💰 **Cache savings as a first-class KPI.** See exactly how many dollars Anthropic prompt caching saved you this week. Not a footnote — a card on the overview.
 - ⏱️ **Live 5-hour block.** Countdown, progress bar, projected total cost — know when the rate-limit window rolls over *before* you hit it.
 - 🤖 **MCP-native.** Plug into Claude Desktop / Cursor / Cline and ask *"What did I work on yesterday, by project?"* in plain English. Real numbers, no screenshots, no copy-paste.
-- 🔒 **100% local & private.** Reads JSONL files you already have. Zero outbound calls. MIT licensed. Your transcripts never leave the machine.
+- 🔒 **100% local & private.** Reads JSONL files you already have. MIT licensed. Your transcripts never leave the machine — the one outbound request fetches public model prices from LiteLLM, and `CCGAUGE_OFFLINE=1` turns it off.
 - 🪜 **Worktree-aware projects.** All worktrees of the same repo collapse into one project row — the way you actually think about your work.
 
 ## What's new in v1.1.0
@@ -69,10 +69,10 @@ See [CHANGELOG.md](https://github.com/chengzuopeng/ccgauge/blob/main/CHANGELOG.m
 ### Cost transparency
 - **Cache savings** quantified as a dollar figure on the overview.
 - Codex cost shown as **OpenAI API equivalent** so subscription users can compare value against pay-as-you-go.
-- Built-in pricing: 12 Claude models + gpt-5 family + o-series; unknown models fall back to family-latest.
+- Built-in pricing covers every Claude family through Claude 5 plus the gpt-5 / gpt-4.1 / o-series range, refreshed from LiteLLM at runtime; unknown models fall back to family-latest.
 
 ### Privacy by design
-- 100% local: read-only access to JSONL files, zero outbound calls.
+- 100% local: read-only access to JSONL files. The only outbound request fetches public model prices from LiteLLM; `CCGAUGE_OFFLINE=1` disables it.
 - Open source, MIT licensed.
 - Background mode for an always-on service with `start / stop / restart / status / open / logs` lifecycle commands.
 
@@ -260,7 +260,7 @@ The marketing site lives in [`site/`](https://github.com/chengzuopeng/ccgauge/tr
 ## FAQ
 
 **Does ccgauge upload anything?**
-No. Runs entirely on your machine; reads JSONL files Claude Code and Codex CLI already store locally; zero outbound calls; no API credentials needed.
+No. Your usage data never leaves the machine: ccgauge reads JSONL files Claude Code and Codex CLI already store locally and needs no API credentials. The one request that does leave is a **download** — public model prices from LiteLLM, sent nothing about you. `CCGAUGE_OFFLINE=1` disables it and falls back to the committed price snapshot.
 
 **How is this different from [ccusage](https://github.com/ryoppippi/ccusage)?**
 ccusage is a CLI that prints usage tables. ccgauge is a polished web dashboard with charts, per-session drill-down, a 5h rate-limit countdown, project / model breakdowns — and **also covers OpenAI Codex CLI** out of the box. Plus an MCP server so your LLM can answer questions about your usage in plain English, and an in-terminal TUI dashboard (`ccgauge report -d`) for when the browser isn't an option.
@@ -269,7 +269,7 @@ ccusage is a CLI that prints usage tables. ccgauge is a polished web dashboard w
 Yes. The dashboard always reports the **API-equivalent dollar value** of your usage — useful to gauge *"how much would this cost on PAYG?"*. Subscription plans bill differently; ccgauge is not your invoice.
 
 **Which models are supported?**
-All `claude-*` (Opus / Sonnet / Haiku, 3.x and 4.x) and the gpt-5 family + gpt-4.1 family + o-series (o3, o4-mini). Unknown models fall back to family-latest pricing automatically.
+All `claude-*` — Opus / Sonnet / Haiku / Fable across the 3, 4 and 5 generations — plus the gpt-5 family (including the gpt-5.6 variants), gpt-4.1 family, and o-series (o3, o4-mini). Unknown models fall back to family-latest pricing automatically, so a model released after your ccgauge version still prices sensibly.
 
 ## License
 
