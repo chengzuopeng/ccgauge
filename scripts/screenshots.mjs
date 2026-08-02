@@ -20,6 +20,7 @@ const PAGES = [
   { id: 'sessions', path: '/sessions' },
   { id: 'projects', path: '/projects' },
   { id: 'models', path: '/models' },
+  { id: 'tools', path: '/tools' },
   { id: 'settings', path: '/settings' },
 ];
 
