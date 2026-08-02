@@ -77,7 +77,7 @@ function addStartOptions(cmd) {
     .option('-p, --port <port>', 'preferred port', DEFAULT_PORT)
     .option('-H, --host <host>', 'bind host', DEFAULT_HOST)
     .option('--no-open', 'do not auto-open the browser (foreground only)')
-    .option('--dir <path>', 'override Claude config dir (will append /projects)')
+    .option('--dir <path>', 'add <path>/projects as an extra Claude source (does not replace the defaults)')
     .option('-q, --quiet', 'silence Next.js output')
     .option('-b, --background', 'run in the background')
     .option('--strict-port', 'fail if the preferred port is unavailable')
