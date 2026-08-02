@@ -46,6 +46,8 @@ ccgauge 读取 Claude Code 和 Codex CLI 本地已经写下的 JSONL 会话文�
 - **会话** —— 每场对话的列表（模型 / token / 花费 / 时长），点进去看消息级时间线。
 - **项目** —— 按 `cwd` 聚合的卡片，含趋势条与花费占比；worktree 自动合并到主仓库。
 - **模型** —— 各模型并排：成本占比、token 占比、缓存命中、官方 per-1M 单价。
+- **工具与技能** —— 按**预估上下文占用**给所有 tool / skill / MCP server 排名，用来揪出那个悄悄吃掉大半上下文的 skill。可按 skill / tool / MCP server 三个维度拆分。数字由 payload 体积估算（约 4 字符 1 token），不是 Anthropic 的按工具计费 —— 看排名，别当账单。仅支持 Claude 数据源，Codex 的 rollout 不记录所需结构。
+- 会话 / 项目 / 模型 / 工具收在 **Analytics** 导航下拉里；概览、用量、设置保持顶层。
 - **亮色 / 暗色 / 跟随系统** 三档主题，首屏无闪烁；**英 / 中** 双语，cookie + localStorage 双向同步。
 
 ### 命令行报告

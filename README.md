@@ -46,6 +46,8 @@ Release notes live in [CHANGELOG.md](https://github.com/chengzuopeng/ccgauge/blo
 - **Sessions** — per-conversation list with model / tokens / cost / duration; click in for the message-level timeline.
 - **Projects** — per-`cwd` aggregation with sparkline and spend share; worktrees auto-collapsed.
 - **Models** — side-by-side cost share, token share, cache hit, official per-1M pricing.
+- **Tools & skills** — ranks every tool, skill, and MCP server by **estimated context footprint**, so you can find the skill quietly eating 80% of your context. Breakdown by skill / tool / MCP server. Estimated from payload size (~4 chars/token), not per-tool billing — trust the ranking, not the absolute numbers. Claude source only; Codex rollouts don't record the needed shape.
+- Sessions / Projects / Models / Tools live under the **Analytics** nav dropdown; Overview, Usage and Settings stay top-level.
 - **Light / Dark / System** themes (no flash), **EN / 中文**, cookie + localStorage synced.
 
 ### CLI report (terminal)
