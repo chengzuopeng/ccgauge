@@ -36,12 +36,6 @@ ccgauge 读取 Claude Code 和 Codex CLI 本地已经写下的 JSONL 会话文�
 - 🔒 **本地优先、隐私第一。** 只读你已有的 JSONL 文件，对话内容全程不出本机，MIT 开源。唯一的外网请求是从 LiteLLM 拉取公开的模型价格（设 `CCGAUGE_OFFLINE=1` 可关闭）。
 - 🪜 **Worktree 感知。** 同一个 repo 的所有 worktree 自动合并到同一个项目行 —— 跟你的思维模型一致。
 
-## v1.1.0 新特性
-
-- **`ccgauge report --dashboard` / `-d`** —— 一屏富 TUI 终端看板：KPI tile、堆叠柱状趋势图、breakdown 表格、7×24 活跃热力图。SSH / tmux / 快速看一眼时不用切浏览器。窗口宽度 < 80 自动 fallback 到纯文本。
-- **`/usage` 自定义日期范围** —— 真正的日历选择器（react-day-picker），跟随主题与语言切换，URL 契约 `?range=custom&from=...&to=...`。
-- **官网根路径** —— 英文页迁到 `/cli/` / `/features/` / `/mcp/`，中文页 `/zh/...`。旧的 `/en/*` 路径还能通过静态 redirect 跳转，不会 404。
-
 完整 release notes 见 [CHANGELOG.md](https://github.com/chengzuopeng/ccgauge/blob/main/CHANGELOG.md)。
 
 ## 功能一览

@@ -36,13 +36,7 @@ ccgauge reads the JSONL session files Claude Code and Codex CLI already store on
 - 🔒 **100% local & private.** Reads JSONL files you already have. MIT licensed. Your transcripts never leave the machine — the one outbound request fetches public model prices from LiteLLM, and `CCGAUGE_OFFLINE=1` turns it off.
 - 🪜 **Worktree-aware projects.** All worktrees of the same repo collapse into one project row — the way you actually think about your work.
 
-## What's new in v1.1.0
-
-- **`ccgauge report --dashboard` / `-d`** — rich one-screen TUI: KPI tiles, stacked-bar trend chart, breakdown tables, day×hour heatmap. Perfect for SSH / tmux / a quick check without leaving the terminal. Falls back to plain text below 80 columns.
-- **Custom date range** on `/usage` — proper calendar picker (react-day-picker), brand-themed, follows your language toggle. `?range=custom&from=...&to=...` URL contract.
-- **Marketing site at root URLs** — English at `/cli/` / `/features/` / `/mcp/`, Chinese under `/zh/...`. Old `/en/*` paths still resolve via static redirects.
-
-See [CHANGELOG.md](https://github.com/chengzuopeng/ccgauge/blob/main/CHANGELOG.md) for the full release notes.
+Release notes live in [CHANGELOG.md](https://github.com/chengzuopeng/ccgauge/blob/main/CHANGELOG.md).
 
 ## Features
 
