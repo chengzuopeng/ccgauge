@@ -58,18 +58,23 @@ const writes: Array<{ what: string; where: string; why: string }> = [
     <h1 class="heading-hero">Everything stays on your machine.</h1>
     <p class="lede mt-5 max-w-3xl">
       ccgauge is built for a simple promise: your conversation transcripts and your AI spend are
-      none of our business. The dashboard, the CLI, and the MCP server all run locally and never
-      make outbound network calls at runtime.
+      none of our business. Everything runs locally, and nothing about your usage is ever
+      transmitted anywhere. The dashboard makes exactly one outbound request — it downloads
+      public model prices — and you can turn it off.
     </p>
   </section>
 
   <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 py-10">
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div class="card card-pad">
-        <div class="label mb-2">No outbound calls</div>
+        <div class="label mb-2">One outbound call, and it's a download</div>
         <p class="text-sm text-text-secondary leading-relaxed">
-          At runtime, ccgauge does not talk to any third-party server. Not to Anthropic. Not to
-          OpenAI. Not to "ccgauge.dev". Bind defaults to <span class="font-mono">127.0.0.1</span>.
+          Never to Anthropic. Never to OpenAI. Never to this site. The dashboard fetches the
+          public LiteLLM price table so newly-released models cost out correctly — a GET that
+          sends nothing about you. <span class="font-mono">CCGAUGE_OFFLINE=1</span> disables it
+          and falls back to the price snapshot shipped in the package. The CLI report and the
+          MCP server never fetch anything at all. Bind defaults to
+          <span class="font-mono">127.0.0.1</span>.
         </p>
       </div>
       <div class="card card-pad">

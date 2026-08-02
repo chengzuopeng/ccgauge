@@ -57,18 +57,20 @@ const writes: Array<{ what: string; where: string; why: string }> = [
     <div class="pill-brand mb-3">隐私</div>
     <h1 class="heading-hero">一切都留在你的电脑里。</h1>
     <p class="lede mt-5 max-w-3xl">
-      ccgauge 的设计原则简单粗暴：你的对话记录和 AI 花费跟我们没关系。仪表盘、CLI、MCP 服务全部本地运行，
-      运行时不发任何外网请求。
+      ccgauge 的设计原则简单粗暴：你的对话记录和 AI 花费跟我们没关系。一切都在本地运行，
+      关于你用量的任何信息都不会被传出去。仪表盘只有一个外网请求 —— 下载公开的模型价格表 —— 而且可以关掉。
     </p>
   </section>
 
   <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 py-10">
     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div class="card card-pad">
-        <div class="label mb-2">零外网调用</div>
+        <div class="label mb-2">只有一个外网请求，而且是下载</div>
         <p class="text-sm text-text-secondary leading-relaxed">
-          运行时不跟任何第三方服务通信。不跟 Anthropic。不跟 OpenAI。不跟 "ccgauge.dev"。
-          默认绑 <span class="font-mono">127.0.0.1</span>。
+          不跟 Anthropic。不跟 OpenAI。也不跟本站。仪表盘会拉取公开的 LiteLLM 价格表，
+          好让新发布的模型也能算对价格 —— 一个不携带任何你的信息的 GET。
+          设 <span class="font-mono">CCGAUGE_OFFLINE=1</span> 可关闭，回退到包内自带的价格快照。
+          CLI 报告和 MCP 服务则完全不发任何请求。默认绑 <span class="font-mono">127.0.0.1</span>。
         </p>
       </div>
       <div class="card card-pad">
