@@ -34,6 +34,7 @@ const tools = [
   { name: 'daily_summary', purpose: 'A specific day\'s totals + top models + top projects. Useful for end-of-day reflection.' },
   { name: 'weekly_summary', purpose: 'A specific week\'s totals + day-by-day breakdown.' },
   { name: 'recent_activity', purpose: 'The last N assistant calls with timestamp / model / prompt preview / cost.' },
+  { name: 'cost_estimator', purpose: 'USD cost of a hypothetical request. Uses the built-in price tables; does NOT read your history.' },
 ];
 
 const promptExamples = [
@@ -49,7 +50,7 @@ const promptExamples = [
 <BaseLayout
   locale={locale}
   title="MCP integration"
-  description="Wire ccgauge into Claude Desktop, Cursor, or any MCP-aware client. Eight tools, one config block, zero copy-paste."
+  description="Wire ccgauge into Claude Desktop, Cursor, or any MCP-aware client. Nine tools, one config block, zero copy-paste."
 >
   <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 pt-12 sm:pt-20 pb-8">
     <div class="pill-brand mb-3">MCP</div>
@@ -81,14 +82,14 @@ const promptExamples = [
 
     <p class="mt-6 text-sm text-text-tertiary max-w-3xl">
       Restart the client. <span class="font-mono">ccgauge</span> should show up in the MCP tool
-      picker with eight tools available. The server starts on first request and indexes your
+      picker with nine tools available. The server starts on first request and indexes your
       JSONL into a separate cache file (<span class="font-mono">~/.ccgauge/cache/index-mcp-v2.json</span>)
       so it never contends with the dashboard for the same on-disk index.
     </p>
   </section>
 
   <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 py-12">
-    <h2 class="heading-section">2. The eight tools</h2>
+    <h2 class="heading-section">2. The nine tools</h2>
     <p class="lede mt-3 max-w-3xl">
       Each tool returns structured JSON. The LLM picks the right one based on your question;
       you don't need to remember names.

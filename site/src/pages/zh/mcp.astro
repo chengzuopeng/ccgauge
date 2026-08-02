@@ -34,6 +34,7 @@ const tools = [
   { name: 'daily_summary', purpose: '某一天的总数 + 模型 Top + 项目 Top。每天复盘很顺手。' },
   { name: 'weekly_summary', purpose: '某一周的总数 + 每日拆分。' },
   { name: 'recent_activity', purpose: '最近 N 次 assistant 调用：时间戳 / 模型 / prompt 片段 / 花费。' },
+  { name: 'cost_estimator', purpose: '估算一个假设请求的美元成本。用内置价格表，**不**读你的历史数据。' },
 ];
 
 const promptExamples = [
@@ -49,7 +50,7 @@ const promptExamples = [
 <BaseLayout
   locale={locale}
   title="MCP 接入"
-  description="把 ccgauge 接进 Claude Desktop / Cursor / 任何懂 MCP 的客户端。8 个 tool、一段配置、零粘贴。"
+  description="把 ccgauge 接进 Claude Desktop / Cursor / 任何懂 MCP 的客户端。9 个 tool、一段配置、零粘贴。"
 >
   <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 pt-12 sm:pt-20 pb-8">
     <div class="pill-brand mb-3">MCP</div>
@@ -80,14 +81,14 @@ const promptExamples = [
     </div>
 
     <p class="mt-6 text-sm text-text-tertiary max-w-3xl">
-      重启客户端，<span class="font-mono">ccgauge</span> 会出现在 MCP tool 选择器里，附带 8 个 tool。
+      重启客户端，<span class="font-mono">ccgauge</span> 会出现在 MCP tool 选择器里，附带 9 个 tool。
       服务在收到第一次请求时启动，并把 JSONL 索引写到独立的缓存文件
       （<span class="font-mono">~/.ccgauge/cache/index-mcp-v2.json</span>），所以不会和仪表盘抢同一份磁盘索引。
     </p>
   </section>
 
   <section data-reveal class="mx-auto max-w-7xl px-4 sm:px-6 py-12">
-    <h2 class="heading-section">2. 8 个 tool</h2>
+    <h2 class="heading-section">2. 9 个 tool</h2>
     <p class="lede mt-3 max-w-3xl">
       每个 tool 都返回结构化 JSON。模型会根据你的问题自动选 tool，你不需要记名字。
     </p>
