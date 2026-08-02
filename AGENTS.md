@@ -27,7 +27,9 @@ app/                       Next.js routes (RSC pages + /api routes)
   api/                     Server-side JSON endpoints (scan, usage, sessions,
                            projects, turns, blocks, pricing, export/usage)
   page.tsx                 Overview
-  usage/, sessions/[id]/, projects/[id]/, models/, settings/   Drill-down pages
+  usage/, sessions/[id]/, projects/[id]/, models/, tools/, settings/
+                           Drill-down pages. Sessions / Projects / Models /
+                           Tools live under the "Analytics" nav dropdown.
 
 bin/cli.mjs                Single-file CLI (commander). Imports the bundled
                            dist/report/index.mjs and dist/mcp/server.mjs lazily
@@ -43,9 +45,15 @@ lib/
   data-loader/             scan.ts (entry), indexer.ts (singleton + watchers),
                            index-persist.ts (~/.ccgauge on-disk cache),
                            parse-jsonl.ts (claude parser), link-sidechain.ts
-                           (sub-agent → parent-turn merge pass).
+                           (sub-agent → parent-turn merge pass, both providers),
+                           derived.ts (memoized per-scan derivations: model /
+                           project lists, turn-row LRU).
   aggregator/              Pure aggregations: totals, time-buckets, by-model,
-                           by-project, by-session, activity heatmap.
+                           by-project, by-session, activity heatmap (activity.ts),
+                           and tool / skill / MCP context footprint (tools.ts,
+                           feeds the /tools page — Claude source only).
+  api/                     error-handler.ts: the withApiErrorHandling wrapper +
+                           shared badRequest shape used by every /api route.
   blocks/                  5-hour billing-block rollups (computeBlocks). Feeds
                            app/api/blocks + the block-progress components.
   pricing/                 LiteLLM-sourced. litellm-pricing.generated.js is the
@@ -64,6 +72,9 @@ lib/
                            records collapse into the same "turn".
   cli-report/              The pretty terminal report. Bundled into dist/report.
   mcp/                     MCP server (stdio JSON-RPC). Bundled into dist/mcp.
+                           tools/ holds the 9 registered tools (usage.ts × 6,
+                           activity.ts × 3); resources/ exposes provider
+                           metadata; check.ts backs `ccgauge mcp --check`.
   i18n/, theme/            Cookie-driven SSR + localStorage mirror + no-flash.
 
 scripts/                   Build & test helpers (esbuild bundlers, postbuild,
@@ -90,8 +101,9 @@ site/                      Astro 4 marketing site (ccgauge.dev). Source-only
 pnpm dev            # Next dev on :3738, hot-reload
 pnpm typecheck      # tsc --noEmit — run before any commit
 pnpm lint           # eslint flat config — run before any commit
-pnpm test           # 7 strip-types suites (codex-parser, pricing-snapshot,
-                    #   turns, sidechain, source-merge, cost-from-usage, range)
+pnpm test           # 8 strip-types suites (codex-parser, pricing-snapshot,
+                    #   pricing-store, turns, sidechain, source-merge,
+                    #   cost-from-usage, range)
                     #   + check-parser-versions + check-readme-images guards
 pnpm test:mcp       # boot the MCP server and exercise its tools
 pnpm update-pricing # regenerate lib/pricing/litellm-pricing.generated.js from LiteLLM
@@ -149,10 +161,26 @@ on 3737 by default.
     in the usage table, not two unrelated siblings.
     See `lib/providers/claude/index.ts#parserVersion` history:
     `claude-v3-synthetic-flag` → `claude-v4-sidechain-merge` →
-    `claude-v5-task-notification-synthetic` (current). Touch this path?
-    Bump `parserVersion` again — stale-cache entries are invisible
-    failures, and `scripts/check-parser-versions.mjs` (run by `pnpm test`)
-    fails when the code version drifts from `scripts/parser-versions.json`.
+    `claude-v5-task-notification-synthetic` → `claude-v6-tool-result-sizes`
+    (current). Touch this path? Bump `parserVersion` again — stale-cache
+    entries are invisible failures, and `scripts/check-parser-versions.mjs`
+    (run by `pnpm test`) fails when the code version drifts from
+    `scripts/parser-versions.json`.
+
+    Codex sub-agents work differently and cost more versions:
+    `codex-v6-output-excludes-readded-reasoning` →
+    `codex-v7-skip-subagent-fork-mirrors` (a spawned sub-agent's rollout
+    MIRRORS the parent — same shared token counter — so counting it
+    double-bills; skip the file when `session_meta.forked_from_id` is set)
+    → `codex-v8-subagent-sidechain-linking` (the sub-agents that ARE real
+    spend fold into the spawning turn via `parentSessionId`, since Codex
+    states the parent in `session_meta`, not in the file path like Claude)
+    → `codex-v9-anchor-userless-subagents` (some sub-agent rollouts carry
+    no user record at all — the prompt arrives as a `response_item` — so
+    unparented sidechain ASSISTANTS get anchored too)
+    → `codex-v10-turn-context-model-precedence` (current;
+    `thread_settings_applied` is a fallback and must never override the
+    per-turn `turn_context` model, or turns bill at the wrong rate).
 
 3. **Records are deduped after parsing.**
    The same `(messageId, requestId)` can appear in multiple JSONL files
