@@ -1,19 +1,27 @@
 import { defineConfig } from 'astro/config';
 import tailwind from '@astrojs/tailwind';
 
-// The site is published to GitHub Pages, so that is the default rather than an
-// env-gated special case: a local `pnpm site:build` now emits the same
-// canonical URLs and the same `/ccgauge` base as CI does. Before this, the
-// non-CI branch pointed at an unused `ccgauge.dev`, which meant a link or
-// sitemap entry could look right locally and break once deployed.
-// CI still passes GH_PAGES_USER / GH_PAGES_REPO so a fork deploys to its own
-// owner and repo without editing this file.
+// Serving origin. GitHub Pages by default; CI passes the real owner so a fork
+// deploys under its own account without editing this file.
 const ghOwner = process.env.GH_PAGES_USER ?? 'chengzuopeng';
-const ghRepo = process.env.GH_PAGES_REPO ?? 'ccgauge';
 const siteUrl = `https://${ghOwner}.github.io`;
-const basePath = `/${ghRepo}`;
 
-const basePrefix = basePath ?? '';
+// The sub-path the site is served from is OPT-IN via BASE_URL. Unset — local
+// dev, local builds — means "served from the root", so `pnpm site:dev` opens at
+// :4321/ with no prefix to remember. The deploy workflow passes
+// BASE_URL=/<repo> because GitHub project Pages serve from /<repo>; that is the
+// only place a base is needed, and deriving it from the repo name there keeps
+// a renamed repo or a fork working with no change here.
+function normalizeBase(raw) {
+  const trimmed = String(raw ?? '').trim();
+  if (!trimmed || trimmed === '/') return '/';
+  return `/${trimmed.replace(/^\/+/, '').replace(/\/+$/, '')}`;
+}
+const basePath = normalizeBase(process.env.BASE_URL);
+
+// Redirect targets are written by hand, so they need '' rather than '/' at the
+// root — `${'/'}/cli/` would emit a double slash.
+const basePrefix = basePath === '/' ? '' : basePath;
 const legacyEnRedirects = {
   '/en/': `${basePrefix}/`,
   '/en/cli/': `${basePrefix}/cli/`,
