@@ -28,6 +28,10 @@ fixes found while making them.
   nothing at all.
 - Inline code in the site's section leads and CLI subcommand table rendered as
   literal backticks.
+- The "why ccgauge" grid's one real screenshot followed the theme, so on the
+  light theme it swapped to the light shot and read as a hole between five dark
+  artwork tiles. It is pinned to the dark variant; every other screenshot
+  surface still follows the theme.
 
 ### Changed
 
@@ -58,6 +62,13 @@ fixes found while making them.
 - **Screenshots refreshed** — all 28 dated from the v1.0.4 era, showing a nav
   bar that no longer exists and no Tools page. The capture script now includes
   it.
+- **Screenshots are redacted before capture.** They are shot against real
+  history, so they were publishing repo names, absolute home paths, skill names
+  and real prompt text. `pnpm screenshots` now blurs the fields that render
+  user content — selected by role, so the rule survives the data changing — and
+  fails the capture outright if a selector matches nothing, rather than
+  silently shipping readable data. Model names, token counts, costs and dates
+  stay sharp.
 - `AGENTS.md`: parser-version history was two Claude versions stale and had no
   Codex history at all; suite count and repo layout brought current.
 - Restored the CHANGELOG's version compare links, absent since 1.1.4.
