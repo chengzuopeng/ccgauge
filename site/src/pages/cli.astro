@@ -80,7 +80,7 @@ const examples = [
           {commands.map((c) => (
             <tr class="border-b border-border/50">
               <td class="py-2.5 pr-4 font-mono text-xs text-brand whitespace-nowrap">{c.cmd}</td>
-              <td class="py-2.5 text-text-secondary">{c.purpose}</td>
+              <td class="py-2.5 text-text-secondary" set:html={renderInlineCode(c.purpose)}></td>
             </tr>
           ))}
         </tbody>

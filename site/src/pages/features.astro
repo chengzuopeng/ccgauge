@@ -225,7 +225,7 @@ const screenshots = [
   {sections.map((s) => (
     <section data-reveal id={s.id} class="mx-auto max-w-7xl px-4 sm:px-6 py-10 sm:py-14 scroll-mt-24">
       <h2 class="heading-section">{s.title}</h2>
-      <p class="lede mt-3 max-w-3xl">{s.lead}</p>
+      <p class="lede mt-3 max-w-3xl" set:html={renderInlineCode(s.lead)}></p>
       <ul class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 max-w-4xl">
         {s.bullets.map((b) => (
           <li class="flex items-baseline gap-2 text-sm text-text-secondary leading-relaxed">
