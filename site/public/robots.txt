@@ -8,4 +8,4 @@ Allow: /
 #
 # If you want one anyway, either upgrade Astro to v5 + re-enable sitemap,
 # or hand-roll a static `public/sitemap.xml` and uncomment the line below:
-# Sitemap: https://ccgauge.linkdiary.cn/sitemap.xml
+# Sitemap: https://ccgauge.dev/sitemap.xml

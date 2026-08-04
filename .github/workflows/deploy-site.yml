@@ -5,13 +5,11 @@
 #     `package.json`, or `pnpm-lock.yaml`
 #   - manual dispatch from the Actions tab
 #
-# Output: served at https://ccgauge.linkdiary.cn/ once
-#         Settings → Pages → Source is set to "GitHub Actions" and
-#         Settings → Pages → Custom domain matches `site/public/CNAME`.
+# Output: served at https://<owner>.github.io/<repo>/ once
+#         Settings → Pages → Source is set to "GitHub Actions".
 #
-# The domain is bound by `site/public/CNAME`, which Astro copies to the
-# artifact root. Dropping the custom domain means going back to project
-# Pages at /<repo>: delete that file and pass BASE_URL=/<repo> here.
+# To switch to a custom domain (e.g. ccgauge.dev), see the header
+# comment in `site/astro.config.mjs` for the three-step checklist.
 
 name: Deploy site to GitHub Pages
 
@@ -63,10 +61,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Build site
-        # No env needed: the custom domain serves from the root, so `BASE_URL`
-        # stays unset (it is opt-in in `site/astro.config.mjs`) and the origin
-        # is the domain itself. `site/public/CNAME` rides along in the artifact
-        # and is what binds the domain on the Pages side.
+        env:
+          # Project Pages serve from https://<owner>.github.io/<repo>/, so the
+          # build needs both halves. `BASE_URL` is opt-in in
+          # `site/astro.config.mjs` — without it the site builds for the root,
+          # which is what local dev wants and what a custom domain would want.
+          GH_PAGES_USER: ${{ github.repository_owner }}
+          BASE_URL: /${{ github.event.repository.name }}
         run: pnpm site:build
 
       - name: Upload Pages artifact

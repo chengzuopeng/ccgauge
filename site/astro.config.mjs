@@ -1,17 +1,17 @@
 import { defineConfig } from 'astro/config';
 import tailwind from '@astrojs/tailwind';
 
-// Serving origin. The site runs on a custom domain, which is why
-// `site/public/CNAME` exists — GitHub Pages reads that file from the published
-// artifact to bind the domain. `SITE_URL` overrides it so a fork can build for
-// its own host without editing this file.
-const siteUrl = process.env.SITE_URL ?? 'https://ccgauge.linkdiary.cn';
+// Serving origin. GitHub Pages by default; CI passes the real owner so a fork
+// deploys under its own account without editing this file.
+const ghOwner = process.env.GH_PAGES_USER ?? 'chengzuopeng';
+const siteUrl = `https://${ghOwner}.github.io`;
 
-// The sub-path the site is served from is OPT-IN via BASE_URL. A custom domain
-// serves from the root, so nothing passes it today and local dev matches
-// production exactly. It stays because dropping the domain would put the site
-// back on project Pages at /<repo>, where a base is mandatory — set
-// BASE_URL=/<repo> in the deploy workflow and everything else follows.
+// The sub-path the site is served from is OPT-IN via BASE_URL. Unset — local
+// dev, local builds — means "served from the root", so `pnpm site:dev` opens at
+// :4321/ with no prefix to remember. The deploy workflow passes
+// BASE_URL=/<repo> because GitHub project Pages serve from /<repo>; that is the
+// only place a base is needed, and deriving it from the repo name there keeps
+// a renamed repo or a fork working with no change here.
 function normalizeBase(raw) {
   const trimmed = String(raw ?? '').trim();
   if (!trimmed || trimmed === '/') return '/';
