@@ -5,6 +5,63 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.2] — 2026-08-01
+
+A documentation release. The READMEs and the site had drifted four and thirteen
+releases behind the code respectively, to the point of stating things that were
+no longer true — so this is mostly corrections, plus the small user-facing
+fixes found while making them.
+
+### Fixed
+
+- **`--dir` help text described the opposite of what the flag does.** It said
+  "override Claude config dir", but the flag is additive: it appends
+  `<path>/projects` to the default sources rather than replacing them. Anyone
+  using it to point ccgauge at one directory got that directory *plus* all the
+  defaults.
+- **"Zero outbound calls" was no longer accurate** and appeared in six places
+  across the READMEs and the site, including the privacy page. Since 1.3.0 the
+  dashboard downloads LiteLLM's public price table on first load. Every
+  statement now says what actually happens — your usage data still never leaves
+  the machine, the one request that leaves is a download carrying nothing about
+  you, `CCGAUGE_OFFLINE=1` disables it, and the CLI report and MCP server fetch
+  nothing at all.
+- Inline code in the site's section leads and CLI subcommand table rendered as
+  literal backticks.
+
+### Changed
+
+- **Official site links now point at `ccgauge.linkdiary.cn`** — both READMEs,
+  the dashboard's in-app Docs link, and `package.json#homepage`. The GitHub
+  Pages deploy at `chengzuopeng.github.io/ccgauge` continues to serve
+  unchanged.
+- **The site's base path is opt-in** via `BASE_URL`. It used to be pinned to
+  `/<repo>`, so `pnpm site:dev` served under `/ccgauge/` and a bare
+  `localhost:4321/` 404'd. The deploy workflow passes it; local dev no longer
+  has a prefix to remember.
+
+### Documentation
+
+- Documented the **Tools & skills page** and the **Analytics nav dropdown**
+  (both shipped in 1.3.0) in the READMEs and on the site — neither had any
+  mention, and the site did not contain the word "skills" at all.
+- Documented **runtime pricing refresh** on the site, which had never mentioned
+  LiteLLM and so implied prices were frozen at whatever the package shipped.
+- The site's CLI page covered one subcommand out of ten and was missing the
+  `report -d` TUI flags; it now covers all ten plus `--dashboard`, `--width`,
+  `--no-banner`, `--compact`.
+- Corrected the MCP tool count from eight to nine across the site
+  (`cost_estimator` was missing) and the pricing-coverage and supported-model
+  claims in the READMEs, which predated Claude 5 and the gpt-5.6 variants.
+- Completed the README env-var table (6 of 11 variables were undocumented) and
+  added `--log` to the startup options.
+- **Screenshots refreshed** — all 28 dated from the v1.0.4 era, showing a nav
+  bar that no longer exists and no Tools page. The capture script now includes
+  it.
+- `AGENTS.md`: parser-version history was two Claude versions stale and had no
+  Codex history at all; suite count and repo layout brought current.
+- Restored the CHANGELOG's version compare links, absent since 1.1.4.
+
 ## [1.4.1] — 2026-08-01
 
 Follow-up to 1.4.0. Codex sub-agents come in more shapes than that release
@@ -1780,6 +1837,7 @@ of HTML to the browser.
 - Initial public release as `ccgauge`: local Next.js dashboard for
   Claude Code token usage, cost, and 5-hour block tracking.
 
+[1.4.2]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/chengzuopeng/ccgauge/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/chengzuopeng/ccgauge/compare/v1.3.0...v1.3.1
