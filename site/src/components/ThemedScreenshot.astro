@@ -11,6 +11,10 @@ interface Props {
   loading?: 'eager' | 'lazy';
   decoding?: 'async' | 'auto' | 'sync';
   imgClass?: string;
+  /** Pin to the dark shot instead of following the theme. For surfaces that sit
+   *  on light card chrome next to dark artwork, where swapping to the light
+   *  screenshot makes that one tile read as a hole in the grid. */
+  forceDark?: boolean;
 }
 
 const {
@@ -20,6 +24,7 @@ const {
   loading = 'lazy',
   decoding = 'async',
   imgClass = 'w-full h-full object-cover',
+  forceDark = false,
 } = Astro.props;
 
 const base = assetUrl(`images/screenshots/${name}-${locale}`);
@@ -27,19 +32,25 @@ const darkSrc = `${base}-dark.png`;
 const lightSrc = `${base}-light.png`;
 ---
 
-<span class="themed-screenshot block w-full h-full">
-  <img
-    src={darkSrc}
-    alt={alt}
-    loading={loading}
-    decoding={decoding}
-    class:list={[imgClass, 'themed-screenshot__img themed-screenshot__img--dark']}
-  />
-  <img
-    src={lightSrc}
-    alt={alt}
-    loading={loading}
-    decoding={decoding}
-    class:list={[imgClass, 'themed-screenshot__img themed-screenshot__img--light']}
-  />
-</span>
+{forceDark ? (
+  <span class="block w-full h-full">
+    <img src={darkSrc} alt={alt} loading={loading} decoding={decoding} class={imgClass} />
+  </span>
+) : (
+  <span class="themed-screenshot block w-full h-full">
+    <img
+      src={darkSrc}
+      alt={alt}
+      loading={loading}
+      decoding={decoding}
+      class:list={[imgClass, 'themed-screenshot__img themed-screenshot__img--dark']}
+    />
+    <img
+      src={lightSrc}
+      alt={alt}
+      loading={loading}
+      decoding={decoding}
+      class:list={[imgClass, 'themed-screenshot__img themed-screenshot__img--light']}
+    />
+  </span>
+)}

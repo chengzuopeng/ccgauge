@@ -28,7 +28,7 @@ const hasMedia = Boolean(screenshotName || imageSrc);
   {hasMedia && (
     <div class="feature-media aspect-[16/10] bg-bg-surface-hi border-b border-border overflow-hidden">
       {screenshotName && screenshotLocale ? (
-        <ThemedScreenshot name={screenshotName} locale={screenshotLocale} alt={imageAlt ?? ''} />
+        <ThemedScreenshot name={screenshotName} locale={screenshotLocale} alt={imageAlt ?? ''} forceDark />
       ) : (
         <img
           src={assetUrl(`images/${imageSrc}`)}
