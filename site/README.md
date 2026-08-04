@@ -1,7 +1,6 @@
 # ccgauge marketing site
 
-The product website at `ccgauge.dev` (and on whichever static host you
-deploy this to). Built with [Astro 4](https://astro.build) + Tailwind v3,
+The product website at `ccgauge.linkdiary.cn`. Built with [Astro 4](https://astro.build) + Tailwind v3,
 bilingual (English + 简体中文), with full dark/light theme support and
 zero JS framework runtime.
 
@@ -123,19 +122,28 @@ pnpm site:gen:placeholders
 
 ## Deploy
 
-Recommended: **Cloudflare Pages**.
+Automatic: **GitHub Actions → GitHub Pages**, via
+`.github/workflows/deploy-site.yml`. Any push to `main` touching `site/**`
+builds and publishes; nothing to run by hand.
 
-- Connect the GitHub repo, keep the build root at the repository root,
-  "Build command" = `pnpm install && pnpm site:build`,
-  "Output" = `site/dist`.
-- DNS the chosen domain (e.g. `ccgauge.dev`) at Cloudflare.
-- Update **`astro.config.mjs#site`** to the real domain so canonical /
-  OG / hreflang absolute URLs are correct. `BaseLayout.astro` reads this
-  through `Astro.site` at build time; `src/consts.ts#SITE_URL_FALLBACK`
-  only catches the off-pipeline edge case and rarely needs touching.
+Two things bind the custom domain:
 
-Alternatives: Vercel, Netlify, GitHub Pages — all support sub-directory
-builds with a one-line config.
+- **`public/CNAME`** holds `ccgauge.linkdiary.cn`. Astro copies `public/` to
+  the artifact root, which is exactly where Pages looks for it. Settings →
+  Pages → Custom domain must match.
+- **`astro.config.mjs#site`** is the same domain, so canonical / OG / hreflang
+  absolute URLs are right. `BaseLayout.astro` reads it through `Astro.site`;
+  `src/consts.ts#SITE_URL_FALLBACK` only catches the off-pipeline edge case.
+
+`base` is opt-in through the `BASE_URL` env var and is **not** set here — a
+custom domain serves from the root, so local dev and production share the same
+paths. Going back to project Pages at `https://<owner>.github.io/<repo>/` means
+deleting `public/CNAME` and passing `BASE_URL=/<repo>` in the workflow; the
+config normalizes it, so `/repo`, `repo` and `/repo/` are equivalent.
+
+Other hosts (Cloudflare Pages, Vercel, Netlify) work too: build root at the
+repository root, build command `pnpm install && pnpm site:build`, output
+`site/dist`. Set `SITE_URL` if the domain differs.
 
 ## Why this isn't part of the npm package
 

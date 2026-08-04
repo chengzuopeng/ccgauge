@@ -9,7 +9,7 @@
 [![license](https://img.shields.io/npm/l/ccgauge?color=4F46E5&style=flat-square)](https://github.com/chengzuopeng/ccgauge/blob/main/LICENSE)
 [![node](https://img.shields.io/node/v/ccgauge?color=4F46E5&style=flat-square)](#)
 
-**🌐 官网：[chengzuopeng.github.io/ccgauge](https://chengzuopeng.github.io/ccgauge)**
+**🌐 官网：[ccgauge.linkdiary.cn](https://ccgauge.linkdiary.cn)**
 
 [English](https://github.com/chengzuopeng/ccgauge/blob/main/README.md) · [简体中文](https://github.com/chengzuopeng/ccgauge/blob/main/README.zh-CN.md)
 

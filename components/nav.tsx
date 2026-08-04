@@ -45,8 +45,8 @@ function isActive(pathname: string, item: NavItem): boolean {
 }
 
 const GITHUB_URL = 'https://github.com/chengzuopeng/ccgauge';
-const DOCS_URL = 'https://chengzuopeng.github.io/ccgauge/';
-const DOCS_URL_ZH = 'https://chengzuopeng.github.io/ccgauge/zh/';
+const DOCS_URL = 'https://ccgauge.linkdiary.cn/';
+const DOCS_URL_ZH = 'https://ccgauge.linkdiary.cn/zh/';
 
 interface ProviderInfo {
   id: ProviderId;

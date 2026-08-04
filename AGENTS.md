@@ -85,7 +85,7 @@ dist/                      esbuild output. Not source-controlled — generated
                            ships in the npm tarball.
 
 site/                      Astro 4 marketing site, published to GitHub Pages at
-                           chengzuopeng.github.io/ccgauge. Source-only
+                           ccgauge.linkdiary.cn. Source-only
                            subdirectory: commands and dependencies are managed
                            by the root `package.json` / `pnpm-lock.yaml`, while
                            site builds remain explicit via `pnpm site:*`.
