@@ -71,6 +71,7 @@
     "screenshots": "node scripts/screenshots.mjs",
     "site:dev": "cd site && astro dev --port 4321",
     "site:build": "cd site && astro build",
+    "edgeone:build": "node scripts/build-site-edgeone.mjs",
     "site:preview": "cd site && astro preview --port 4322",
     "site:check": "cd site && astro check",
     "site:gen:placeholders": "node site/scripts/gen-placeholders.mjs",
