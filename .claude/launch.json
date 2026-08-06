@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ccgauge-dev",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev"],
+      "port": 3738
+    },
+    {
+      "name": "ccgauge-site",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["site:dev"],
+      "port": 4321
+    }
+  ]
+}

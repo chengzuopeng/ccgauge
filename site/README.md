@@ -1,7 +1,6 @@
 # ccgauge marketing site
 
-The product website at `ccgauge.dev` (and on whichever static host you
-deploy this to). Built with [Astro 4](https://astro.build) + Tailwind v3,
+The product website, served from two hosts (see Deploy). Built with [Astro 4](https://astro.build) + Tailwind v3,
 bilingual (English + 简体中文), with full dark/light theme support and
 zero JS framework runtime.
 
@@ -123,19 +122,64 @@ pnpm site:gen:placeholders
 
 ## Deploy
 
-Recommended: **Cloudflare Pages**.
+Both deployments are driven by `.github/workflows/deploy-site.yml` on any push
+to `main` touching `site/**`, `package.json`, `pnpm-lock.yaml`, or the workflow
+itself. Same source, two builds, because the two hosts serve differently:
 
-- Connect the GitHub repo, keep the build root at the repository root,
-  "Build command" = `pnpm install && pnpm site:build`,
-  "Output" = `site/dist`.
-- DNS the chosen domain (e.g. `ccgauge.dev`) at Cloudflare.
-- Update **`astro.config.mjs#site`** to the real domain so canonical /
-  OG / hreflang absolute URLs are correct. `BaseLayout.astro` reads this
-  through `Astro.site` at build time; `src/consts.ts#SITE_URL_FALLBACK`
-  only catches the off-pipeline edge case and rarely needs touching.
+| Host | URL | Job | Build env |
+|---|---|---|---|
+| GitHub Pages | `https://chengzuopeng.github.io/ccgauge/` | `build` + `deploy` | `BASE_URL=/<repo>`, `GH_PAGES_USER` |
+| EdgeOne | `https://ccgauge.linkdiary.cn/` | `edgeone` | `SITE_URL=https://ccgauge.linkdiary.cn` |
 
-Alternatives: Vercel, Netlify, GitHub Pages — all support sub-directory
-builds with a one-line config.
+`SITE_URL` sets the origin used for canonical / hreflang / og:url. Getting it
+wrong is silent — relative links keep working while every absolute URL points
+at the other host. `BASE_URL` is opt-in: unset means "served from the root",
+which is what a custom domain and local dev both want. Pages needs it because
+project Pages serve under `/<repo>`.
+
+### Why EdgeOne is pushed from CI rather than connected to the repo
+
+EdgeOne's Git integration cannot build this site. It picks the framework by
+scanning the repo root, and this root is a Next.js app, so it loads
+`@edgeone/opennextjs-pages` ~0.4s *before* it reads any build configuration,
+then fails on a `next build` artifact an Astro build never produces:
+
+    [plugins][✘] Error executing onBuild hook: ENOENT ... .next/required-server-files.json
+
+Setting 框架预设 to "Other" only chooses the build command. Deleting the markers
+from the build command doesn't work either — that was tried and reverted
+(a9684ad / bfb59ef): the deploy still reported "Next.js project detected" four
+seconds after both files were gone, emitting a byte-identical edge bundle
+compiled from middleware that no longer existed. The detection result is
+captured at plugin-load time, before any build command runs.
+
+So CI builds the site and pushes the finished output, which never gives EdgeOne
+a repo to inspect:
+
+```bash
+npx --yes edgeone pages deploy site/dist -n <project> -t <token>
+```
+
+### EdgeOne setup, and the two things that will bite you
+
+- **The project must be `Upload` type.** A project created in the console by
+  connecting a Git repo has Provider `Github`, and the CLI refuses it:
+  *"This project type does not support direct folder or zip file deployment."*
+  There is no way to convert one — delete it and let the CLI create the project
+  on first deploy, then re-bind the custom domain, which the deletion releases.
+- **`EDGEONE_API_TOKEN` must be a *repository* secret**, not an environment
+  secret. Environment secrets are only visible to jobs that declare that
+  `environment:`, and the `edgeone` job deliberately doesn't — it must not queue
+  behind the Pages deployment. Settings → Secrets and variables → Actions →
+  Repository secrets.
+- `EDGEONE_PROJECT_NAME` (repository *variable*) overrides the project name,
+  defaulting to `ccgauge`. Set it to point at a differently named project
+  without editing the workflow.
+- The deploy step skips with a notice when the token is absent, so forks and
+  a not-yet-configured repo stay green instead of failing.
+
+Token: EdgeOne console → API Token. Expiries from 1 day to 1 year are offered;
+the deploy starts failing silently-ish (a red `edgeone` job) when it lapses.
 
 ## Why this isn't part of the npm package
 

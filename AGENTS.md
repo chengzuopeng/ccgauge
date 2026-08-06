@@ -84,8 +84,13 @@ dist/                      esbuild output. Not source-controlled — generated
                            by `pnpm build`. Listed in package.json#files so it
                            ships in the npm tarball.
 
-site/                      Astro 4 marketing site, published to GitHub Pages at
-                           chengzuopeng.github.io/ccgauge. Source-only
+site/                      Astro 4 marketing site. Deployed twice from one
+                           workflow: GitHub Pages at chengzuopeng.github.io/ccgauge
+                           and EdgeOne at ccgauge.linkdiary.cn — see
+                           `site/README.md#deploy`, which also records why
+                           EdgeOne can't use its own Git integration and the
+                           two setup traps (project must be `Upload` type;
+                           the token must be a REPOSITORY secret). Source-only
                            subdirectory: commands and dependencies are managed
                            by the root `package.json` / `pnpm-lock.yaml`, while
                            site builds remain explicit via `pnpm site:*`.

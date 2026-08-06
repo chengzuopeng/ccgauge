@@ -53,3 +53,8 @@ site/.astro/
 # playwright-mcp artefacts (console logs + page snapshots dropped here
 # by the browser tool during ad-hoc verification runs)
 .playwright-mcp/
+
+# Per-developer Claude Code settings — tool permissions each person grants,
+# not a property of the project. `.claude/launch.json` IS tracked: it names the
+# two dev servers so anyone gets the same ports.
+.claude/settings.local.json
