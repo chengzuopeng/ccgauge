@@ -245,6 +245,14 @@ on 3737 by default.
 - **TypeScript everywhere.** `.ts` / `.tsx`. The CLI entry is `.mjs` so it can
   ship as-is in the npm tarball without compilation; everything it imports is
   pre-bundled via esbuild into `dist/`.
+- **Keep `tsconfig.json` free of comments.** TypeScript reads it as JSONC, but
+  third-party tooling reads it with a plain `JSON.parse` and dies on the first
+  `//` — an EdgeOne deploy failed exactly this way, in framework detection,
+  before it ever ran a build. The root config excludes `site/**` because the
+  marketing site has its own Astro tsconfig and its own `pnpm site:check` step;
+  excluding it keeps root `tsc --noEmit` fast and stops Astro / Vite types from
+  leaking into the main compile graph. That rationale lives here now rather
+  than in the file.
 - **Server components by default.** Pages and most components are RSC. Add
   `'use client'` only when you need state, effects, or event handlers.
 - **`@/` is repo-root.** Configured in `tsconfig.json` and aliased identically
