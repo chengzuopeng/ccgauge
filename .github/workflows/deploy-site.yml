@@ -1,17 +1,28 @@
-# Build and deploy the marketing site (under `site/`) to GitHub Pages.
+# Build and deploy the marketing site (under `site/`) to its two hosts.
 #
 # Triggers:
 #   - any push to `main` that touches `site/**`, the workflow itself,
 #     `package.json`, or `pnpm-lock.yaml`
 #   - manual dispatch from the Actions tab
 #
-# Output: served at https://<owner>.github.io/<repo>/ once
-#         Settings → Pages → Source is set to "GitHub Actions".
+# Two independent deployments, built from the same source with different
+# origins because they are served differently:
 #
-# To switch to a custom domain (e.g. ccgauge.dev), see the header
-# comment in `site/astro.config.mjs` for the three-step checklist.
+#   GitHub Pages   https://<owner>.github.io/<repo>/   BASE_URL=/<repo>
+#   EdgeOne        https://ccgauge.linkdiary.cn/       SITE_URL=<that>, no base
+#
+# They are separate jobs on purpose: a missing EdgeOne token or a platform
+# outage must not stop the Pages deploy, and vice versa.
+#
+# Why EdgeOne is deployed from here rather than from its own Git integration:
+# EdgeOne auto-detects the framework by scanning the repo root, and this root
+# is a Next.js app, so it loads its Next plugin before reading any build
+# configuration and then fails on a `next build` artifact an Astro build never
+# produces. That detection happens before any build command runs, so nothing
+# the build does can prevent it (tried and reverted in a9684ad). Pushing
+# already-built output with the CLI never gives EdgeOne a repo to inspect.
 
-name: Deploy site to GitHub Pages
+name: Deploy docs site
 
 on:
   push:
@@ -30,10 +41,10 @@ permissions:
   pages: write
   id-token: write
 
-# Don't run two Pages deployments at once — but never cancel an
-# already-running one mid-deploy (Pages doesn't roll back gracefully).
+# Don't run two deployments at once — but never cancel an already-running one
+# mid-deploy (Pages doesn't roll back gracefully).
 concurrency:
-  group: pages
+  group: deploy-site
   cancel-in-progress: false
 
 jobs:
@@ -88,3 +99,46 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+  edgeone:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          # 22 rather than the 20 the Pages job uses: this is the version
+          # EdgeOne's own GitHub Actions example pins for their CLI.
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build site
+        env:
+          # Custom domain, so it serves from the root: SITE_URL sets the origin
+          # for canonical / hreflang / og:url, and BASE_URL stays unset. Getting
+          # this wrong is silent — relative links keep working while every
+          # absolute URL points at the other host.
+          SITE_URL: https://ccgauge.linkdiary.cn
+        run: pnpm site:build
+
+      - name: Deploy to EdgeOne Pages
+        # Skipped rather than failed when the secret is absent, so the Pages
+        # deploy stays green in a fork or before the token is configured.
+        # `vars.EDGEONE_PROJECT_NAME` overrides the project name without
+        # editing this file; the CLI creates the project if it doesn't exist.
+        env:
+          EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
+          PROJECT: ${{ vars.EDGEONE_PROJECT_NAME || 'ccgauge' }}
+        run: |
+          if [ -z "$EDGEONE_API_TOKEN" ]; then
+            echo "::notice::EDGEONE_API_TOKEN not set — skipping the EdgeOne deploy."
+            exit 0
+          fi
+          npx --yes edgeone pages deploy site/dist -n "$PROJECT" -t "$EDGEONE_API_TOKEN"
