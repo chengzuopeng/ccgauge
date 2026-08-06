@@ -1,10 +1,17 @@
 import { defineConfig } from 'astro/config';
 import tailwind from '@astrojs/tailwind';
 
-// Serving origin. GitHub Pages by default; CI passes the real owner so a fork
-// deploys under its own account without editing this file.
+// Serving origin, used for canonical / hreflang / og:url. The same source
+// deploys to two hosts, so this has to be settable per deploy: `SITE_URL` wins
+// when present (the ccgauge.linkdiary.cn build sets it), otherwise it falls
+// back to GitHub Pages, where CI passes the real owner so a fork deploys under
+// its own account without editing this file.
+//
+// Getting this wrong is silent: relative links still work, but every canonical
+// and og:url points at the other host — on a root-served deploy that resolves
+// to a URL which doesn't exist, since Pages serves under /<repo>.
 const ghOwner = process.env.GH_PAGES_USER ?? 'chengzuopeng';
-const siteUrl = `https://${ghOwner}.github.io`;
+const siteUrl = process.env.SITE_URL ?? `https://${ghOwner}.github.io`;
 
 // The sub-path the site is served from is OPT-IN via BASE_URL. Unset — local
 // dev, local builds — means "served from the root", so `pnpm site:dev` opens at
