@@ -184,9 +184,23 @@ on 3737 by default.
     → `codex-v9-anchor-userless-subagents` (some sub-agent rollouts carry
     no user record at all — the prompt arrives as a `response_item` — so
     unparented sidechain ASSISTANTS get anchored too)
-    → `codex-v10-turn-context-model-precedence` (current;
-    `thread_settings_applied` is a fallback and must never override the
-    per-turn `turn_context` model, or turns bill at the wrong rate).
+    → `codex-v10-turn-context-model-precedence`
+    (`thread_settings_applied` is a fallback and must never override the
+    per-turn `turn_context` model, or turns bill at the wrong rate)
+    → `codex-v11-item-completed-user-turns` (current; the interactive TUI
+    wraps events in an `item_completed` envelope instead of the flat
+    `user_message` sub-type, so a typed message produced no UserRecord and
+    every call became its own "(no user text)" row).
+
+    Two of those versions exist because a Codex rollout's shape varies
+    **within one `cli_version`**, which is the thing to internalise before
+    debugging this parser. v7's `forked_from_id` is present on some
+    `thread_spawn` rollouts and absent on others from the same build nine
+    minutes apart; v11's envelope is written by `originator: codex-tui`
+    while `codex_exec` still writes the flat shape, side by side in one
+    session directory. So when Codex data looks wrong, compare
+    `originator` and `thread_source` across the affected files before
+    reaching for the version number — the version will usually match.
 
 3. **Records are deduped after parsing.**
    The same `(messageId, requestId)` can appear in multiple JSONL files
