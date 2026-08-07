@@ -613,6 +613,120 @@ assert.ok(rangeToDates('7d').from instanceof Date);
   console.log('✓ replayed session_meta ignored; thread_settings_applied resolves the model');
 }
 
+{
+  // Codex 0.147's interactive TUI wraps events in an `item_completed` envelope
+  // rather than emitting flat `user_message` / `agent_message` sub-types. Not a
+  // version split — the same 0.147.0 writes the flat shape from `codex exec`
+  // and the envelope from the TUI, side by side in one session directory. The
+  // discriminator is `originator`.
+  //
+  // Missing this meant a TUI session produced no UserRecord at all, so every
+  // token_count became its own "(no user text)" row — nine of them for a single
+  // typed message. Cost was unaffected; only attribution broke.
+  const dir = mkdtempSync(join(tmpdir(), 'ccgauge-codex-item-'));
+  const item = (ts, obj) =>
+    JSON.stringify({ timestamp: ts, type: 'event_msg', payload: { type: 'item_completed', item: obj } });
+  const tokens = (ts, input) =>
+    JSON.stringify({
+      timestamp: ts,
+      type: 'event_msg',
+      payload: {
+        type: 'token_count',
+        info: {
+          total_token_usage: {
+            input_tokens: input,
+            cached_input_tokens: 0,
+            output_tokens: 10,
+            reasoning_output_tokens: 0,
+          },
+        },
+      },
+    });
+
+  const tuiFile = join(dir, 'tui.jsonl');
+  writeFileSync(
+    tuiFile,
+    [
+      JSON.stringify({
+        timestamp: '2026-08-07T09:48:15Z',
+        type: 'session_meta',
+        payload: { id: 'tui-1', cwd: '/Users/x', originator: 'codex-tui', cli_version: '0.147.0' },
+      }),
+      JSON.stringify({
+        timestamp: '2026-08-07T09:48:16Z',
+        type: 'turn_context',
+        payload: { turn_id: 't-1', cwd: '/Users/x', model: 'gpt-5.6-terra', effort: 'medium' },
+      }),
+      // `content[].type` is lowercase "text" here and capital "Text" on an
+      // AgentMessage — the extractor has to accept both.
+      item('2026-08-07T09:48:39Z', {
+        type: 'UserMessage',
+        content: [{ type: 'text', text: '怎么默认开启 fast 模式' }],
+      }),
+      // Everything else in the envelope duplicates what `response_item` already
+      // reports. Reading it here too would double-count every tool call.
+      item('2026-08-07T09:48:40Z', { type: 'Reasoning', summary_text: [] }),
+      item('2026-08-07T09:48:41Z', {
+        type: 'AgentMessage',
+        content: [{ type: 'Text', text: 'let me check' }],
+      }),
+      item('2026-08-07T09:48:42Z', { type: 'CommandExecution', command: ['sed', '-n', '1p'] }),
+      JSON.stringify({
+        timestamp: '2026-08-07T09:48:43Z',
+        type: 'response_item',
+        payload: { type: 'custom_tool_call', name: 'shell' },
+      }),
+      tokens('2026-08-07T09:48:44Z', 25_241),
+      item('2026-08-07T09:51:00Z', { type: 'UserMessage', content: [{ type: 'text', text: '/fast on' }] }),
+      tokens('2026-08-07T09:51:12Z', 34_936),
+    ].join('\n') + '\n',
+    'utf8',
+  );
+  const tui = await parseCodexJsonlFile(tuiFile);
+
+  assert.equal(tui.user.length, 2, 'both UserMessage items become user records');
+  assert.equal(tui.user[0].textPreview, '怎么默认开启 fast 模式');
+  assert.equal(tui.user[1].textPreview, '/fast on');
+  assert.equal(
+    tui.assistant.filter((r) => r.parentUuid === null).length,
+    0,
+    'no orphan calls — every record hangs off a user turn',
+  );
+  assert.deepEqual(
+    tui.assistant[0].toolNames,
+    ['shell'],
+    'tools come from response_item only; the CommandExecution item must not add a second',
+  );
+  assert.equal(tui.assistant[0].model, 'gpt-5.6-terra', 'turn_context still supplies the model');
+
+  // A transitional build emitting both shapes must not record the turn twice.
+  const bothFile = join(dir, 'both.jsonl');
+  writeFileSync(
+    bothFile,
+    [
+      JSON.stringify({
+        timestamp: '2026-08-07T10:00:00Z',
+        type: 'session_meta',
+        payload: { id: 'both-1', cwd: '/Users/x' },
+      }),
+      JSON.stringify({
+        timestamp: '2026-08-07T10:00:01Z',
+        type: 'event_msg',
+        payload: { type: 'user_message', message: 'hello' },
+      }),
+      item('2026-08-07T10:00:02Z', { type: 'UserMessage', content: [{ type: 'text', text: 'hello' }] }),
+      tokens('2026-08-07T10:00:03Z', 1000),
+    ].join('\n') + '\n',
+    'utf8',
+  );
+  const both = await parseCodexJsonlFile(bothFile);
+  assert.equal(both.user.length, 1, 'flat user_message wins; the envelope does not duplicate it');
+  assert.equal(both.user[0].textPreview, 'hello');
+
+  rmSync(dir, { recursive: true, force: true });
+  console.log('✓ item_completed envelope: user turns read, tools not double-counted, no dupes');
+}
+
 // --- ccusage parity: cost math (reasoning not billed) + fast/priority tier ---
 {
   const codexPricing = resolveCodexPricing('gpt-5.3-codex').pricing;

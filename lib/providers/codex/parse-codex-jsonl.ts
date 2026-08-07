@@ -82,7 +82,9 @@ function extractMessageText(payload: Record<string, unknown>): string {
   if (typeof content === 'string') return content;
   if (Array.isArray(content)) {
     for (const c of content as Array<Record<string, unknown>>) {
-      const t = c?.type;
+      // Case-insensitive: the same field is `"text"` on a UserMessage item and
+      // `"Text"` on an AgentMessage one.
+      const t = typeof c?.type === 'string' ? c.type.toLowerCase() : '';
       if ((t === 'input_text' || t === 'output_text' || t === 'text') && typeof c.text === 'string') {
         return c.text;
       }
@@ -101,6 +103,9 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
 
   let sessionId = '';
   let sessionMetaSeen = false;
+  // Set when the flat `user_message` shape appears, so the `item_completed`
+  // envelope defers to it rather than recording the same turn twice.
+  let sawFlatUserMessage = false;
   // Set only for KEPT sub-agent rollouts (guardian / auto-review / legacy
   // spawns). Folds their turns into the conversation turn that spawned them
   // instead of listing each review pass as its own top-level row.
@@ -125,6 +130,30 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
     hasThinking: false,
     pendingTextPreview: '',
   };
+
+  // Shared by both event shapes a user turn can arrive in.
+  function pushUserMessage(text: string, timestamp: string): void {
+    if (!text) return;
+    const uuid = `${sessionId}::u${userIdx++}`;
+    user.push({
+      type: 'user',
+      source: 'codex',
+      uuid,
+      parentUuid: null,
+      timestamp,
+      sessionId,
+      cwd: turn.cwd || defaultCwd,
+      textPreview: text.slice(0, TEXT_PREVIEW_MAX),
+      filePath: file,
+      // Mirrors Claude's parse-jsonl: a sidechain user is synthetic, so it
+      // never roots a turn of its own and the walk continues to the spawner.
+      ...(subagentLineageRoot
+        ? { isSidechain: true, isSynthetic: true, parentSessionId: subagentLineageRoot }
+        : {}),
+    });
+    parentLinks.push([uuid, null]);
+    turn.userUuid = uuid;
+  }
 
   for await (const line of rl) {
     if (!line.trim()) continue;
@@ -186,27 +215,29 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
       const sub = asString(payload.type);
 
       if (sub === 'user_message') {
-        const text = extractMessageText(payload);
-        if (!text) continue;
-        const uuid = `${sessionId}::u${userIdx++}`;
-        user.push({
-          type: 'user',
-          source: 'codex',
-          uuid,
-          parentUuid: null,
-          timestamp: ts,
-          sessionId,
-          cwd: turn.cwd || defaultCwd,
-          textPreview: text.slice(0, TEXT_PREVIEW_MAX),
-          filePath: file,
-          // Mirrors Claude's parse-jsonl: a sidechain user is synthetic, so it
-          // never roots a turn of its own and the walk continues to the spawner.
-          ...(subagentLineageRoot
-            ? { isSidechain: true, isSynthetic: true, parentSessionId: subagentLineageRoot }
-            : {}),
-        });
-        parentLinks.push([uuid, null]);
-        turn.userUuid = uuid;
+        sawFlatUserMessage = true;
+        pushUserMessage(extractMessageText(payload), ts);
+        continue;
+      }
+
+      // Codex 0.147's interactive TUI (`originator: codex-tui`) wraps events in
+      // an `item_completed` envelope instead of emitting the flat `user_message`
+      // / `agent_message` sub-types. Note this is NOT a version split: the same
+      // 0.147.0 writes the flat shape from `codex exec` and the envelope from
+      // the TUI, in the same session directory.
+      //
+      // Only the user turn is read from the envelope. `response_item` still
+      // carries the assistant text, the reasoning and the tool calls in both
+      // shapes — verified one-for-one on a real TUI rollout — so taking those
+      // from here as well would double-count every tool call.
+      if (sub === 'item_completed') {
+        // Belt and braces: the two shapes have never appeared in one session,
+        // but if a transitional build emits both, the flat event wins and this
+        // doesn't add a second copy of the same turn.
+        if (sawFlatUserMessage) continue;
+        const item = payload.item as Record<string, unknown> | null | undefined;
+        if (!item || asString(item.type) !== 'UserMessage') continue;
+        pushUserMessage(extractMessageText(item), ts);
         continue;
       }
 

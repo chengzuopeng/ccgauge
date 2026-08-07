@@ -1,4 +1,4 @@
 {
   "claude": "claude-v6-tool-result-sizes",
-  "codex": "codex-v10-turn-context-model-precedence"
+  "codex": "codex-v11-item-completed-user-turns"
 }
