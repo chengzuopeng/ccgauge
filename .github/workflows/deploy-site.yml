@@ -137,8 +137,28 @@ jobs:
           EDGEONE_API_TOKEN: ${{ secrets.EDGEONE_API_TOKEN }}
           PROJECT: ${{ vars.EDGEONE_PROJECT_NAME || 'ccgauge' }}
         run: |
+          set -o pipefail
           if [ -z "$EDGEONE_API_TOKEN" ]; then
             echo "::notice::EDGEONE_API_TOKEN not set — skipping the EdgeOne deploy."
             exit 0
           fi
-          npx --yes edgeone pages deploy site/dist -n "$PROJECT" -t "$EDGEONE_API_TOKEN"
+
+          log=$(mktemp)
+          if npx --yes edgeone pages deploy site/dist -n "$PROJECT" -t "$EDGEONE_API_TOKEN" 2>&1 | tee "$log"; then
+            exit 0
+          fi
+
+          # The CLI queries project status one last time after the deploy has
+          # already landed, and that read has flaked on EdgeOne's side (HTTP
+          # 522) while the site was live and current. Failing the job there
+          # teaches people to ignore a red deploy, which is worse than the flake.
+          #
+          # Narrow on purpose: `Deploy Success` is only printed after the upload
+          # completed, the deployment was created, and polling confirmed it. A
+          # real failure — bad token, wrong project type, upload error — never
+          # reaches that line and still fails the job.
+          if grep -q 'Deploy Success' "$log"; then
+            echo "::warning::Deploy landed, but the CLI's post-deploy status query failed. Treating as success — verify at https://ccgauge.linkdiary.cn/ if this repeats."
+            exit 0
+          fi
+          exit 1
