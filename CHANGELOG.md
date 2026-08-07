@@ -5,6 +5,28 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.3] — 2026-08-07
+
+### Fixed
+
+- **A message typed into the Codex CLI showed up as many "(no user text)" rows
+  instead of one.** Codex 0.147's interactive TUI wraps rollout events in an
+  `item_completed` envelope rather than emitting the flat `user_message` /
+  `agent_message` sub-types, so ccgauge found no user turn to group by and every
+  API call in the conversation became its own row — nine of them for one typed
+  message. Costs and token counts were never affected; only the grouping and the
+  prompt preview were.
+
+  Worth knowing if you compare rollouts: this is not a version cutover. The same
+  Codex build writes the old shape from `codex exec` and the new one from the
+  interactive TUI, so a session directory can hold both.
+
+### Changed
+
+- Codex `parserVersion` → `codex-v11-item-completed-user-turns`. The persisted
+  index reparses Codex transcripts on first load, so affected history corrects
+  itself with no manual step.
+
 ## [1.4.2] — 2026-08-01
 
 A documentation release. The READMEs and the site had drifted four and thirteen
@@ -1848,6 +1870,7 @@ of HTML to the browser.
 - Initial public release as `ccgauge`: local Next.js dashboard for
   Claude Code token usage, cost, and 5-hour block tracking.
 
+[1.4.3]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/chengzuopeng/ccgauge/compare/v1.3.1...v1.4.0
