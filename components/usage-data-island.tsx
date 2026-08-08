@@ -11,7 +11,7 @@ import { UsageTable } from '@/components/usage-table';
 import { GranularityPicker } from '@/components/granularity-picker';
 import { formatTokensCompact, formatUSD, formatPct } from '@/lib/utils';
 import { type SortKey } from '@/lib/usage-query';
-import type { UsageTurnRow } from '@/lib/serialize';
+import type { UsageTurnSummary } from '@/lib/serialize';
 
 /**
  * Client data-island for /usage. Subscribes to URL search params and fetches
@@ -36,7 +36,7 @@ interface TurnsPayload {
     saved: number;
   };
   trend: TokenStackDatum[];
-  turns: UsageTurnRow[];
+  turns: UsageTurnSummary[];
   totalCount: number;
   pageCount: number;
   page: number;
@@ -52,8 +52,30 @@ interface TurnsPayload {
   gran: string;
 }
 
-// Module-level cache survives unmount; reset only when the page reloads.
+// Module-level cache survives unmount; reset only when the page reloads. Bounded
+// because it never used to be: one entry per distinct filter URL, each a full
+// payload, retained for the life of the tab. Map iteration order is insertion
+// order, so evicting the first key is LRU as long as every read re-inserts.
+const CACHE_MAX = 12;
 const cache = new Map<string, TurnsPayload>();
+
+function cacheGet(url: string): TurnsPayload | undefined {
+  const hit = cache.get(url);
+  if (!hit) return undefined;
+  cache.delete(url);
+  cache.set(url, hit);
+  return hit;
+}
+
+function cacheSet(url: string, payload: TurnsPayload): void {
+  cache.delete(url);
+  cache.set(url, payload);
+  while (cache.size > CACHE_MAX) {
+    const oldest = cache.keys().next().value;
+    if (oldest === undefined) break;
+    cache.delete(oldest);
+  }
+}
 
 interface InitialBundle {
   payload: TurnsPayload;
@@ -71,18 +93,26 @@ export function UsageDataIsland({ initial, costFootnote }: Props) {
   const sp = useSearchParams();
 
   // Seed the cache with whatever the server-rendered shell handed us.
-  if (initial && !cache.has(initial.url)) cache.set(initial.url, initial.payload);
+  if (initial && !cache.has(initial.url)) cacheSet(initial.url, initial.payload);
 
   const url = useMemo(() => buildUrl(sp.toString()), [sp]);
 
-  const [data, setData] = useState<TurnsPayload | null>(() => cache.get(url) ?? null);
+  const [data, setData] = useState<TurnsPayload | null>(() => cacheGet(url) ?? null);
   const [loading, setLoading] = useState(!cache.has(url));
   const [error, setError] = useState<string | null>(null);
+  // Bumped by the auto-refresh tick to re-run the fetch below. It used to fire
+  // its OWN fetch and bump `reqId` first, which made every tick cancel whatever
+  // request was in flight — including the one a filter click had just started.
+  // The click's response was then dropped on the floor and the table sat
+  // unchanged until the NEXT tick's fetch landed, so 10 of 12 measured clicks
+  // froze for up to 16.5s, always unfreezing on a 15s boundary. One request
+  // pipeline, one counter: a refresh can no longer outrank a newer navigation.
+  const [refreshNonce, setRefreshNonce] = useState(0);
   const reqId = useRef(0);
 
   useEffect(() => {
     const my = ++reqId.current;
-    const cached = cache.get(url);
+    const cached = cacheGet(url);
     if (cached) {
       // SWR: render cached immediately, refetch silently.
       setData(cached);
@@ -98,7 +128,7 @@ export function UsageDataIsland({ initial, costFootnote }: Props) {
       })
       .then((payload) => {
         if (my !== reqId.current) return; // a newer fetch superseded
-        cache.set(url, payload);
+        cacheSet(url, payload);
         setData(payload);
         setLoading(false);
       })
@@ -107,22 +137,15 @@ export function UsageDataIsland({ initial, costFootnote }: Props) {
         setError(err.message);
         setLoading(false);
       });
-  }, [url]);
+  }, [url, refreshNonce]);
 
-  // Allow external triggers (AutoRefresh) to bust the cache.
+  // Allow external triggers (AutoRefresh) to bust the cache. Drops only the
+  // current URL's entry — clearing the whole map threw away every other filter
+  // combo the user might navigate back to.
   useEffect(() => {
     function onRefresh() {
-      cache.clear();
-      reqId.current++;
-      const my = reqId.current;
-      fetch(url, { cache: 'no-store' })
-        .then((r) => r.json())
-        .then((payload: TurnsPayload) => {
-          if (my !== reqId.current) return;
-          cache.set(url, payload);
-          setData(payload);
-        })
-        .catch(() => {});
+      cache.delete(url);
+      setRefreshNonce((n) => n + 1);
     }
     window.addEventListener('ccgauge:refresh', onRefresh);
     return () => window.removeEventListener('ccgauge:refresh', onRefresh);
@@ -191,7 +214,7 @@ export function UsageDataIsland({ initial, costFootnote }: Props) {
   );
 }
 
-function IslandSkeleton() {
+export function IslandSkeleton() {
   return (
     <div>
       <div className="usage-overview-block grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">

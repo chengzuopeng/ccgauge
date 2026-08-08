@@ -11,7 +11,8 @@ import { getProvider } from '@/lib/providers';
 import { AutoRefresh } from '@/components/auto-refresh';
 import { OverviewToggle } from '@/components/overview-toggle';
 import { getAllModels, getAllProjects } from '@/lib/data-loader/derived';
-import { UsageDataIsland } from '@/components/usage-data-island';
+import { Suspense } from 'react';
+import { UsageDataIsland, IslandSkeleton } from '@/components/usage-data-island';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -86,7 +87,12 @@ export default async function UsagePage({
       {totalRecords === 0 ? (
         <EmptyState title={t('common.empty.title')} desc={t('common.empty.desc')} />
       ) : (
-        <UsageDataIsland costFootnote={costFootnote || undefined} />
+        // `useSearchParams()` suspends on a dynamic route, and Next requires a
+        // boundary above it. Without one the island's suspension propagated to
+        // the whole page transition.
+        <Suspense fallback={<IslandSkeleton />}>
+          <UsageDataIsland costFootnote={costFootnote || undefined} />
+        </Suspense>
       )}
     </PageShell>
   );
