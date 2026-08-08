@@ -8,6 +8,12 @@
       "port": 3738
     },
     {
+      "name": "ccgauge-prod",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["bin/cli.mjs", "-p", "3739", "--no-open", "--strict-port"],
+      "port": 3739
+    },
+    {
       "name": "ccgauge-site",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["site:dev"],
