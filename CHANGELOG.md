@@ -5,6 +5,34 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.4] — 2026-08-08
+
+### Fixed
+
+- **A `codex review` run from inside a conversation no longer shows up as its
+  own row.** The review is a separate top-level Codex session whose rollout
+  never names the conversation that ran it, so its usage surfaced as an extra
+  row titled "Review the code changes against the base branch …" — a prompt
+  you never typed — next to the message that actually triggered it. The one
+  link that exists is the startup banner `codex review` prints into the
+  spawning turn's tool output; ccgauge now reads it and folds the review's
+  usage into that turn. Nothing is re-billed: linking only regroups rows.
+  Running `codex review` yourself in a terminal still gets its own row, since
+  there is no spawning turn to fold into.
+- **Clicks on the usage page could freeze for many seconds.** Three causes,
+  all fixed: the per-call detail rows shipped with every response (9.29MB for
+  a page of 25 — now fetched per turn when a row is expanded, 38KB); expanding
+  a heavy turn rendered thousands of DOM rows in one commit (now 200 at a time
+  with "Show more"); and a Next.js 15.5 quirk could leave a filter click
+  uncommitted until the next auto-refresh tick, up to 15s (now self-rescued
+  within ~200ms). Typical filter clicks land in well under a second.
+
+### Changed
+
+- Codex `parserVersion` → `codex-v12-review-spawn-linkage`. The persisted
+  index reparses Codex transcripts on first load, so affected history corrects
+  itself with no manual step.
+
 ## [1.4.3] — 2026-08-07
 
 ### Fixed
