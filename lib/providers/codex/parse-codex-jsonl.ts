@@ -1,9 +1,29 @@
 import { createReadStream, promises as fs } from 'node:fs';
 import readline from 'node:readline';
 import type { AssistantRecord, UserRecord } from '@/lib/types';
-import type { ParsedFile } from '../types';
+import type { ParsedFile, SpawnedSessionLink } from '../types';
 
 const TEXT_PREVIEW_MAX = 200;
+
+// `codex review` starts a brand-new top-level session whose `session_meta`
+// carries no `parent_thread_id`, so nothing on the child side says which
+// conversation ran it. What it does do is print a startup banner, and when the
+// caller is an agent that banner lands in the spawning turn's tool output:
+//
+//   OpenAI Codex v0.147.0
+//   --------
+//   workdir: /Users/x/proj
+//   ...
+//   session id: 019fe02e-db7c-7a70-aaea-89e83e9b03d1
+//
+// Verified on every `codex review` in a 3-month history (5/5, cli_version
+// 0.144.1 and 0.147.0, carried by both `function_call_output` and
+// `custom_tool_call_output`). The needle is checked before the regex runs, and
+// only against tool-output lines; `session_meta`'s JSON key is `session_id`,
+// which cannot match `session id: `.
+const SPAWN_BANNER_NEEDLE = 'session id: ';
+const SPAWN_BANNER =
+  /session id: ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi;
 
 async function fileMtimeIso(file: string): Promise<string> {
   try {
@@ -100,6 +120,8 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
   const assistant: AssistantRecord[] = [];
   const user: UserRecord[] = [];
   const parentLinks: Array<[string, string | null]> = [];
+  const spawnedSessions: SpawnedSessionLink[] = [];
+  const spawnedSeen = new Set<string>();
 
   let sessionId = '';
   let sessionMetaSeen = false;
@@ -110,6 +132,10 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
   // spawns). Folds their turns into the conversation turn that spawned them
   // instead of listing each review pass as its own top-level row.
   let subagentLineageRoot = '';
+  // `codex review`'s launcher thread: `thread_source: 'user'` yet every one of
+  // its user messages is a prompt Codex synthesised ("Review the code changes
+  // against the base branch …"), so none of them may root a turn.
+  let reviewLauncher = false;
   let cliVersion: string | undefined;
   let defaultCwd = '';
   let userIdx = 0;
@@ -147,12 +173,30 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
       filePath: file,
       // Mirrors Claude's parse-jsonl: a sidechain user is synthetic, so it
       // never roots a turn of its own and the walk continues to the spawner.
+      // A review launcher knows it is one but not who spawned it — that link
+      // arrives later, from the banner the spawning transcript recorded.
       ...(subagentLineageRoot
         ? { isSidechain: true, isSynthetic: true, parentSessionId: subagentLineageRoot }
-        : {}),
+        : reviewLauncher
+          ? { isSidechain: true, isSynthetic: true }
+          : {}),
     });
     parentLinks.push([uuid, null]);
     turn.userUuid = uuid;
+  }
+
+  // Attribute a session started from inside this turn back to this turn.
+  function recordSpawnBanner(line: string): void {
+    if (!turn.userUuid) return;
+    SPAWN_BANNER.lastIndex = 0;
+    for (let m = SPAWN_BANNER.exec(line); m; m = SPAWN_BANNER.exec(line)) {
+      const child = m[1].toLowerCase();
+      // A long-running command is polled repeatedly and reprints its banner
+      // each time; the first sighting is the one inside the spawning turn.
+      if (child === sessionId || spawnedSeen.has(child)) continue;
+      spawnedSeen.add(child);
+      spawnedSessions.push({ sessionId: child, parentUuid: turn.userUuid });
+    }
   }
 
   for await (const line of rl) {
@@ -213,6 +257,14 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
 
     if (evt.type === 'event_msg') {
       const sub = asString(payload.type);
+
+      // Always the first event of a `codex review` launcher, so it lands before
+      // the synthesised prompts it has to suppress. Verified on every such
+      // rollout in a 3-month history (5/5, cli_version 0.144.1 and 0.147.0).
+      if (sub === 'entered_review_mode') {
+        reviewLauncher = true;
+        continue;
+      }
 
       if (sub === 'user_message') {
         sawFlatUserMessage = true;
@@ -427,9 +479,17 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
         }
         continue;
       }
+
+      // Scanned on the raw line rather than the parsed payload: the banner sits
+      // inside a doubly-escaped string in `output`, and re-serialising a 30k-token
+      // tool result to reach it costs far more than one substring check.
+      if (sub === 'function_call_output' || sub === 'custom_tool_call_output') {
+        if (line.includes(SPAWN_BANNER_NEEDLE)) recordSpawnBanner(line);
+        continue;
+      }
       continue;
     }
   }
 
-  return { assistant, user, parentLinks };
+  return { assistant, user, parentLinks, spawnedSessions };
 }

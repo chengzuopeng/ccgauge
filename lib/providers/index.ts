@@ -9,7 +9,7 @@ import type { ProviderAdapter, ProviderId } from './types';
 // globalThis slot instead; server-only entry points call `ensurePricingLoaded()`
 // to populate it (instrumentation.ts, MCP entry, CLI entry).
 
-export type { ProviderAdapter, ProviderId, ProviderCapabilities, PricingResolution, PricingMatchType } from './types';
+export type { ProviderAdapter, ProviderId, ProviderCapabilities, PricingResolution, PricingMatchType, SpawnedSessionLink } from './types';
 
 export const PROVIDERS: Record<ProviderId, ProviderAdapter> = {
   claude: claudeAdapter,

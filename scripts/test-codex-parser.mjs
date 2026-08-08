@@ -837,4 +837,160 @@ assert.ok(rangeToDates('7d').from instanceof Date);
   console.log('✓ per-model fast multipliers gated by global service_tier=fast|priority');
 }
 
+{
+  // `codex review` run from inside a turn is not a sub-agent — it's a whole new
+  // top-level session, written as a PAIR:
+  //   launcher  thread_source: 'user',     entered_review_mode, 0 tokens,
+  //                                        the synthesised prompt (twice)
+  //   worker    thread_source: 'subagent', session_id -> launcher, all tokens
+  // Neither names the conversation that ran the command, so before v12 the pair
+  // surfaced as its own row titled "Review the code changes against the base
+  // branch …" — a prompt the user never typed, sitting next to the message that
+  // actually triggered it. The only link is the startup banner `codex review`
+  // prints, which lands in the spawning turn's tool output.
+  const dir = mkdtempSync(join(tmpdir(), 'ccgauge-codex-review-'));
+  const LAUNCHER = '019fe02e-db7c-7a70-aaea-89e83e9b03d1';
+  const REVIEW_PROMPT = "Review the code changes against the base branch 'dea65d0f2'.";
+  const tokens = (ts, input) =>
+    JSON.stringify({
+      timestamp: ts,
+      type: 'event_msg',
+      payload: {
+        type: 'token_count',
+        info: {
+          total_token_usage: {
+            input_tokens: input,
+            cached_input_tokens: 0,
+            output_tokens: 10,
+            reasoning_output_tokens: 0,
+          },
+        },
+      },
+    });
+
+  // ── the spawning conversation ────────────────────────────────────────
+  // The banner arrives minutes after the launch, on a later poll of the still
+  // running command — so it has to be read wherever it lands in the turn, not
+  // from the tool call that started it.
+  const banner =
+    `OpenAI Codex v0.147.0\\r\\n--------\\r\\nworkdir: /tmp/proj\\r\\nmodel: gpt-5.6-sol\\r\\n` +
+    `reasoning summaries: none\\r\\nsession id: ${LAUNCHER}\\r\\n--------`;
+  const mainFile = join(dir, 'main.jsonl');
+  writeFileSync(
+    mainFile,
+    [
+      JSON.stringify({
+        timestamp: '2026-08-08T07:01:25Z',
+        type: 'session_meta',
+        payload: { id: 'main-thread', cwd: '/tmp/proj', cli_version: '0.147.0' },
+      }),
+      JSON.stringify({
+        timestamp: '2026-08-08T07:01:35Z',
+        type: 'event_msg',
+        payload: { type: 'user_message', message: '整体 review 下未 push 的改动' },
+      }),
+      tokens('2026-08-08T07:01:45Z', 5_000),
+      JSON.stringify({
+        timestamp: '2026-08-08T07:03:13Z',
+        type: 'response_item',
+        payload: { type: 'custom_tool_call', name: 'exec' },
+      }),
+      JSON.stringify({
+        timestamp: '2026-08-08T07:06:14Z',
+        type: 'response_item',
+        payload: { type: 'custom_tool_call_output', output: [{ text: banner }] },
+      }),
+      // Polled again while the command is still running: same banner, and the
+      // second sighting must not register a second link.
+      JSON.stringify({
+        timestamp: '2026-08-08T07:07:20Z',
+        type: 'response_item',
+        payload: { type: 'function_call_output', output: [{ text: banner }] },
+      }),
+      tokens('2026-08-08T07:20:00Z', 9_000),
+    ].join('\n') + '\n',
+    'utf8',
+  );
+  const main = await parseCodexJsonlFile(mainFile);
+  assert.deepEqual(
+    main.spawnedSessions,
+    [{ sessionId: LAUNCHER, parentUuid: 'main-thread::u0' }],
+    'the banner attributes the review session to the turn that ran the command, once',
+  );
+
+  // ── the launcher half ────────────────────────────────────────────────
+  const launcherFile = join(dir, 'launcher.jsonl');
+  writeFileSync(
+    launcherFile,
+    [
+      JSON.stringify({
+        timestamp: '2026-08-08T07:03:15Z',
+        type: 'session_meta',
+        payload: {
+          id: LAUNCHER,
+          session_id: LAUNCHER,
+          cwd: '/tmp/proj',
+          thread_source: 'user',
+          source: 'exec',
+          cli_version: '0.147.0',
+        },
+      }),
+      JSON.stringify({
+        timestamp: '2026-08-08T07:03:15Z',
+        type: 'event_msg',
+        payload: { type: 'entered_review_mode' },
+      }),
+      JSON.stringify({
+        timestamp: '2026-08-08T07:03:15Z',
+        type: 'event_msg',
+        payload: { type: 'user_message', message: REVIEW_PROMPT },
+      }),
+      JSON.stringify({
+        timestamp: '2026-08-08T07:03:16Z',
+        type: 'event_msg',
+        payload: { type: 'user_message', message: REVIEW_PROMPT },
+      }),
+    ].join('\n') + '\n',
+    'utf8',
+  );
+  const launcher = await parseCodexJsonlFile(launcherFile);
+  assert.equal(launcher.user.length, 2, 'the launcher records both copies of the prompt');
+  for (const u of launcher.user) {
+    assert.equal(u.isSynthetic, true, 'a review prompt is Codex-generated, so it never roots a turn');
+    assert.equal(u.isSidechain, true, 'and it is sidechain, so the linker will try to anchor it');
+  }
+  assert.equal(
+    launcher.user[0].parentSessionId,
+    undefined,
+    'the launcher cannot name its spawner — that comes from the banner side',
+  );
+
+  // A `thread_source: 'user'` session WITHOUT entered_review_mode is a real
+  // conversation and must keep rooting its own turns.
+  const plainFile = join(dir, 'plain.jsonl');
+  writeFileSync(
+    plainFile,
+    [
+      JSON.stringify({
+        timestamp: '2026-08-08T09:00:00Z',
+        type: 'session_meta',
+        payload: { id: 'plain-1', cwd: '/tmp/proj', thread_source: 'user', source: 'exec' },
+      }),
+      JSON.stringify({
+        timestamp: '2026-08-08T09:00:01Z',
+        type: 'event_msg',
+        payload: { type: 'user_message', message: 'a message I actually typed' },
+      }),
+      tokens('2026-08-08T09:00:02Z', 1_000),
+    ].join('\n') + '\n',
+    'utf8',
+  );
+  const plain = await parseCodexJsonlFile(plainFile);
+  assert.equal(plain.user[0].isSynthetic, undefined, 'a plain exec session still roots its own turns');
+  assert.equal(plain.user[0].isSidechain, undefined, 'and is not sidechain');
+
+  rmSync(dir, { recursive: true, force: true });
+  console.log('✓ codex review: launcher prompts are synthetic; the spawn banner names the turn');
+}
+
 console.log('\nAll codex parser + pricing assertions passed.');

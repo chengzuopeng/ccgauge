@@ -21,10 +21,25 @@ export interface PricingResolution {
   matchedKey: string | null;
 }
 
+/**
+ * A session started by a command run from INSIDE another session's turn
+ * (`codex review`). The child writes its own top-level rollout with no
+ * `parent_thread_id`, so the only evidence of the relationship lives in the
+ * spawning transcript — hence a per-file side channel rather than a field on
+ * the child's records.
+ */
+export interface SpawnedSessionLink {
+  /** `session_meta.id` of the spawned session. */
+  sessionId: string;
+  /** UserRecord uuid of the turn that ran the command. */
+  parentUuid: string;
+}
+
 export interface ParsedFile {
   assistant: AssistantRecord[];
   user: UserRecord[];
   parentLinks: Array<[string, string | null]>;
+  spawnedSessions?: SpawnedSessionLink[];
 }
 
 export interface ProviderAdapter {

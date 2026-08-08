@@ -2,6 +2,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import type { AssistantRecord, ProviderId, UserRecord } from '../types';
+import type { SpawnedSessionLink } from '../providers/types';
 
 const SCHEMA_VERSION = 2;
 
@@ -17,6 +18,9 @@ export interface PersistedFileEntry {
   assistantRecords: AssistantRecord[];
   userRecords: UserRecord[];
   parentLinks: Array<[string, string | null]>;
+  // Optional: absent in caches written before this field existed. Those are
+  // discarded anyway on the `parserVersion` bump that introduced it.
+  spawnedSessions?: SpawnedSessionLink[];
 }
 
 interface PersistedIndex {

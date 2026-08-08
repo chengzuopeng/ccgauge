@@ -564,4 +564,123 @@ const PROJ = `/Users/x/.claude/projects/-proj/${SESSION}`;
   console.log('✓ filter boundary: seed is the last-resort root; memo never steals the parent thread');
 }
 
+// ── codex review: a spawned SESSION folds into the turn that ran it ────
+{
+  // `codex review` is not a sub-agent of the conversation — it's a separate
+  // top-level session, and a pair of them:
+  //   launcher (0 tokens, synthesised prompt) ← worker (all the tokens)
+  // The launcher owns no assistant record, so the usual "anchor onto the parent
+  // thread's last assistant" has nothing to bind to and BOTH halves orphaned
+  // into their own row. `spawnedSessions` carries the one hard link that exists:
+  // the banner `codex review` printed into the spawning turn's tool output.
+  const dir = '/Users/x/.codex/sessions/2026/08/08';
+  const LAUNCHER = '019fe02e-db7c';
+
+  const uMain = {
+    uuid: 'main::u0',
+    textPreview: '整体 review 下未 push 的改动',
+    isSynthetic: false,
+    isSidechain: false,
+    sessionId: 'main-thread',
+    timestamp: '2026-08-08T07:01:35.000Z',
+    filePath: `${dir}/rollout-main.jsonl`,
+  };
+  const aMain = {
+    uuid: 'main::a0',
+    isSidechain: false,
+    sessionId: 'main-thread',
+    timestamp: '2026-08-08T07:01:45.000Z',
+    filePath: `${dir}/rollout-main.jsonl`,
+  };
+  // Launcher: synthetic prompt, no parentSessionId — it cannot name its spawner.
+  const uLaunch = {
+    uuid: `${LAUNCHER}::u0`,
+    textPreview: "Review the code changes against the base branch 'dea65d0f2'.",
+    isSynthetic: true,
+    isSidechain: true,
+    sessionId: LAUNCHER,
+    timestamp: '2026-08-08T07:03:15.000Z',
+    filePath: `${dir}/rollout-launcher.jsonl`,
+  };
+  // Worker: names the launcher, which has no assistant to anchor onto.
+  const uWork = {
+    uuid: 'worker::u0',
+    textPreview: "Review the code changes against the base branch 'dea65d0f2'.",
+    isSynthetic: true,
+    isSidechain: true,
+    sessionId: 'worker-thread',
+    parentSessionId: LAUNCHER,
+    timestamp: '2026-08-08T07:03:16.000Z',
+    filePath: `${dir}/rollout-worker.jsonl`,
+  };
+  const aWork = {
+    uuid: 'worker::a0',
+    isSidechain: true,
+    sessionId: 'worker-thread',
+    parentSessionId: LAUNCHER,
+    timestamp: '2026-08-08T07:03:31.000Z',
+    filePath: `${dir}/rollout-worker.jsonl`,
+  };
+
+  const assistants = [aMain, aWork];
+  const users = [uMain, uLaunch, uWork];
+  const base = () => ({
+    'main::u0': null,
+    'main::a0': 'main::u0',
+    [`${LAUNCHER}::u0`]: null,
+    'worker::u0': null,
+    'worker::a0': 'worker::u0',
+  });
+
+  // Without the banner, both halves stay orphans — today's (pre-fix) shape.
+  const noLink = base();
+  const before = linkSidechainParents({
+    assistantRecords: assistants,
+    userRecords: users,
+    parentMap: noLink,
+  });
+  assert.equal(before.relinked, 0, 'no banner -> nothing to link');
+  // Only the worker reaches the orphan counter; the launcher names no parent
+  // session at all, so it bails before the linker considers it a sub-agent.
+  assert.equal(before.orphans, 1, 'the worker orphans without the spawn link');
+  const beforeIdx = buildTurnIndex(assistants, users, noLink);
+  assert.notEqual(
+    beforeIdx.get('worker::a0'),
+    'main::u0',
+    'the review lands in its own row when the link is missing (graceful fallback)',
+  );
+
+  // With it, both halves resolve to the turn that ran the command.
+  const parentMap = base();
+  const stats = linkSidechainParents({
+    assistantRecords: assistants,
+    userRecords: users,
+    parentMap,
+    spawnedSessions: [{ sessionId: LAUNCHER, parentUuid: 'main::u0' }],
+  });
+  assert.equal(stats.orphans, 0, 'the banner resolves both halves');
+  assert.equal(parentMap[`${LAUNCHER}::u0`], 'main::u0', 'launcher pinned to the spawning turn');
+  assert.equal(parentMap['worker::u0'], 'main::u0', 'worker pinned through its assistant-less launcher');
+
+  const index = buildTurnIndex(assistants, users, parentMap);
+  assert.equal(index.get('main::a0'), 'main::u0', 'the conversation keeps its own turn');
+  assert.equal(
+    index.get('worker::a0'),
+    'main::u0',
+    'the review folds into the message that triggered it (the bug fix)',
+  );
+
+  // An unrelated banner must not steal a sub-agent that already resolves.
+  const decoy = base();
+  linkSidechainParents({
+    assistantRecords: assistants,
+    userRecords: users,
+    parentMap: decoy,
+    spawnedSessions: [{ sessionId: 'some-other-session', parentUuid: 'main::u0' }],
+  });
+  assert.equal(decoy['worker::u0'], null, 'a banner for a different session links nothing');
+
+  console.log('✓ codex review: launcher + worker fold into the turn that ran the command');
+}
+
 console.log('\nAll sidechain-linking assertions passed.');

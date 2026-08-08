@@ -187,12 +187,31 @@ on 3737 by default.
     → `codex-v10-turn-context-model-precedence`
     (`thread_settings_applied` is a fallback and must never override the
     per-turn `turn_context` model, or turns bill at the wrong rate)
-    → `codex-v11-item-completed-user-turns` (current; the interactive TUI
+    → `codex-v11-item-completed-user-turns` (the interactive TUI
     wraps events in an `item_completed` envelope instead of the flat
     `user_message` sub-type, so a typed message produced no UserRecord and
-    every call became its own "(no user text)" row).
+    every call became its own "(no user text)" row)
+    → `codex-v12-review-spawn-linkage` (current; see below).
 
-    Two of those versions exist because a Codex rollout's shape varies
+    v12 is the one that is not a sub-agent problem at all. `codex review`
+    run from inside a turn starts a separate TOP-LEVEL session, written as a
+    pair: a launcher (`thread_source: 'user'`, first event
+    `entered_review_mode`, zero tokens, Codex's synthesised prompt) and a
+    worker (`thread_source: 'subagent'`, `session_id` → the launcher, all the
+    tokens). Nothing on either side names the conversation that ran the
+    command, and the launcher spends nothing, so the worker had no assistant
+    to anchor onto — the pair surfaced as its own row titled "Review the code
+    changes against the base branch …", a prompt the user never typed, right
+    next to the message that triggered it. The only link that exists is the
+    startup banner `codex review` prints (`session id: <uuid>`), which lands
+    in the spawning turn's tool output; `ParsedFile.spawnedSessions` carries
+    it across files to `linkSidechainParents`. Present on 5/5 `codex review`
+    runs across cli_version 0.144.1 and 0.147.0 — and when it is absent (you
+    ran `codex review` yourself, so there IS no spawning turn) the pair keeps
+    its own row via the `seedTextMap` fallback. Nothing is ever double- or
+    under-counted: linking only regroups rows, never usage.
+
+    Two of the earlier versions exist because a Codex rollout's shape varies
     **within one `cli_version`**, which is the thing to internalise before
     debugging this parser. v7's `forked_from_id` is present on some
     `thread_spawn` rollouts and absent on others from the same build nine

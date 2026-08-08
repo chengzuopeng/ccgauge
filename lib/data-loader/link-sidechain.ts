@@ -1,5 +1,6 @@
 
 import type { AssistantRecord, UserRecord } from '../types';
+import type { SpawnedSessionLink } from '../providers/types';
 
 // Claude Code stores sub-agent transcripts under the parent session's
 // `subagents/` dir. Two layouts exist:
@@ -51,6 +52,8 @@ interface LinkInputs {
   assistantRecords: AssistantRecord[];
   userRecords: UserRecord[];
   parentMap: Record<string, string | null>;
+  /** Cross-file: sessions a transcript reported starting from inside a turn. */
+  spawnedSessions?: SpawnedSessionLink[];
 }
 
 export interface LinkSidechainStats {
@@ -68,7 +71,13 @@ export function linkSidechainParents({
   assistantRecords,
   userRecords,
   parentMap,
+  spawnedSessions,
 }: LinkInputs): LinkSidechainStats {
+
+  const spawnedBy = new Map<string, string>();
+  for (const s of spawnedSessions ?? []) {
+    if (!spawnedBy.has(s.sessionId)) spawnedBy.set(s.sessionId, s.parentUuid);
+  }
 
   const parentAssistantsBySession = new Map<string, AssistantRecord[]>();
   for (const a of assistantRecords) {
@@ -100,7 +109,13 @@ export function linkSidechainParents({
 
   // Anchor one unparented sub-agent record onto the spawning turn: the parent
   // thread's last assistant record at or before `rec.timestamp`.
-  function anchor(rec: { uuid: string; timestamp: string; filePath: string; parentSessionId?: string }) {
+  function anchor(rec: {
+    uuid: string;
+    timestamp: string;
+    filePath: string;
+    sessionId: string;
+    parentSessionId?: string;
+  }) {
     // Claude states the spawning session in the transcript PATH; Codex states
     // it in session_meta, which the parser stamps onto the record.
     let fromPath = pathParentByFile.get(rec.filePath);
@@ -109,7 +124,17 @@ export function linkSidechainParents({
       pathParentByFile.set(rec.filePath, fromPath);
     }
     const parentSessionId = fromPath ?? rec.parentSessionId;
-    if (!parentSessionId) return;
+    // Neither half of a `codex review` pair can reach its conversation on its
+    // own: the launcher names no parent session, and the worker names the
+    // launcher, which spends nothing and so owns no assistant to anchor onto.
+    // Both resolve through the banner the spawning turn happened to log.
+    //
+    // The map holds every session a transcript reported starting (`codex exec`
+    // children too), but it is only ever read HERE — for a sidechain record
+    // whose normal anchor came up empty. A plain `codex exec` child is its own
+    // conversation, is not sidechain, and so is never offered to this function.
+    const spawnedByUuid = spawnedBy.get(parentSessionId || rec.sessionId);
+    if (!parentSessionId && !spawnedByUuid) return;
 
     if (!seenFiles.has(rec.filePath)) {
       seenFiles.add(rec.filePath);
@@ -122,8 +147,17 @@ export function linkSidechainParents({
       return;
     }
 
-    const parentAssistants = parentAssistantsBySession.get(parentSessionId);
+    const parentAssistants = parentSessionId
+      ? parentAssistantsBySession.get(parentSessionId)
+      : undefined;
     if (!parentAssistants || parentAssistants.length === 0) {
+      // Falling back to the spawning turn's USER record, not an assistant: the
+      // banner pins the turn, and pinning the turn is the whole point.
+      if (spawnedByUuid) {
+        parentMap[rec.uuid] = spawnedByUuid;
+        stats.relinked += 1;
+        return;
+      }
       stats.orphans += 1;
       return;
     }

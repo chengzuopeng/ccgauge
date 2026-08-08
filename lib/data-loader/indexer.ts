@@ -3,7 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { dedupAssistantRecords } from '../dedup';
 import { listProviders } from '../providers';
-import type { ProviderAdapter, ProviderId } from '../providers';
+import type { ProviderAdapter, ProviderId, SpawnedSessionLink } from '../providers';
 import type {
   AssistantRecord,
   ScanResult,
@@ -29,6 +29,7 @@ interface FileEntry {
   assistantRecords: AssistantRecord[];
   userRecords: UserRecord[];
   parentLinks: Array<[string, string | null]>;
+  spawnedSessions: SpawnedSessionLink[];
 }
 
 interface SnapshotExtended extends ScanResult {
@@ -226,6 +227,7 @@ class FileIndexer {
               assistantRecords: persistedEntry.assistantRecords,
               userRecords: persistedEntry.userRecords,
               parentLinks: persistedEntry.parentLinks,
+              spawnedSessions: persistedEntry.spawnedSessions ?? [],
             });
             return;
           }
@@ -238,6 +240,7 @@ class FileIndexer {
             assistantRecords: parsed.assistant,
             userRecords: parsed.user,
             parentLinks: parsed.parentLinks,
+            spawnedSessions: parsed.spawnedSessions ?? [],
           });
         } catch (err) {
           this.recordError(`parse ${file}: ${(err as Error).message}`);
@@ -328,6 +331,7 @@ class FileIndexer {
               assistantRecords: parsed.assistant,
               userRecords: parsed.user,
               parentLinks: parsed.parentLinks,
+              spawnedSessions: parsed.spawnedSessions ?? [],
             });
             changed = true;
           } catch (err) {
@@ -394,6 +398,7 @@ class FileIndexer {
           assistantRecords: parsed.assistant,
           userRecords: parsed.user,
           parentLinks: parsed.parentLinks,
+          spawnedSessions: parsed.spawnedSessions ?? [],
         });
         this.lastWorkStart = workStart;
         this.scheduleSnapshotRebuild();
@@ -419,6 +424,7 @@ class FileIndexer {
     const assistant: AssistantRecord[] = [];
     const user: UserRecord[] = [];
     const parentMap: Record<string, string | null> = {};
+    const spawnedSessions: SpawnedSessionLink[] = [];
     let recordsParsed = 0;
 
     const bySource: Record<ProviderId, ScanStatsBySource> = {
@@ -449,6 +455,7 @@ class FileIndexer {
       for (const rec of entry.assistantRecords) assistant.push(rec);
       for (const rec of entry.userRecords) user.push(rec);
       for (const [uuid, parent] of entry.parentLinks) parentMap[uuid] = parent;
+      for (const link of entry.spawnedSessions) spawnedSessions.push(link);
       recordsParsed += entry.assistantRecords.length + entry.userRecords.length;
       bySource[entry.source].filesScanned += 1;
       bySource[entry.source].recordsParsed +=
@@ -466,6 +473,7 @@ class FileIndexer {
       assistantRecords: dedupedAssistants,
       userRecords: dedupedUsers,
       parentMap,
+      spawnedSessions,
     });
 
     // Stamp each sidechain record with whether it's a Workflow (ultracode)
@@ -584,6 +592,7 @@ class FileIndexer {
           assistantRecords: entry.assistantRecords,
           userRecords: entry.userRecords,
           parentLinks: entry.parentLinks,
+          spawnedSessions: entry.spawnedSessions,
         });
       }
       savePersistedIndex(
