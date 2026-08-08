@@ -1,25 +1,13 @@
 import { NextResponse } from 'next/server';
-import { getCachedScan } from '@/lib/data-loader/scan';
 import {
   aggregateByTime,
   aggregateTotals,
   isGranularity,
   type Granularity,
 } from '@/lib/aggregator';
-import {
-  recordsToTurnRowsCached,
-  getAllModels,
-  getAllProjects,
-} from '@/lib/data-loader/derived';
-import {
-  isUsageRange,
-  rangeToDates,
-  parseCustomRange,
-  type UsageRange,
-} from '@/lib/range';
-import { resolveSource, filterBySource, expandSources } from '@/lib/source';
+import { getAllModels, getAllProjects } from '@/lib/data-loader/derived';
+import { expandSources } from '@/lib/source';
 import { combineTotals, combineTimeBuckets } from '@/lib/source-merge';
-import { resolveCanonicalCwd } from '@/lib/project-label';
 import {
   USAGE_PAGE_SIZE,
   isSortKey,
@@ -27,6 +15,7 @@ import {
   type SortKey,
 } from '@/lib/usage-query';
 import { badRequest, withApiErrorHandling } from '@/lib/api/error-handler';
+import { parseTurnFilters, loadTurnScope } from '@/lib/api/turn-scope';
 import { detectCodexFastTier } from '@/lib/providers/codex/speed';
 import type { UsageTurnRow } from '@/lib/serialize';
 
@@ -71,25 +60,9 @@ export const GET = withApiErrorHandling(async (req: Request) => {
   const url = new URL(req.url);
   const sp = url.searchParams;
 
-  const source = await resolveSource(sp.get('source'));
-
-  const rangeRaw = sp.get('range') || '7d';
-  if (!isUsageRange(rangeRaw)) {
-    return badRequest(`invalid range: ${rangeRaw}`, 'invalid_range');
-  }
-  const range = rangeRaw as UsageRange;
-  let dates: { from?: Date; to?: Date };
-  if (range === 'custom') {
-    dates = parseCustomRange(sp.get('from'), sp.get('to'));
-    if (!dates.from) {
-      return badRequest(
-        'range=custom requires a valid `from` (YYYY-MM-DD)',
-        'invalid_custom_range',
-      );
-    }
-  } else {
-    dates = rangeToDates(range);
-  }
+  const parsed = await parseTurnFilters(sp);
+  if ('error' in parsed) return parsed.error;
+  const { source, range, dates, models, projects } = parsed.filters;
 
   const granRaw = sp.get('gran') || (range === '1d' ? 'hour' : 'day');
   if (!isGranularity(granRaw)) {
@@ -97,24 +70,17 @@ export const GET = withApiErrorHandling(async (req: Request) => {
   }
   const gran = granRaw as Granularity;
 
-  const models = sp.get('models')?.split(',').filter(Boolean) ?? [];
-  const projects = sp.get('projects')?.split(',').filter(Boolean) ?? [];
   const query = (sp.get('q') || '').trim();
   const sortRaw = sp.get('sort') || 'timestamp';
   const sortKey: SortKey = isSortKey(sortRaw) ? sortRaw : 'timestamp';
   const sortDir: 'asc' | 'desc' = sp.get('dir') === 'asc' ? 'asc' : 'desc';
   const pageNum = parseUsagePageParam(sp.get('page'));
 
-  const scan = await getCachedScan();
-  const allSourceRecords = filterBySource(scan.records, source);
-  const allSourceUsers = filterBySource(scan.userRecords, source);
+  const { allSourceRecords, projectFilteredRecords, allTurns } = await loadTurnScope(
+    parsed.filters,
+  );
 
   const sources = expandSources(source);
-
-  const projectsSet = new Set(projects);
-  const projectFilteredRecords = projects.length
-    ? allSourceRecords.filter((r) => projectsSet.has(resolveCanonicalCwd(r.cwd)))
-    : allSourceRecords;
 
   const baseOpts = {
     from: dates.from,
@@ -139,41 +105,20 @@ export const GET = withApiErrorHandling(async (req: Request) => {
     requests: b.requests,
   }));
 
-  const fromIso = dates.from ? dates.from.toISOString() : '';
-  const toIso = dates.to ? dates.to.toISOString() : '';
-  const filteredRecords = projectFilteredRecords.filter((r) => {
-    if (dates.from && r.timestamp < fromIso) return false;
-    if (dates.to && r.timestamp > toIso) return false;
-    if (models.length && !models.includes(r.model)) return false;
-    return true;
-  });
-
-  // Cache key uses the range TOKEN (not the resolved fromIso/toIso) so 7d /
-  // 30d / 90d hit the same cache entry on every request — `rangeToDates`
-  // recomputes `now - Nd` per call, which would otherwise drift the key. For
-  // `custom`, we include the explicit from/to since those ARE stable.
-  const customStamp = range === 'custom' ? `${fromIso}~${toIso}` : '';
-  const filterKey = [
-    source,
-    range,
-    customStamp,
-    models.slice().sort().join(','),
-    projects.slice().sort().join(','),
-  ].join('|');
-
-  const allTurns = recordsToTurnRowsCached(
-    scan,
-    filterKey,
-    filteredRecords,
-    allSourceUsers,
-    scan.parentMap,
-  );
   const searched = filterTurnsByQuery(allTurns, query);
   const sorted = sortTurns(searched, sortKey, sortDir);
   const totalCount = sorted.length;
   const pageCount = Math.max(1, Math.ceil(totalCount / USAGE_PAGE_SIZE));
   const safePage = Math.min(pageNum, pageCount - 1);
-  const pageSlice = sorted.slice(safePage * USAGE_PAGE_SIZE, (safePage + 1) * USAGE_PAGE_SIZE);
+  // `children` — every API call of the turn — is 99.5% of this payload and is
+  // needed only once a row is expanded. Measured before it was dropped: 9.29MB
+  // for a page of 25, one turn alone 4MB / 3498 calls, and the client spent
+  // 0.9s parsing it on every filter click. /api/turns/children serves it per
+  // turn, on demand, paginated. Copied rather than deleted in place: these rows
+  // come straight out of the shared LRU.
+  const pageSlice = sorted
+    .slice(safePage * USAGE_PAGE_SIZE, (safePage + 1) * USAGE_PAGE_SIZE)
+    .map(({ children: _children, ...rest }) => rest);
 
   const allModels = getAllModels(allSourceRecords);
   const allProjects = getAllProjects(allSourceRecords);

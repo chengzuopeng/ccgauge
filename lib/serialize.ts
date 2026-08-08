@@ -151,6 +151,14 @@ export interface UsageTurnRow {
   children: UsageTableRow[];
 }
 
+/**
+ * A turn row without its per-call detail — what `/api/turns` puts on the wire.
+ * `children` is fetched separately from `/api/turns/children` when a row is
+ * expanded; inlining it made the list response ~200x bigger than the part
+ * anyone actually looks at.
+ */
+export type UsageTurnSummary = Omit<UsageTurnRow, 'children'>;
+
 export function recordsToTurnRows(
   assistants: AssistantRecord[],
   users: UserRecord[],
