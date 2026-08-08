@@ -1,8 +1,9 @@
 'use client';
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState, useTransition } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useT, useI18n } from '@/lib/i18n/context';
+import { usePendingNav } from '@/lib/use-pending-nav';
 import type { ProviderId } from '@/lib/providers/types';
 
 interface ProviderInfo {
@@ -43,12 +44,13 @@ function isChoice(v: string | null | undefined, available: ProviderId[]): v is C
 }
 
 export function SourceSwitcher({ available, initial, providers }: Props) {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const t = useT();
   const { locale } = useI18n();
-  const [pending, startTransition] = useTransition();
+  // Shared hook rather than a local useTransition: a source switch is a
+  // same-route navigation, so it needs the hook's stuck-transition rescue too.
+  const { pending, navigate } = usePendingNav();
   const urlSource = searchParams.get('source');
   const urlChoice: Choice | null = isChoice(urlSource, available) ? (urlSource as Choice) : null;
   const [current, setCurrent] = useState<Choice>(urlChoice ?? initial);
@@ -68,9 +70,7 @@ export function SourceSwitcher({ available, initial, providers }: Props) {
     const target = deepLinkRoute(pathname)
       ? `/${pathname.split('/')[1]}?${params.toString()}`
       : `${pathname}?${params.toString()}`;
-    startTransition(() => {
-      router.push(target);
-    });
+    navigate(target);
   };
 
   const orderedProviders = providers.filter((p) => available.includes(p.id));
