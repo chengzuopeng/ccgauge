@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
@@ -13,7 +13,7 @@ import {
   projectNameFromCwd,
   cn,
 } from '@/lib/utils';
-import type { UsageTableRow, UsageTurnRow } from '@/lib/serialize';
+import type { UsageTableRow, UsageTurnRow, UsageTurnSummary } from '@/lib/serialize';
 import { useT, useI18n } from '@/lib/i18n/context';
 import type { Locale } from '@/lib/i18n/dict';
 import { HoverCard } from '@/components/hover-card';
@@ -64,6 +64,17 @@ const COLUMNS: ColumnDef[] = [
 
 const STORAGE_KEY = 'ccgauge.usage.cols.v4';
 
+/** Matches the server default; a turn can hold thousands of calls, and
+ *  rendering them all at once cost 2.1s of blocked main thread. */
+const CHILDREN_PAGE_SIZE = 200;
+
+interface ChildState {
+  items: UsageTableRow[];
+  total: number;
+  loading: boolean;
+  error?: string;
+}
+
 function defaultVisible(): Record<ColumnId, boolean> {
   return COLUMNS.reduce(
     (acc, c) => {
@@ -91,7 +102,7 @@ function loadVisible(): Record<ColumnId, boolean> {
 }
 
 interface UsageTableProps {
-  rows: UsageTurnRow[];
+  rows: UsageTurnSummary[];
   totalCount: number;
   page: number;
   pageCount: number;
@@ -109,6 +120,7 @@ export function UsageTable({ rows, totalCount, page, pageCount, sort, query, cod
   const { pending, navigate } = usePendingNav();
 
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [childrenById, setChildrenById] = useState<Record<string, ChildState>>({});
   const [visible, setVisible] = useState<Record<ColumnId, boolean>>(defaultVisible);
   const [colsOpen, setColsOpen] = useState(false);
   const [colsPos, setColsPos] = useState<{ top: number; right: number } | null>(null);
@@ -209,11 +221,68 @@ export function UsageTable({ rows, totalCount, page, pageCount, sort, query, cod
     pushParams({ page: n > 0 ? String(n + 1) : undefined });
   }
 
+  const qs = params.toString();
+
+  // Which calls belong to a turn depends on the date/model/project filters, so
+  // anything already fetched is stale the moment they move. Sort/search/page
+  // are in the same string and don't affect it — dropping the cache on those
+  // too costs one refetch of a row the user has to re-open anyway.
+  useEffect(() => {
+    setExpanded(new Set());
+    setChildrenById({});
+  }, [qs]);
+
+  const loadChildren = useCallback(
+    async (turnId: string, offset: number) => {
+      const sp = new URLSearchParams(qs);
+      for (const k of ['q', 'sort', 'dir', 'page', 'gran']) sp.delete(k);
+      sp.set('turnId', turnId);
+      sp.set('offset', String(offset));
+      sp.set('limit', String(CHILDREN_PAGE_SIZE));
+
+      setChildrenById((prev) => ({
+        ...prev,
+        [turnId]: { items: prev[turnId]?.items ?? [], total: prev[turnId]?.total ?? 0, loading: true },
+      }));
+      try {
+        const res = await fetch(`/api/turns/children?${sp.toString()}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as { children: UsageTableRow[]; total: number };
+        setChildrenById((prev) => {
+          const before = prev[turnId]?.items ?? [];
+          // `offset === 0` is a fresh open, anything else appends. Guarding on
+          // the length keeps a double-click from duplicating a page.
+          const items =
+            offset === 0
+              ? data.children
+              : before.length === offset
+                ? [...before, ...data.children]
+                : before;
+          return { ...prev, [turnId]: { items, total: data.total, loading: false } };
+        });
+      } catch (err) {
+        setChildrenById((prev) => ({
+          ...prev,
+          [turnId]: {
+            items: prev[turnId]?.items ?? [],
+            total: prev[turnId]?.total ?? 0,
+            loading: false,
+            error: (err as Error).message,
+          },
+        }));
+      }
+    },
+    [qs],
+  );
+
   function toggleExpand(id: string) {
     setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
-      else next.add(id);
+      else {
+        next.add(id);
+        if (!childrenById[id]) void loadChildren(id, 0);
+      }
       return next;
     });
   }
@@ -341,6 +410,10 @@ export function UsageTable({ rows, totalCount, page, pageCount, sort, query, cod
                     turn={turn}
                     isOpen={isOpen}
                     onToggle={() => toggleExpand(turn.turnId)}
+                    childState={childrenById[turn.turnId]}
+                    onLoadMore={() =>
+                      loadChildren(turn.turnId, childrenById[turn.turnId]?.items.length ?? 0)
+                    }
                     userText={userText}
                     expandLabel={t('usage.turn.expand')}
                     collapseLabel={t('usage.turn.collapse')}
@@ -404,6 +477,8 @@ function RowsForTurn({
   turn,
   isOpen,
   onToggle,
+  childState,
+  onLoadMore,
   userText,
   expandLabel,
   collapseLabel,
@@ -412,9 +487,11 @@ function RowsForTurn({
   t,
   codexFastActive,
 }: {
-  turn: UsageTurnRow;
+  turn: UsageTurnSummary;
   isOpen: boolean;
   onToggle: () => void;
+  childState?: ChildState;
+  onLoadMore: () => void;
   userText: string;
   expandLabel: string;
   collapseLabel: string;
@@ -438,6 +515,8 @@ function RowsForTurn({
     ? turn.toolNames.slice(0, 3).join(', ') + (turn.toolNames.length > 3 ? '…' : '')
     : '—';
 
+  const hasMoreChildren = !!childState && childState.items.length < childState.total;
+
   return (
     <>
       <tr
@@ -458,30 +537,61 @@ function RowsForTurn({
           </td>
         ))}
       </tr>
-      {isOpen &&
-        turn.children.map((r) => (
-          <tr
-            key={r.uuid}
-            className="border-b border-border last:border-b-0 bg-bg-surface-hi/20 text-text-tertiary"
-          >
-            <td className="px-2 py-1.5 w-6"></td>
-            {activeColumns.map((c) => (
-              <td
-                key={c.id}
-                className={cn('px-3 py-1.5', c.align === 'right' ? 'text-right' : 'text-left')}
-              >
-                {renderChildCell(c.id, r, turn.userText, locale, t, codexFastActive)}
+      {isOpen && (
+        <>
+          {(childState?.items ?? []).map((r) => (
+            <tr
+              key={r.uuid}
+              className="border-b border-border last:border-b-0 bg-bg-surface-hi/20 text-text-tertiary"
+            >
+              <td className="px-2 py-1.5 w-6"></td>
+              {activeColumns.map((c) => (
+                <td
+                  key={c.id}
+                  className={cn('px-3 py-1.5', c.align === 'right' ? 'text-right' : 'text-left')}
+                >
+                  {renderChildCell(c.id, r, turn.userText, locale, t, codexFastActive)}
+                </td>
+              ))}
+            </tr>
+          ))}
+          {(childState?.loading || childState?.error || hasMoreChildren) && (
+            <tr className="border-b border-border last:border-b-0 bg-bg-surface-hi/20">
+              <td className="px-2 py-1.5 w-6"></td>
+              <td colSpan={activeColumns.length} className="px-3 py-1.5 text-xs">
+                {childState?.error ? (
+                  <span className="text-warning">
+                    {t('usage.turn.callsFailed', { error: childState.error })}
+                  </span>
+                ) : childState?.loading ? (
+                  <span className="text-text-tertiary">{t('usage.turn.loadingCalls')}</span>
+                ) : (
+                  <button
+                    type="button"
+                    className="text-accent hover:underline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onLoadMore();
+                    }}
+                  >
+                    {t('usage.turn.loadMoreCalls', {
+                      shown: childState?.items.length ?? 0,
+                      total: childState?.total ?? 0,
+                    })}
+                  </button>
+                )}
               </td>
-            ))}
-          </tr>
-        ))}
+            </tr>
+          )}
+        </>
+      )}
     </>
   );
 }
 
 function renderTurnCell(
   id: ColumnId,
-  turn: UsageTurnRow,
+  turn: UsageTurnSummary,
   modelLabel: string,
   toolsLabel: string,
   userText: string,
