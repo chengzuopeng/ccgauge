@@ -79,6 +79,11 @@ export const RawRecordSchema = z
       .optional(),
     promptId: z.string().optional(),
     isSidechain: z.boolean().optional(),
+    /** Set by Claude Code on messages IT injected into the conversation rather
+     *  than ones the user typed — slash-command expansions, hook output, skill
+     *  preambles, image placeholders. `.passthrough()` would carry it anyway;
+     *  it is declared so the parser can read it without a cast. */
+    isMeta: z.boolean().optional(),
     permissionMode: z.string().optional(),
   })
   .passthrough();

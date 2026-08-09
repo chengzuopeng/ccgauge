@@ -173,7 +173,19 @@ function parseUser(raw: RawRecord, file: string): UserRecord | null {
   if (skill) skillInject = { skill, chars: contentChars(content) };
 
   const isSidechain = raw.isSidechain === true;
-  const isSynthetic = isSidechain || (!!textPreview && isSyntheticUserText(textPreview));
+  // `isMeta` is Claude Code's own marker for a message it injected rather than
+  // one the user typed, so it catches every shape at once — slash-command
+  // expansions, Stop-hook announcements and feedback, skill preambles,
+  // "Continue from where you left off.", malformed-tool-call retries, image
+  // placeholders. Measured over a week of transcripts it is exact: 261 of 261
+  // `isMeta` messages were injected, and none of 1437 real prompts carried it.
+  // Before this, 8% of usage rows (82 of 1023) were titled with injected text.
+  //
+  // It does NOT subsume `isSyntheticUserText`: `<task-notification>` records
+  // carry no `isMeta` at all (175 of 175 checked), so the prefix list below
+  // still does the work the marker doesn't.
+  const isSynthetic =
+    isSidechain || raw.isMeta === true || (!!textPreview && isSyntheticUserText(textPreview));
 
   return {
     type: 'user',
@@ -192,6 +204,11 @@ function parseUser(raw: RawRecord, file: string): UserRecord | null {
   };
 }
 
+/**
+ * Prefix fallback for injected messages that carry no `isMeta` marker. The
+ * marker is the primary signal (see `parseUser`); this list only has to cover
+ * what it misses, plus transcripts written before Claude Code emitted it.
+ */
 export function isSyntheticUserText(text: string): boolean {
   const t = text.trimStart();
 
@@ -208,5 +225,11 @@ export function isSyntheticUserText(text: string): boolean {
   // the work it triggered back into that spawning turn instead of spawning a
   // standalone "<task-notification>…" row per completion.
   if (t.startsWith('<task-notification>')) return true;
+
+  // A slash command lands as a PAIR of unmarked records: `<command-name>…`
+  // with the args the user actually typed, then `<local-command-stdout>…`
+  // echoing what the command printed. Only the echo is synthetic — skipping it
+  // roots the turn on the invocation instead of on "Goal set: …".
+  if (t.startsWith('<local-command-stdout>')) return true;
   return false;
 }
