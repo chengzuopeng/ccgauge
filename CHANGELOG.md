@@ -5,6 +5,38 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.5] — 2026-08-20
+
+### Fixed
+
+- **One typed message could still scatter across a dozen usage rows.** Claude
+  Code writes its own injections into the transcript as ordinary `user`
+  records — slash-command expansions, Stop-hook announcements and feedback,
+  skill preambles, "Continue from where you left off.", image placeholders —
+  and ccgauge read them as prompts. In the reported case a single `/goal` run
+  produced 17 rows where 2 belonged. ccgauge now reads Claude Code's own
+  marker for injected messages instead of guessing from text prefixes, so new
+  shapes of injection fold correctly without needing a patch each time.
+  Measured over a week of real transcripts: 156 injected rows became 0.
+- **Slash commands were titled with their XML envelope.** A row for
+  `/goal 开发 dev…` read `<command-name>/goal</command-name>…`, with the
+  request itself pushed past the preview cutoff. It now reads as the line
+  that was typed.
+- **Switching the data-source tab was slow with Codex data.** The Codex
+  fast-tier setting was re-read from disk once per usage record rather than
+  once per request. The overview went from 1.5s to 0.2s, and a source-tab
+  click now lands in about 140ms.
+- **The cache directory grew without bound.** Each interrupted process left a
+  temp file behind and nothing collected them — 2.2GB across 125 files on one
+  machine. They are now swept on startup and after each save; existing ones
+  clear themselves on first run of this version.
+
+### Changed
+
+- Claude `parserVersion` → `claude-v7-meta-injected-synthetic`. The persisted
+  index reparses Claude transcripts on first load, so affected history
+  corrects itself with no manual step.
+
 ## [1.4.4] — 2026-08-08
 
 ### Fixed
