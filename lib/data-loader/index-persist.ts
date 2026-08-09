@@ -43,10 +43,50 @@ function getIndexPath(name: string): string {
   return path.join(getStateDir(), 'cache', fileName);
 }
 
+// A crashed or killed process leaves its `<index>.tmp-<pid>` behind, and
+// nothing ever collected them: 125 orphans totalling 2.2GB accumulated over
+// three months on one machine, the oldest from another quarter.
+//
+// Swept by age rather than by pid liveness — pids get recycled, and no
+// legitimate write stays open for an hour (a 140MB index lands in seconds).
+// Swept across the whole cache dir rather than per index name, because each
+// index only ever cleans its own: the dashboard's temps outnumbered by the
+// MCP server's 6:1 on that machine, and neither would touch the other's.
+const TMP_MAX_AGE_MS = 60 * 60 * 1000;
+const TMP_NAME_RE = /\.tmp-\d+$/;
+
+async function sweepStaleTmp(filePath: string, keep?: string): Promise<void> {
+  const dir = path.dirname(filePath);
+  let names: string[];
+  try {
+    names = await fs.readdir(dir);
+  } catch {
+    return;
+  }
+  const cutoff = Date.now() - TMP_MAX_AGE_MS;
+  await Promise.all(
+    names.map(async (name) => {
+      if (!TMP_NAME_RE.test(name)) return;
+      const full = path.join(dir, name);
+      if (full === keep) return;
+      try {
+        const stat = await fs.stat(full);
+        if (stat.mtimeMs > cutoff) return;
+        await fs.unlink(full);
+      } catch {
+        // Raced with another sweeper, or another process still owns it.
+      }
+    }),
+  );
+}
+
 export async function loadPersistedIndex(
   name: string = DEFAULT_INDEX_NAME,
 ): Promise<PersistedIndex | null> {
   const filePath = getIndexPath(name);
+  // Startup is the one moment we know no write of ours is in flight, so it is
+  // the natural place to collect whatever a previous run left behind.
+  void sweepStaleTmp(filePath);
   try {
     const raw = await fs.readFile(filePath, 'utf8');
     const parsed = JSON.parse(raw) as PersistedIndex;
@@ -74,8 +114,15 @@ export async function savePersistedIndex(
     files: payload.files,
   };
   const tmp = `${filePath}.tmp-${process.pid}`;
-  await fs.writeFile(tmp, JSON.stringify(data));
-  await fs.rename(tmp, filePath);
+  try {
+    await fs.writeFile(tmp, JSON.stringify(data));
+    await fs.rename(tmp, filePath);
+  } catch (err) {
+    // A failed write must not become one more orphan.
+    await fs.rm(tmp, { force: true }).catch(() => {});
+    throw err;
+  }
+  await sweepStaleTmp(filePath, tmp);
 }
 
 export async function clearPersistedIndex(
