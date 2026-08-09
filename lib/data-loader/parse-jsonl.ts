@@ -47,6 +47,22 @@ function extractUserText(content: unknown): string {
   return '';
 }
 
+// A slash command is recorded as an XML envelope, not as the line the user
+// typed: `<command-name>/goal</command-name>` plus a `<command-args>` payload.
+// Left raw, the usage row is titled with the markup and the actual request is
+// buried past the preview cutoff. Rendered back to `/goal <args>`, the row
+// reads as what was typed.
+const COMMAND_NAME_RE = /<command-name>([^<]*)<\/command-name>/;
+const COMMAND_ARGS_RE = /<command-args>([\s\S]*?)<\/command-args>/;
+function renderSlashCommand(text: string): string | null {
+  const name = COMMAND_NAME_RE.exec(text);
+  if (!name) return null;
+  const cmd = name[1].trim();
+  if (!cmd) return null;
+  const args = (COMMAND_ARGS_RE.exec(text)?.[1] ?? '').trim();
+  return args ? `${cmd} ${args}` : cmd;
+}
+
 // A skill invocation loads its body as a synthetic user message whose first
 // line is `Base directory for this skill: <path>`. The path basename is the
 // skill slug — self-contained, so no join back to the Skill tool_use needed.
@@ -156,7 +172,7 @@ function parseUser(raw: RawRecord, file: string): UserRecord | null {
   const msg = raw.message as Record<string, unknown> | undefined;
   const content = msg?.content;
   const fullText = extractUserText(content);
-  const textPreview = fullText.slice(0, TEXT_PREVIEW_MAX);
+  const textPreview = (renderSlashCommand(fullText) ?? fullText).slice(0, TEXT_PREVIEW_MAX);
 
   let toolResults: Array<{ toolUseId: string; chars: number }> | undefined;
   if (Array.isArray(content)) {

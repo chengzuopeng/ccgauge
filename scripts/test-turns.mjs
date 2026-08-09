@@ -271,6 +271,26 @@ function assistant(uuid) {
 
   const parsed = await parseJsonlFile(file);
 
+  // A slash command reads back as the line the user typed, not as its markup.
+  const slashFile = join(dir, 'slash.jsonl');
+  writeFileSync(
+    slashFile,
+    [
+      usr('u-cmd', null, '<command-name>/goal</command-name>\n  <command-message>goal</command-message>\n  <command-args>开发 dev，逐 phase 进行</command-args>'),
+      usr('u-bare', null, '<command-name>/model</command-name>\n  <command-args></command-args>'),
+      usr('u-plain', null, 'a plain message with <command-name> nowhere near a real envelope'),
+    ]
+      .map((r) => JSON.stringify(r))
+      .join('\n') + '\n',
+    'utf8',
+  );
+  const slash = await parseJsonlFile(slashFile);
+  const slashBy = Object.fromEntries(slash.user.map((u) => [u.uuid, u.textPreview]));
+  assert.equal(slashBy['u-cmd'], '/goal 开发 dev，逐 phase 进行', 'command + args render as typed');
+  assert.equal(slashBy['u-bare'], '/model', 'an argless command renders as just the command');
+  assert.ok(slashBy['u-plain'].startsWith('a plain message'), 'ordinary text is untouched');
+  console.log('✓ slash commands read back as the line the user typed');
+
   rmSync(dir, { recursive: true, force: true });
 
   const byUuid = Object.fromEntries(parsed.user.map((u) => [u.uuid, u]));
