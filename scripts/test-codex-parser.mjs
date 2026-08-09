@@ -17,6 +17,7 @@ const {
   codexFastMultiplier,
   codexConfigRequestsFastTier,
   detectCodexFastTier,
+  invalidateCodexTierCache,
 } = await import(join(root, 'lib/providers/codex/speed.ts'));
 const { parseDateLike, parseLocalDateOnly } = await import(join(root, 'lib/date-utils.ts'));
 const { isUsageRange, normalizeUsageRange, rangeToDates } = await import(join(root, 'lib/range.ts'));
@@ -766,10 +767,13 @@ assert.ok(rangeToDates('7d').from instanceof Date);
 }
 
 {
-  // detectCodexFastTier reads config.toml on EVERY call — no module-level cache.
-  // Toggle the file mid-test and confirm the next call picks up the new value.
-  // Override BOTH CODEX_HOME and HOME so the real ~/.codex/config.toml can't
-  // shadow our tmp config (codexHomePaths() ORs the two sources).
+  // detectCodexFastTier re-reads config.toml after at most TIER_TTL_MS — never
+  // a boot-time cache. The TTL exists because this sits on the per-record cost
+  // path (~20k calls per codex aggregation); tests hop the window with the
+  // invalidate hook instead of sleeping through it. Toggle the file mid-test
+  // and confirm the next (invalidated) call picks up the new value. Override
+  // BOTH CODEX_HOME and HOME so the real ~/.codex/config.toml can't shadow our
+  // tmp config (codexHomePaths() ORs the two sources).
   const rootDir = mkdtempSync(join(tmpdir(), 'ccgauge-codex-tier-'));
   const codexDir = join(rootDir, '.codex');
   (await import('node:fs')).mkdirSync(codexDir);
@@ -779,26 +783,33 @@ assert.ok(rangeToDates('7d').from instanceof Date);
   process.env.CODEX_HOME = codexDir;
   process.env.HOME = rootDir;
   try {
+    invalidateCodexTierCache();
     writeFileSync(cfg, 'model = "gpt-5"\nservice_tier = "fast"\n', 'utf8');
     assert.equal(detectCodexFastTier(), true, 'reads fast from config.toml');
+    assert.equal(detectCodexFastTier(), true, 'TTL window serves the cached value');
     writeFileSync(cfg, 'model = "gpt-5"\nservice_tier = "default"\n', 'utf8');
-    assert.equal(detectCodexFastTier(), false, 'live re-reads after edit to default');
+    invalidateCodexTierCache();
+    assert.equal(detectCodexFastTier(), false, 're-reads after edit once the TTL passes');
     writeFileSync(cfg, 'model = "gpt-5"\nservice_tier = "priority"\n', 'utf8');
-    assert.equal(detectCodexFastTier(), true, 'live re-reads after edit to priority');
+    invalidateCodexTierCache();
+    assert.equal(detectCodexFastTier(), true, 're-reads after edit to priority');
   } finally {
     if (prevCodexHome === undefined) delete process.env.CODEX_HOME;
     else process.env.CODEX_HOME = prevCodexHome;
     if (prevHome === undefined) delete process.env.HOME;
     else process.env.HOME = prevHome;
     rmSync(rootDir, { recursive: true, force: true });
+    invalidateCodexTierCache();
   }
-  console.log('✓ detectCodexFastTier has no boot cache (live config.toml reads)');
+  console.log('✓ detectCodexFastTier: TTL re-reads, no boot cache');
 }
 
 {
   // Per-model multipliers ported from ccusage's fast-multiplier-overrides.json.
   // Wire up a fast-tier CODEX_HOME *and* HOME so codexFastMultiplier returns > 1
-  // even when the dev's real ~/.codex/config.toml says default.
+  // even when the dev's real ~/.codex/config.toml says default. The tier cache
+  // was invalidated by the previous block, so the first call re-reads from the
+  // env set up here.
   const rootDir = mkdtempSync(join(tmpdir(), 'ccgauge-codex-mult-'));
   const codexDir = join(rootDir, '.codex');
   (await import('node:fs')).mkdirSync(codexDir);
@@ -833,6 +844,7 @@ assert.ok(rangeToDates('7d').from instanceof Date);
     if (prevHome === undefined) delete process.env.HOME;
     else process.env.HOME = prevHome;
     rmSync(rootDir, { recursive: true, force: true });
+    invalidateCodexTierCache();
   }
   console.log('✓ per-model fast multipliers gated by global service_tier=fast|priority');
 }

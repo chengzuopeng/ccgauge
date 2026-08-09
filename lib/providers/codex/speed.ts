@@ -22,9 +22,9 @@ import type { Pricing } from '@/lib/types';
  * The earlier v1.2.0 implementation cached the config read at module load,
  * which meant editing config.toml required restarting the dashboard. v1.2.2
  * switched to per-turn `effort==='low'` detection, which turned out to be a
- * misread of the actual signal. This version restores global detection but
- * reads `config.toml` **on every call** so live edits propagate immediately.
- * The cost is one ~few-hundred-byte file read per request — negligible.
+ * misread of the actual signal. This version restores global detection with a
+ * short TTL between reads (below) so live edits still propagate in about a
+ * second without a restart.
  */
 
 const FAST_MULTIPLIER_OVERRIDES: Record<string, number> = {
@@ -67,28 +67,46 @@ function codexHomePaths(): string[] {
   return Array.from(new Set(homes));
 }
 
+// This sits on the per-RECORD cost path: costOfRecord -> codexFastMultiplier
+// -> here, once for every Codex assistant record in every aggregation loop. An
+// uncached readFileSync made one codex/all overview render do ~20k synchronous
+// reads of config.toml — 1.4s of the render, 12x the claude-only render, paid
+// again on every request. One second of TTL keeps a live config.toml edit
+// propagating within a second (the reason the v1.4.x rewrite dropped the boot
+// cache) at one read per window instead of one per record.
+const TIER_TTL_MS = 1000;
+let tierCache: { at: number; value: boolean } | null = null;
+
+/** Test hook: drop the TTL window so the next call re-reads config.toml. */
+export function invalidateCodexTierCache(): void {
+  tierCache = null;
+}
+
 /**
  * Whether the active Codex config currently requests the fast / priority
- * service tier. Re-reads config.toml on every call — no cache — so editing
- * the file takes effect immediately without restarting the dashboard.
+ * service tier. Re-reads config.toml at most once per TIER_TTL_MS, so editing
+ * the file takes effect within about a second, no restart needed.
  */
 export function detectCodexFastTier(): boolean {
+  const now = Date.now();
+  if (tierCache && now - tierCache.at < TIER_TTL_MS) return tierCache.value;
+  let value = false;
   for (const home of codexHomePaths()) {
     try {
       const content = readFileSync(path.join(home, 'config.toml'), 'utf8');
-      if (codexConfigRequestsFastTier(content)) return true;
+      if (codexConfigRequestsFastTier(content)) {
+        value = true;
+        break;
+      }
     } catch {
       // missing / unreadable config.toml → not on the fast tier
     }
   }
-  return false;
+  tierCache = { at: now, value };
+  return value;
 }
 
-/**
- * Per-model multiplier when fast tier is active, else 1. Caller decides
- * whether to consult `detectCodexFastTier()` to scope the call — the cost
- * path does it once per request and passes the result to many records.
- */
+/** Per-model multiplier when fast tier is active, else 1. */
 export function codexFastMultiplier(model: string): number {
   if (!detectCodexFastTier()) return 1;
   return FAST_MULTIPLIER_OVERRIDES[normalizeCodexModelKey(model)] ?? DEFAULT_FAST_MULTIPLIER;
