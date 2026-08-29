@@ -8,7 +8,9 @@ import assert from 'node:assert/strict';
 const __filename = fileURLToPath(import.meta.url);
 const root = dirname(dirname(__filename));
 
-const { parseCodexJsonlFile } = await import(join(root, 'lib/providers/codex/parse-codex-jsonl.ts'));
+const { parseCodexJsonlFile, splitModelRoute } = await import(
+  join(root, 'lib/providers/codex/parse-codex-jsonl.ts'),
+);
 const { resolveCodexPricing, BUILTIN_PRICING_OPENAI } = await import(join(root, 'lib/providers/codex/pricing.ts'));
 const { costFromUsage } = await import(join(root, 'lib/pricing/cost-from-usage.ts'));
 const { shortenCodexModel } = await import(join(root, 'lib/providers/codex/shorten-model.ts'));
@@ -1003,6 +1005,93 @@ assert.ok(rangeToDates('7d').from instanceof Date);
 
   rmSync(dir, { recursive: true, force: true });
   console.log('✓ codex review: launcher prompts are synthetic; the spawn banner names the turn');
+}
+
+{
+  const dir = mkdtempSync(join(tmpdir(), 'ccgauge-codex-route-'));
+  const tokens = (ts, input) =>
+    JSON.stringify({
+      timestamp: ts,
+      type: 'event_msg',
+      payload: {
+        type: 'token_count',
+        info: {
+          total_token_usage: {
+            input_tokens: input,
+            cached_input_tokens: 0,
+            output_tokens: 10,
+            reasoning_output_tokens: 0,
+          },
+        },
+      },
+    });
+  const write = (name, lines) => {
+    const f = join(dir, name);
+    writeFileSync(f, lines.join('\n') + '\n', 'utf8');
+    return f;
+  };
+
+  const routed = await parseCodexJsonlFile(
+    write('routed.jsonl', [
+      JSON.stringify({
+        timestamp: '2026-09-01T10:00:00Z',
+        type: 'session_meta',
+        payload: { id: 'routed-1', cwd: '/tmp/proj', model_provider: 'custom' },
+      }),
+      JSON.stringify({
+        timestamp: '2026-09-01T10:00:01Z',
+        type: 'turn_context',
+        payload: { turn_id: 't-1', cwd: '/tmp/proj', model: 'llm-gateway--gpt-5.6-sol' },
+      }),
+      tokens('2026-09-01T10:00:02Z', 1_000),
+    ]),
+  );
+  assert.equal(routed.assistant[0].model, 'gpt-5.6-sol', 'a relay route prefix is stripped from the model');
+  assert.equal(routed.assistant[0].modelRoute, 'llm-gateway', 'and kept as modelRoute');
+  assert.equal(resolveCodexPricing(routed.assistant[0].model).matchType, 'exact', 'so the model prices again');
+
+  const fromSettings = await parseCodexJsonlFile(
+    write('settings.jsonl', [
+      JSON.stringify({
+        timestamp: '2026-09-01T11:00:00Z',
+        type: 'session_meta',
+        payload: { id: 'settings-1', cwd: '/tmp/proj' },
+      }),
+      JSON.stringify({
+        timestamp: '2026-09-01T11:00:01Z',
+        type: 'event_msg',
+        payload: { type: 'thread_settings_applied', thread_settings: { model: 'alice@example.com--gpt-6-astra' } },
+      }),
+      tokens('2026-09-01T11:00:02Z', 1_000),
+    ]),
+  );
+  assert.equal(fromSettings.assistant[0].model, 'gpt-6-astra', 'the thread_settings fallback splits too');
+  assert.equal(fromSettings.assistant[0].modelRoute, 'alice@example.com', 'a route may contain @ and .');
+
+  const plain = await parseCodexJsonlFile(
+    write('plain.jsonl', [
+      JSON.stringify({
+        timestamp: '2026-09-01T12:00:00Z',
+        type: 'session_meta',
+        payload: { id: 'plain-1', cwd: '/tmp/proj' },
+      }),
+      JSON.stringify({
+        timestamp: '2026-09-01T12:00:01Z',
+        type: 'turn_context',
+        payload: { turn_id: 't-2', cwd: '/tmp/proj', model: 'gpt-5.6-luna' },
+      }),
+      tokens('2026-09-01T12:00:02Z', 1_000),
+    ]),
+  );
+  assert.equal(plain.assistant[0].model, 'gpt-5.6-luna', 'an unrouted model is untouched');
+  assert.equal('modelRoute' in plain.assistant[0], false, 'and carries no modelRoute');
+
+  rmSync(dir, { recursive: true, force: true });
+
+  assert.deepEqual(splitModelRoute('--gpt-5.5'), { model: '--gpt-5.5', route: '' }, 'nothing before the separator');
+  assert.deepEqual(splitModelRoute('llm-gateway--'), { model: 'llm-gateway--', route: '' }, 'nothing after the separator');
+  assert.deepEqual(splitModelRoute('a--b--gpt-5.5'), { model: 'gpt-5.5', route: 'a--b' }, 'splits on the last separator');
+  console.log('✓ relay route prefixes split off the model; unrouted models untouched');
 }
 
 console.log('\nAll codex parser + pricing assertions passed.');

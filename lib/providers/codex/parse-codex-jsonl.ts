@@ -48,6 +48,7 @@ interface TurnState {
    *  `thread_settings_applied` (thread-level, fires between turns and can carry
    *  a stale default) must not override it. */
   modelFromTurnContext: boolean;
+  modelRoute: string;
   effort?: string;
   userUuid: string | null;
   toolNames: string[];
@@ -93,6 +94,12 @@ function asNumber(v: unknown): number {
  */
 function isSubagentForkMirror(payload: Record<string, unknown>): boolean {
   return asString(payload.thread_source) === 'subagent' && !!asString(payload.forked_from_id);
+}
+
+export function splitModelRoute(raw: string): { model: string; route: string } {
+  const i = raw.lastIndexOf('--');
+  if (i <= 0 || i + 2 >= raw.length) return { model: raw, route: '' };
+  return { model: raw.slice(i + 2), route: raw.slice(0, i) };
 }
 
 function extractMessageText(payload: Record<string, unknown>): string {
@@ -151,6 +158,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
     cwd: '',
     model: 'gpt-unknown',
     modelFromTurnContext: false,
+    modelRoute: '',
     userUuid: null,
     toolNames: [],
     hasThinking: false,
@@ -244,7 +252,9 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
       turn.cwd = asString(payload.cwd) || defaultCwd;
       const m = asString(payload.model);
       if (m) {
-        turn.model = m;
+        const split = splitModelRoute(m);
+        turn.model = split.model;
+        turn.modelRoute = split.route;
         turn.modelFromTurnContext = true;
       }
       const eff = asString(payload.effort);
@@ -315,7 +325,11 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
         if (turn.modelFromTurnContext) continue;
         const settings = payload.thread_settings as Record<string, unknown> | null | undefined;
         const m = settings ? asString(settings.model) : '';
-        if (m) turn.model = m;
+        if (m) {
+          const split = splitModelRoute(m);
+          turn.model = split.model;
+          turn.modelRoute = split.route;
+        }
         continue;
       }
 
@@ -420,6 +434,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
           cwd: turn.cwd || defaultCwd,
           version: cliVersion,
           model: turn.model || 'gpt-unknown',
+          ...(turn.modelRoute ? { modelRoute: turn.modelRoute } : {}),
           messageId: requestId,
           usage: {
             input_tokens: Math.max(0, deltaInput - deltaCached),

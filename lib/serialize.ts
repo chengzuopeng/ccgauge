@@ -52,6 +52,7 @@ export interface UsageTableRow {
   timestamp: string;
   source: 'claude' | 'codex';
   model: string;
+  modelRoute?: string;
   cwd: string;
 
   projectLabel: string;
@@ -87,6 +88,7 @@ export function recordsToTableRows(records: AssistantRecord[]): UsageTableRow[] 
       timestamp: r.timestamp,
       source: r.source,
       model: r.model,
+      modelRoute: r.modelRoute,
       cwd: r.cwd,
       projectLabel: resolveProjectLabel(r.cwd),
       sessionId: r.sessionId,
@@ -220,6 +222,7 @@ export function recordsToTurnRows(
       timestamp: r.timestamp,
       source: r.source,
       model: r.model,
+      modelRoute: r.modelRoute,
       cwd: r.cwd,
       projectLabel: resolveProjectLabel(r.cwd),
       sessionId: r.sessionId,

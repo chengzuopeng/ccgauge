@@ -769,7 +769,7 @@ function renderChildCell(
     }
     case 'model':
       return (
-        <span className="whitespace-nowrap">
+        <span className="whitespace-nowrap" title={r.modelRoute}>
           {shortenModel(r.model)}
           {r.effort ? ` · ${r.effort}` : ''}
           {codexFastActive && r.source === 'codex' && (
