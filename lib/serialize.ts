@@ -1,6 +1,6 @@
 import type { BlockProgressInfo } from './blocks/compute';
 import type { AssistantRecord, ProviderId, UserRecord } from './types';
-import { costOfRecord } from './pricing/calculate';
+import { pricedCostOfRecord } from './pricing/calculate';
 import { buildTurnIndex } from './turns';
 import { resolveProjectLabel } from './project-label';
 
@@ -69,6 +69,7 @@ export interface UsageTableRow {
   costOutput: number;
   costCacheRead: number;
   costCacheWrite: number;
+  unpriced?: boolean;
   toolNames: string[];
 
   effort?: string;
@@ -82,7 +83,7 @@ export interface UsageTableRow {
 
 export function recordsToTableRows(records: AssistantRecord[]): UsageTableRow[] {
   return records.map((r) => {
-    const c = costOfRecord(r);
+    const { cost: c, priced } = pricedCostOfRecord(r);
     return {
       uuid: r.uuid,
       timestamp: r.timestamp,
@@ -107,6 +108,7 @@ export function recordsToTableRows(records: AssistantRecord[]): UsageTableRow[] 
       costOutput: c.output,
       costCacheRead: c.cacheRead,
       costCacheWrite: c.cacheCreation5m + c.cacheCreation1h,
+      unpriced: priced ? undefined : true,
       toolNames: r.toolNames,
       effort: r.effort,
     };
@@ -149,6 +151,7 @@ export interface UsageTurnRow {
    *  by distinct transcript file, not by call — one agent makes many API
    *  calls). 0 when none. */
   workflowSubagentCount: number;
+  unpricedCallCount: number;
   userText: string;
   children: UsageTableRow[];
 }
@@ -207,7 +210,7 @@ export function recordsToTurnRows(
   const workflowFilesByTurn = new Map<string, Set<string>>();
   for (const r of assistants) {
     const turnId = turnIndex.get(r.uuid) ?? r.uuid;
-    const c = costOfRecord(r);
+    const { cost: c, priced } = pricedCostOfRecord(r);
     const direct = resolveDirectPrompt(r.uuid);
     if (r.isWorkflowSubagent) {
       let set = workflowFilesByTurn.get(turnId);
@@ -241,6 +244,7 @@ export function recordsToTurnRows(
       costOutput: c.output,
       costCacheRead: c.cacheRead,
       costCacheWrite: c.cacheCreation5m + c.cacheCreation1h,
+      unpriced: priced ? undefined : true,
       toolNames: r.toolNames,
       effort: r.effort,
       isWorkflowSubagent: r.isWorkflowSubagent || undefined,
@@ -270,6 +274,7 @@ export function recordsToTurnRows(
     let costOutput = 0;
     let costCacheRead = 0;
     let costCacheWrite = 0;
+    let unpricedCallCount = 0;
     for (const c of children) {
       modelSet.add(c.model);
       for (const t of c.toolNames) toolSet.add(t);
@@ -284,6 +289,7 @@ export function recordsToTurnRows(
       costOutput += c.costOutput;
       costCacheRead += c.costCacheRead;
       costCacheWrite += c.costCacheWrite;
+      if (c.unpriced) unpricedCallCount++;
     }
     const userRec = userMap.get(turnId);
     const startMs = new Date(first.timestamp).getTime();
@@ -316,6 +322,7 @@ export function recordsToTurnRows(
       efforts: Array.from(effortSet),
       hasWorkflowSubagents: (workflowFilesByTurn.get(turnId)?.size ?? 0) > 0,
       workflowSubagentCount: workflowFilesByTurn.get(turnId)?.size ?? 0,
+      unpricedCallCount,
       userText: userRec?.textPreview ?? '',
       children,
     });

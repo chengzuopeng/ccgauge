@@ -706,8 +706,18 @@ function renderTurnCell(
       );
     case 'cost':
       return (
-        <span className="num-mono text-text-primary font-medium">
-          {formatUSDPrecise(turn.cost)}
+        <span className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
+          {turn.unpricedCallCount > 0 && (
+            <span
+              className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold leading-none text-warning bg-bg-surface-hi/60 border border-border"
+              title={t('usage.badge.unpricedHint', { count: turn.unpricedCallCount, total: turn.callCount })}
+            >
+              {t('usage.badge.unpriced')}
+            </span>
+          )}
+          <span className="num-mono text-text-primary font-medium">
+            {formatUSDPrecise(turn.cost)}
+          </span>
         </span>
       );
     case 'tools':
@@ -817,7 +827,13 @@ function renderChildCell(
         </HoverCard>
       );
     case 'cost':
-      return <span className="num-mono">{formatUSDPrecise(r.cost)}</span>;
+      return r.unpriced ? (
+        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold leading-none text-warning bg-bg-surface-hi/60 border border-border" title={t('usage.badge.unpricedHint', { count: 1, total: 1 })}>
+          {t('usage.badge.unpriced')}
+        </span>
+      ) : (
+        <span className="num-mono">{formatUSDPrecise(r.cost)}</span>
+      );
     case 'tools':
       return (
         <span className="block text-xs truncate max-w-[160px]" title={r.toolNames.join(', ')}>
