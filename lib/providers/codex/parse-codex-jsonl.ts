@@ -49,7 +49,6 @@ interface TurnState {
    *  `thread_settings_applied` (thread-level, fires between turns and can carry
    *  a stale default) must not override it. */
   modelFromTurnContext: boolean;
-  modelRoute: string;
   effort?: string;
   userUuid: string | null;
   toolNames: string[];
@@ -153,7 +152,6 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
     cwd: '',
     model: 'gpt-unknown',
     modelFromTurnContext: false,
-    modelRoute: '',
     userUuid: null,
     toolNames: [],
     hasThinking: false,
@@ -247,9 +245,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
       turn.cwd = asString(payload.cwd) || defaultCwd;
       const m = asString(payload.model);
       if (m) {
-        const split = splitModelRoute(m);
-        turn.model = split.model;
-        turn.modelRoute = split.route;
+        turn.model = m;
         turn.modelFromTurnContext = true;
       }
       const eff = asString(payload.effort);
@@ -320,11 +316,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
         if (turn.modelFromTurnContext) continue;
         const settings = payload.thread_settings as Record<string, unknown> | null | undefined;
         const m = settings ? asString(settings.model) : '';
-        if (m) {
-          const split = splitModelRoute(m);
-          turn.model = split.model;
-          turn.modelRoute = split.route;
-        }
+        if (m) turn.model = m;
         continue;
       }
 
@@ -414,6 +406,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
         }
 
         const uuid = `${sessionId}::a${assistantIdx++}`;
+        const split = splitModelRoute(turn.model || 'gpt-unknown');
         const requestId = turn.turnId
           ? `${turn.turnId}::a${assistantIdx}`
           : `${sessionId}::a${assistantIdx}`;
@@ -428,8 +421,8 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
           requestId,
           cwd: turn.cwd || defaultCwd,
           version: cliVersion,
-          model: turn.model || 'gpt-unknown',
-          ...(turn.modelRoute ? { modelRoute: turn.modelRoute } : {}),
+          model: split.model,
+          ...(split.route ? { modelRoute: split.route } : {}),
           messageId: requestId,
           usage: {
             input_tokens: Math.max(0, deltaInput - deltaCached),
