@@ -5,6 +5,48 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.6] — 2026-09-14
+
+### Added
+
+- **Models served through a Codex relay are priced.** grok, kimi, deepseek and
+  glm models reached through an OpenAI-compatible relay stayed at $0 however
+  often prices were refreshed, because only OpenAI and Anthropic entries were
+  kept from LiteLLM. xAI, DeepSeek, Moonshot and Z.ai chat models are now kept
+  too, in the offline snapshot and in refreshed prices.
+
+### Fixed
+
+- **Relay model ids lost their price and label.** A relay such as
+  `model_provider = "custom"` records every model as `<route>--<model>`
+  (`llm-gateway--gpt-5.6-sol`), which matched no price and showed a garbled
+  name. The route is now split off the model and kept alongside it. Model
+  filters, bookmarks, search and `report --model` still match the full routed
+  id, the CSV export gains a `model_route` column, and the MCP
+  `cost_estimator` accepts routed ids. Ids that merely put a suffix after a
+  model name (`gpt-5--eastus`) are left whole.
+- **Calls with no known price were silently counted as $0.** They are now
+  flagged with an "unpriced" badge in the usage table, and every cost total —
+  usage, overview, project and session cards, the CLI report and dashboard,
+  MCP totals — says how many calls it counted at $0. The CSV export adds
+  `unpriced` / `unpriced_calls` columns, and /models no longer labels an
+  unpriced model as "fallback price".
+- **Usage rows kept stale prices after a price refresh.** Cached rows are now
+  rebuilt when the price table changes, and the dashboard loads the cached
+  LiteLLM prices before building any rows.
+- **A model id such as `constructor` produced `$NaN` totals.** Price lookups
+  no longer match built-in object keys.
+- **The settings price table hid gpt-6 models.** Every gpt-N model from gpt-5
+  onward is listed.
+
+### Changed
+
+- Offline pricing snapshot refreshed from LiteLLM (new Claude and OpenAI
+  models, plus the relay providers above).
+- Codex `parserVersion` → `codex-v14-model-route-guard`. The persisted index
+  reparses Codex rollouts on first load, so routed history corrects itself
+  with no manual step.
+
 ## [1.4.5] — 2026-08-20
 
 ### Fixed
