@@ -7,7 +7,7 @@ import type {
   SessionSummary,
   UserRecord,
 } from '../types';
-import { costOfRecord } from '../pricing/calculate';
+import { costOfRecord, pricedCostOfRecord } from '../pricing/calculate';
 import { getProvider } from '../providers';
 import { projectNameFromCwd } from '../utils';
 import { resolveProjectLabel } from '../project-label';
@@ -112,12 +112,13 @@ function makeBucket(key: string, label: string): AggregateBucket {
     cost: 0,
     saved: 0,
     requests: 0,
+    unpricedRequests: 0,
     models: {},
   };
 }
 
 function pushRecord(b: AggregateBucket, rec: AssistantRecord) {
-  const cost = costOfRecord(rec);
+  const { cost, priced } = pricedCostOfRecord(rec);
   b.inputTokens += rec.usage.input_tokens;
   b.outputTokens += rec.usage.output_tokens;
   b.cacheReadTokens += rec.usage.cache_read_input_tokens;
@@ -127,6 +128,7 @@ function pushRecord(b: AggregateBucket, rec: AssistantRecord) {
   b.cost += cost.total;
   b.saved += cost.saved;
   b.requests += 1;
+  if (!priced) b.unpricedRequests += 1;
   const m = b.models[rec.model] ?? { tokens: 0, cost: 0, requests: 0 };
   m.tokens += rec.usage.input_tokens + rec.usage.output_tokens + rec.usage.cache_read_input_tokens + rec.usage.cache_creation_input_tokens;
   m.cost += cost.total;
@@ -320,6 +322,7 @@ export function aggregateTotals(
   cost: number;
   saved: number;
   requests: number;
+  unpricedRequests: number;
 } {
   let inputTokens = 0;
   let outputTokens = 0;
@@ -328,10 +331,11 @@ export function aggregateTotals(
   let cost = 0;
   let saved = 0;
   let requests = 0;
+  let unpricedRequests = 0;
   const prepared = prepareOpts(opts);
   for (const rec of records) {
     if (!withinRangePrepared(rec, prepared)) continue;
-    const c = costOfRecord(rec);
+    const { cost: c, priced } = pricedCostOfRecord(rec);
     inputTokens += rec.usage.input_tokens;
     outputTokens += rec.usage.output_tokens;
     cacheReadTokens += rec.usage.cache_read_input_tokens;
@@ -339,6 +343,7 @@ export function aggregateTotals(
     cost += c.total;
     saved += c.saved;
     requests += 1;
+    if (!priced) unpricedRequests += 1;
   }
   return {
     inputTokens,
@@ -349,5 +354,6 @@ export function aggregateTotals(
     cost,
     saved,
     requests,
+    unpricedRequests,
   };
 }

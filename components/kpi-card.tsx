@@ -5,6 +5,7 @@ export interface KpiCardProps {
   label: string;
   value: ReactNode;
   hint?: ReactNode;
+  warning?: ReactNode;
   delta?: { value: number; positiveIsGood?: boolean } | { firstTime: true; label?: string } | null;
   deltaTitle?: string;
   progress?: { value: number; tone?: 'brand' | 'success' | 'warning' | 'danger' } | null;
@@ -16,6 +17,7 @@ export function KpiCard({
   label,
   value,
   hint,
+  warning,
   delta,
   deltaTitle,
   progress,
@@ -46,7 +48,12 @@ export function KpiCard({
           <DeltaPill value={delta.value} positiveIsGood={delta.positiveIsGood} title={deltaTitle} />
         )}
       </div>
-      {hint && <div className="text-xs text-text-secondary mt-auto leading-snug">{hint}</div>}
+      {(warning || hint) && (
+        <div className="text-xs text-text-secondary mt-auto leading-snug">
+          {warning && <div className="text-warning">{warning}</div>}
+          {hint}
+        </div>
+      )}
       {progress && (
         <div className="mt-auto pt-2">
           <ProgressBar value={progress.value} tone={progress.tone} />

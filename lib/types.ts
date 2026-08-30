@@ -224,6 +224,7 @@ export interface AggregateBucket {
   cost: number;
   saved: number;
   requests: number;
+  unpricedRequests: number;
   models: Record<string, { tokens: number; cost: number; requests: number }>;
 }
 

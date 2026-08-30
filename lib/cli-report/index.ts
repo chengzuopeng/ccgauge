@@ -163,6 +163,7 @@ export interface ReportData {
     cost: number;
     saved: number;
     requests: number;
+    unpriced: number;
 
     turns: number;
   };
@@ -212,6 +213,7 @@ function computeReportData(
     cost: 0,
     saved: 0,
     requests: 0,
+    unpriced: 0,
     turns: 0,
   };
 
@@ -238,6 +240,7 @@ function computeReportData(
     totals.cost += t.cost;
     totals.saved += t.saved;
     totals.requests += t.requests;
+    totals.unpriced += t.unpricedRequests;
     for (const r of sourceRecs) totals.reasoning += r.usage.reasoning_tokens ?? 0;
 
     const turnSummaries = summarizeTurns(sourceRecs, scan.userRecords, scan.parentMap);
@@ -530,6 +533,14 @@ export function renderText(d: ReportData, o: ReportOptions): string {
     ],
   ];
   lines.push(renderPairedKv(costRows, c));
+  if (t.unpriced > 0) {
+    lines.push(
+      '  ' +
+        c.yellow(
+          `${t.unpriced.toLocaleString()} request(s) use a model with no known price and are counted as $0`,
+        ),
+    );
+  }
   lines.push('');
 
   if (o.showTrend !== false && d.trend.length > 0) {

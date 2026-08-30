@@ -34,6 +34,7 @@ interface TurnsPayload {
     cacheCreationTokens: number;
     cost: number;
     saved: number;
+    unpricedRequests: number;
   };
   trend: TokenStackDatum[];
   turns: UsageTurnSummary[];
@@ -185,6 +186,11 @@ export function UsageDataIsland({ initial, costFootnote }: Props) {
           label={t('usage.kpi.totalCost')}
           value={formatUSD(data.totals.cost)}
           hint={costFootnote || undefined}
+          warning={
+            data.totals.unpricedRequests > 0
+              ? t('common.unpricedCalls', { count: data.totals.unpricedRequests })
+              : undefined
+          }
         />
         <KpiCard label={t('usage.kpi.cacheSaved')} value={formatUSD(data.totals.saved)} accent="success" />
         <KpiCard label={t('usage.kpi.cacheHit')} value={formatPct(cacheHit, 0)} accent="success" />

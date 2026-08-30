@@ -1,4 +1,3 @@
-
 import type { AggregateBucket } from './types';
 
 export interface Totals {
@@ -10,6 +9,7 @@ export interface Totals {
   cost: number;
   saved: number;
   requests: number;
+  unpricedRequests: number;
 }
 
 const ZERO: Totals = {
@@ -21,6 +21,7 @@ const ZERO: Totals = {
   cost: 0,
   saved: 0,
   requests: 0,
+  unpricedRequests: 0,
 };
 
 export function combineTotals(parts: Totals[]): Totals {
@@ -36,6 +37,7 @@ export function combineTotals(parts: Totals[]): Totals {
       cost: acc.cost + p.cost,
       saved: acc.saved + p.saved,
       requests: acc.requests + p.requests,
+      unpricedRequests: acc.unpricedRequests + p.unpricedRequests,
     }),
     { ...ZERO },
   );
@@ -64,6 +66,7 @@ export function combineTimeBuckets(perSource: AggregateBucket[][]): AggregateBuc
       existing.cost += b.cost;
       existing.saved += b.saved;
       existing.requests += b.requests;
+      existing.unpricedRequests += b.unpricedRequests;
       for (const [modelName, m] of Object.entries(b.models)) {
         const cur = existing.models[modelName] ?? { tokens: 0, cost: 0, requests: 0 };
         cur.tokens += m.tokens;

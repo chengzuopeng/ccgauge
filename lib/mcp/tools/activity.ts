@@ -27,6 +27,7 @@ const ZERO_TOTALS_PUBLIC: FlatTotals = {
   cost_usd: 0,
   saved_usd: 0,
   requests: 0,
+  unpriced_requests: 0,
   turns: 0,
 };
 

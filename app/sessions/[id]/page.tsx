@@ -5,7 +5,7 @@ import { aggregateBySession } from '@/lib/aggregator';
 import { Section, PageShell } from '@/components/section';
 import { KpiCard } from '@/components/kpi-card';
 import { TokenStackChart, type TokenStackDatum } from '@/components/charts/token-stack-chart';
-import { costOfRecord } from '@/lib/pricing/calculate';
+import { pricedCostOfRecord } from '@/lib/pricing/calculate';
 import {
   formatTokensCompact,
   formatUSD,
@@ -48,23 +48,28 @@ export default async function SessionDetailPage({
   const sessions = aggregateBySession(sessionRecords, userRecords, { source });
   const session = sessions[0];
 
+  let unpricedRequests = 0;
   const messages = sessionRecords
     .slice()
     .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
-    .map((r) => ({
-      uuid: r.uuid,
-      timestamp: r.timestamp,
-      model: r.model,
-      input: r.usage.input_tokens,
-      output: r.usage.output_tokens,
-      reasoning: r.usage.reasoning_tokens ?? 0,
-      cacheRead: r.usage.cache_read_input_tokens,
-      cacheCreation: r.usage.cache_creation_input_tokens,
-      cost: costOfRecord(r).total,
-      tools: r.toolNames,
-      thinking: r.hasThinking,
-      preview: r.textPreview,
-    }));
+    .map((r) => {
+      const { cost, priced } = pricedCostOfRecord(r);
+      if (!priced) unpricedRequests += 1;
+      return {
+        uuid: r.uuid,
+        timestamp: r.timestamp,
+        model: r.model,
+        input: r.usage.input_tokens,
+        output: r.usage.output_tokens,
+        reasoning: r.usage.reasoning_tokens ?? 0,
+        cacheRead: r.usage.cache_read_input_tokens,
+        cacheCreation: r.usage.cache_creation_input_tokens,
+        cost: cost.total,
+        tools: r.toolNames,
+        thinking: r.hasThinking,
+        preview: r.textPreview,
+      };
+    });
 
   const trend: TokenStackDatum[] = messages.map((m, i) => ({
     label: `#${i + 1}`,
@@ -97,7 +102,11 @@ export default async function SessionDetailPage({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <KpiCard label={t('session.kpi.requests')} value={String(session.requests)} />
         <KpiCard label={t('session.kpi.totalTokens')} value={formatTokensCompact(session.totalTokens, locale)} />
-        <KpiCard label={t('session.kpi.cost')} value={formatUSD(session.cost)} />
+        <KpiCard
+          label={t('session.kpi.cost')}
+          value={formatUSD(session.cost)}
+          warning={unpricedRequests > 0 ? t('common.unpricedCalls', { count: unpricedRequests }) : undefined}
+        />
         <KpiCard label={t('session.kpi.duration')} value={formatDuration(session.durationMs)} />
       </div>
 

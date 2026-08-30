@@ -87,6 +87,11 @@ export default async function ProjectDetailPage({
           label={t('usage.kpi.totalCost')}
           value={formatUSD(totals.cost)}
           hint={t('common.savedViaCache', { amount: formatUSD(totals.saved) })}
+          warning={
+            totals.unpricedRequests > 0
+              ? t('common.unpricedCalls', { count: totals.unpricedRequests })
+              : undefined
+          }
         />
       </div>
 

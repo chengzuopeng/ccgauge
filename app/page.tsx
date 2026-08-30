@@ -199,6 +199,11 @@ async function OverviewContent({ source }: { source: EffectiveSource }) {
             tokens: fmtTokens(month.totalTokens),
             req: month.requests,
           })}
+          warning={
+            month.unpricedRequests > 0
+              ? t('common.unpricedCalls', { count: month.unpricedRequests })
+              : undefined
+          }
         />
         <KpiCard
           label={t('overview.kpi.cacheHit')}

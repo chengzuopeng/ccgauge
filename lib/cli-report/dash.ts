@@ -134,7 +134,12 @@ function renderKpiTiles(c: Palette, w: number, scan: ScanResult, data: ReportDat
     {
       label: 'Cost',
       value: c.bold(formatUSD(t.cost)),
-      sub: t.cost > 0 ? `${formatUSD(t.cost / Math.max(1, t.requests))} / req` : '—',
+      sub:
+        t.unpriced > 0
+          ? c.yellow(`${t.unpriced.toLocaleString()} unpriced reqs at $0`)
+          : t.cost > 0
+            ? `${formatUSD(t.cost / Math.max(1, t.requests))} / req`
+            : '—',
       spark: sparkline(sparkCost, 14, c.output),
     },
     {

@@ -27,6 +27,7 @@ const { combineTotals, combineTimeBuckets } = await import(join(root, 'lib/sourc
     cost: 1.23,
     saved: 0.5,
     requests: 5,
+    unpricedRequests: 1,
   };
   const out = combineTotals([t]);
   assert.equal(out, t, 'single-input shortcut should return the same object reference');
@@ -43,6 +44,7 @@ const { combineTotals, combineTimeBuckets } = await import(join(root, 'lib/sourc
     cost: 1.5,
     saved: 0.4,
     requests: 5,
+    unpricedRequests: 0,
   };
   const codex = {
     inputTokens: 70,
@@ -53,6 +55,7 @@ const { combineTotals, combineTimeBuckets } = await import(join(root, 'lib/sourc
     cost: 0.9,
     saved: 0,
     requests: 3,
+    unpricedRequests: 2,
   };
   const out = combineTotals([claude, codex]);
   assert.equal(out.inputTokens, 170);
@@ -61,6 +64,7 @@ const { combineTotals, combineTimeBuckets } = await import(join(root, 'lib/sourc
   assert.equal(out.cacheCreationTokens, 30);
   assert.equal(out.totalTokens, 530);
   assert.equal(out.requests, 8);
+  assert.equal(out.unpricedRequests, 2);
 
   assert.equal(out.cost.toFixed(2), '2.40');
   assert.equal(out.saved.toFixed(2), '0.40');
@@ -68,12 +72,13 @@ const { combineTotals, combineTimeBuckets } = await import(join(root, 'lib/sourc
 }
 
 {
-  const a = { inputTokens: 10, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, totalTokens: 10, cost: 0.1, saved: 0, requests: 1 };
-  const b = { inputTokens: 20, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, totalTokens: 20, cost: 0.2, saved: 0, requests: 2 };
-  const c = { inputTokens: 30, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, totalTokens: 30, cost: 0.3, saved: 0, requests: 3 };
+  const a = { inputTokens: 10, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, totalTokens: 10, cost: 0.1, saved: 0, requests: 1, unpricedRequests: 0 };
+  const b = { inputTokens: 20, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, totalTokens: 20, cost: 0.2, saved: 0, requests: 2, unpricedRequests: 1 };
+  const c = { inputTokens: 30, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, totalTokens: 30, cost: 0.3, saved: 0, requests: 3, unpricedRequests: 3 };
   const out = combineTotals([a, b, c]);
   assert.equal(out.inputTokens, 60);
   assert.equal(out.requests, 6);
+  assert.equal(out.unpricedRequests, 4);
   assert.equal(out.cost.toFixed(2), '0.60');
   console.log('✓ combineTotals: three-input sum (forward-compatible)');
 }
@@ -95,11 +100,11 @@ const { combineTotals, combineTimeBuckets } = await import(join(root, 'lib/sourc
 
 {
   const claudeSeries = [
-    bucket('2026-05-10', 'May 10', { input: 100, output: 50, cacheRead: 200, cacheCreation: 30, total: 380, cost: 1.5, saved: 0.4, requests: 5, models: { 'claude-opus-4-7': { tokens: 380, cost: 1.5, requests: 5 } } }),
+    bucket('2026-05-10', 'May 10', { input: 100, output: 50, cacheRead: 200, cacheCreation: 30, total: 380, cost: 1.5, saved: 0.4, requests: 5, unpriced: 2, models: { 'claude-opus-4-7': { tokens: 380, cost: 1.5, requests: 5 } } }),
     bucket('2026-05-11', 'May 11', { input: 50, total: 50, cost: 0.5, requests: 2, models: { 'claude-sonnet-4-7': { tokens: 50, cost: 0.5, requests: 2 } } }),
   ];
   const codexSeries = [
-    bucket('2026-05-10', 'May 10', { input: 70, output: 80, total: 150, cost: 0.9, requests: 3, models: { 'gpt-5.2-codex': { tokens: 150, cost: 0.9, requests: 3 } } }),
+    bucket('2026-05-10', 'May 10', { input: 70, output: 80, total: 150, cost: 0.9, requests: 3, unpriced: 1, models: { 'gpt-5.2-codex': { tokens: 150, cost: 0.9, requests: 3 } } }),
     bucket('2026-05-12', 'May 12', { input: 20, total: 20, cost: 0.2, requests: 1, models: { 'gpt-5': { tokens: 20, cost: 0.2, requests: 1 } } }),
   ];
   const merged = combineTimeBuckets([claudeSeries, codexSeries]);
@@ -116,6 +121,7 @@ const { combineTotals, combineTimeBuckets } = await import(join(root, 'lib/sourc
   assert.equal(may10.totalTokens, 530);
   assert.equal(may10.requests, 8);
   assert.equal(may10.cost.toFixed(2), '2.40');
+  assert.equal(may10.unpricedRequests, 3);
   assert.equal(Object.keys(may10.models).length, 2, 'May 10 has both Claude + Codex models');
   assert.equal(may10.models['claude-opus-4-7'].tokens, 380);
   assert.equal(may10.models['gpt-5.2-codex'].tokens, 150);
@@ -167,6 +173,7 @@ function bucket(key, label, partial = {}) {
     cost: partial.cost ?? 0,
     saved: partial.saved ?? 0,
     requests: partial.requests ?? 0,
+    unpricedRequests: partial.unpriced ?? 0,
     models: partial.models ?? {},
   };
 }

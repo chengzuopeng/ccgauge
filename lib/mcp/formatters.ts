@@ -31,6 +31,7 @@ export interface FlatTotals {
   cost_usd: number;
   saved_usd: number;
   requests: number;
+  unpriced_requests: number;
   turns: number;
 }
 
@@ -44,6 +45,7 @@ const ZERO_TOTALS: FlatTotals = {
   cost_usd: 0,
   saved_usd: 0,
   requests: 0,
+  unpriced_requests: 0,
   turns: 0,
 };
 
@@ -82,6 +84,7 @@ export function totalsForSource(
     cost_usd: t.cost,
     saved_usd: t.saved,
     requests: t.requests,
+    unpriced_requests: t.unpricedRequests,
     turns: summarizeTurns(inWindow, ctx.users, ctx.parentMap).size,
   };
 }
@@ -98,6 +101,7 @@ function sumTotals(parts: FlatTotals[]): FlatTotals {
       cost_usd: acc.cost_usd + p.cost_usd,
       saved_usd: acc.saved_usd + p.saved_usd,
       requests: acc.requests + p.requests,
+      unpriced_requests: acc.unpriced_requests + p.unpriced_requests,
 
       turns: acc.turns + p.turns,
     }),
@@ -198,6 +202,7 @@ export function timeBuckets(
         cost_usd: b.cost,
         saved_usd: b.saved,
         requests: b.requests,
+        unpriced_requests: b.unpricedRequests,
         turns: turnsByKey.get(b.key) ?? 0,
       };
       entry.bySource[s] = flat;
