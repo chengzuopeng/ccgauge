@@ -2,6 +2,7 @@ import type { Pricing } from '@/lib/types';
 import type { PricingResolution } from '../types';
 // Relative + explicit .js so raw `node --experimental-strip-types` test runs resolve it.
 import { LITELLM_OPENAI_PRICING } from '../../pricing/litellm-pricing.generated.js';
+import { splitModelRoute } from './model-route.js';
 
 /**
  * Static OpenAI/Codex pricing base = hand-maintained gap models + the committed
@@ -53,6 +54,11 @@ const prefixRe = /^(openai)\//;
 
 export function resolveCodexPricing(model: string): PricingResolution {
   if (!model) return { pricing: null, matchType: 'none', matchedKey: null };
+  const { model: bare, route } = splitModelRoute(model);
+  if (route) {
+    const inner = resolveCodexPricing(bare);
+    return inner.matchType === 'exact' ? { ...inner, matchType: 'prefix-stripped' } : inner;
+  }
   const pricing = activeOpenAI();
   if (pricing[model]) {
     return { pricing: pricing[model], matchType: 'exact', matchedKey: model };

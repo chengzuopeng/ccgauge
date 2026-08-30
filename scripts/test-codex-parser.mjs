@@ -8,9 +8,10 @@ import assert from 'node:assert/strict';
 const __filename = fileURLToPath(import.meta.url);
 const root = dirname(dirname(__filename));
 
-const { parseCodexJsonlFile, splitModelRoute } = await import(
+const { parseCodexJsonlFile } = await import(
   join(root, 'lib/providers/codex/parse-codex-jsonl.ts'),
 );
+const { splitModelRoute } = await import(join(root, 'lib/providers/codex/model-route.js'));
 const { resolveCodexPricing, BUILTIN_PRICING_OPENAI } = await import(join(root, 'lib/providers/codex/pricing.ts'));
 const { costFromUsage } = await import(join(root, 'lib/pricing/cost-from-usage.ts'));
 const { shortenCodexModel } = await import(join(root, 'lib/providers/codex/shorten-model.ts'));
@@ -1049,6 +1050,14 @@ assert.ok(rangeToDates('7d').from instanceof Date);
   assert.equal(routed.assistant[0].model, 'gpt-5.6-sol', 'a relay route prefix is stripped from the model');
   assert.equal(routed.assistant[0].modelRoute, 'llm-gateway', 'and kept as modelRoute');
   assert.equal(resolveCodexPricing(routed.assistant[0].model).matchType, 'exact', 'so the model prices again');
+  const rawRouted = resolveCodexPricing('llm-gateway--gpt-5.6-sol');
+  assert.equal(rawRouted.matchType, 'prefix-stripped', 'a raw routed id resolves through its route prefix');
+  assert.deepEqual(rawRouted.pricing, resolveCodexPricing('gpt-5.6-sol').pricing, 'at the unrouted model price');
+  assert.equal(
+    resolveCodexPricing('llm-gateway--gpt-9-future').matchType,
+    'family-fallback',
+    'and a routed unknown gpt still reaches the family fallback',
+  );
 
   const fromSettings = await parseCodexJsonlFile(
     write('settings.jsonl', [

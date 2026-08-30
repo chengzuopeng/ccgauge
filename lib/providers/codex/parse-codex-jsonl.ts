@@ -2,6 +2,7 @@ import { createReadStream, promises as fs } from 'node:fs';
 import readline from 'node:readline';
 import type { AssistantRecord, UserRecord } from '@/lib/types';
 import type { ParsedFile, SpawnedSessionLink } from '../types';
+import { splitModelRoute } from './model-route.js';
 
 const TEXT_PREVIEW_MAX = 200;
 
@@ -94,12 +95,6 @@ function asNumber(v: unknown): number {
  */
 function isSubagentForkMirror(payload: Record<string, unknown>): boolean {
   return asString(payload.thread_source) === 'subagent' && !!asString(payload.forked_from_id);
-}
-
-export function splitModelRoute(raw: string): { model: string; route: string } {
-  const i = raw.lastIndexOf('--');
-  if (i <= 0 || i + 2 >= raw.length) return { model: raw, route: '' };
-  return { model: raw.slice(i + 2), route: raw.slice(0, i) };
 }
 
 function extractMessageText(payload: Record<string, unknown>): string {

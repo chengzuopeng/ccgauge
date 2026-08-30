@@ -239,7 +239,7 @@ export function registerUsageTools(server: McpServer): void {
         model: z
           .string()
           .min(1)
-          .describe('Exact model id (e.g. "claude-opus-4-8-20260115", "gpt-5.2-codex"). Date suffixes are stripped automatically.'),
+          .describe('Exact model id (e.g. "claude-opus-4-8-20260115", "gpt-5.2-codex"). Date suffixes are stripped automatically, and so are Codex relay route prefixes ("<route>--<model>").'),
         input_tokens: z.number().int().min(0).default(0),
         output_tokens: z
           .number()
