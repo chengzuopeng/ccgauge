@@ -3,6 +3,7 @@ import { recordsToTurnRowsCached } from '@/lib/data-loader/derived';
 import { isUsageRange, rangeToDates, parseCustomRange, type UsageRange } from '@/lib/range';
 import { resolveSource, filterBySource } from '@/lib/source';
 import { resolveCanonicalCwd } from '@/lib/project-label';
+import { matchesModel } from '@/lib/providers/codex/model-route.js';
 import { badRequest } from '@/lib/api/error-handler';
 import type { AssistantRecord, UserRecord } from '@/lib/types';
 import type { EffectiveSource } from '@/lib/source';
@@ -92,6 +93,7 @@ export async function loadTurnScope(f: TurnFilters): Promise<TurnScope> {
   const allSourceUsers = filterBySource(scan.userRecords, f.source);
 
   const projectsSet = new Set(f.projects);
+  const modelsSet = new Set(f.models);
   const projectFilteredRecords = f.projects.length
     ? allSourceRecords.filter((r) => projectsSet.has(resolveCanonicalCwd(r.cwd)))
     : allSourceRecords;
@@ -99,7 +101,7 @@ export async function loadTurnScope(f: TurnFilters): Promise<TurnScope> {
   const filteredRecords = projectFilteredRecords.filter((r) => {
     if (f.dates.from && r.timestamp < f.fromIso) return false;
     if (f.dates.to && r.timestamp > f.toIso) return false;
-    if (f.models.length && !f.models.includes(r.model)) return false;
+    if (f.models.length && !matchesModel(modelsSet, r.model, r.modelRoute)) return false;
     return true;
   });
 

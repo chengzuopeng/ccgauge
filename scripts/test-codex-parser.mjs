@@ -11,7 +11,9 @@ const root = dirname(dirname(__filename));
 const { parseCodexJsonlFile } = await import(
   join(root, 'lib/providers/codex/parse-codex-jsonl.ts'),
 );
-const { splitModelRoute } = await import(join(root, 'lib/providers/codex/model-route.js'));
+const { splitModelRoute, joinModelRoute, matchesModel } = await import(
+  join(root, 'lib/providers/codex/model-route.js'),
+);
 const { resolveCodexPricing, BUILTIN_PRICING_OPENAI } = await import(join(root, 'lib/providers/codex/pricing.ts'));
 const { costFromUsage } = await import(join(root, 'lib/pricing/cost-from-usage.ts'));
 const { shortenCodexModel } = await import(join(root, 'lib/providers/codex/shorten-model.ts'));
@@ -1100,6 +1102,20 @@ assert.ok(rangeToDates('7d').from instanceof Date);
   assert.deepEqual(splitModelRoute('--gpt-5.5'), { model: '--gpt-5.5', route: '' }, 'nothing before the separator');
   assert.deepEqual(splitModelRoute('llm-gateway--'), { model: 'llm-gateway--', route: '' }, 'nothing after the separator');
   assert.deepEqual(splitModelRoute('a--b--gpt-5.5'), { model: 'gpt-5.5', route: 'a--b' }, 'splits on the last separator');
+  assert.equal(joinModelRoute('gpt-5.6-sol', 'llm-gateway'), 'llm-gateway--gpt-5.6-sol', 'join restores the raw id');
+  assert.equal(joinModelRoute('gpt-5.6-sol', undefined), 'gpt-5.6-sol', 'join without a route is the model');
+  assert.equal(matchesModel(new Set(['gpt-5.6-sol']), 'gpt-5.6-sol', 'llm-gateway'), true, 'a bare filter matches routed calls');
+  assert.equal(
+    matchesModel(new Set(['llm-gateway--gpt-5.6-sol']), 'gpt-5.6-sol', 'llm-gateway'),
+    true,
+    'a raw routed filter still matches its calls',
+  );
+  assert.equal(
+    matchesModel(new Set(['llm-gateway--gpt-5.6-sol']), 'gpt-5.6-sol', 'grok'),
+    false,
+    'but not the same model through another route',
+  );
+  assert.equal(matchesModel(new Set(['llm-gateway--gpt-5.6-sol']), 'gpt-5.6-sol', undefined), false, 'nor an unrouted call');
   console.log('✓ relay route prefixes split off the model; unrouted models untouched');
 }
 

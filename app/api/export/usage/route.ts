@@ -8,6 +8,7 @@ import { badRequest, withApiErrorHandling } from '@/lib/api/error-handler';
 import { getProvider } from '@/lib/providers';
 import { projectNameFromCwd } from '@/lib/utils';
 import { resolveCanonicalCwd } from '@/lib/project-label';
+import { joinModelRoute, matchesModel } from '@/lib/providers/codex/model-route.js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -38,6 +39,9 @@ function filterTurnsByQuery(turns: UsageTurnRow[], q: string): UsageTurnRow[] {
       t.cwd.toLowerCase().includes(needle) ||
       t.sessionId.toLowerCase().includes(needle) ||
       t.models.some((m) => m.toLowerCase().includes(needle)) ||
+      t.children.some(
+        (c) => !!c.modelRoute && joinModelRoute(c.model, c.modelRoute).toLowerCase().includes(needle),
+      ) ||
       t.toolNames.some((tool) => tool.toLowerCase().includes(needle)),
   );
 }
@@ -201,10 +205,11 @@ export const GET = withApiErrorHandling(async (req: Request) => {
     dates = rangeToDates(range);
   }
 
+  const modelsSet = new Set(models);
   const filteredRecords = sourceRecords.filter((r) => {
     if (dates.from && r.timestamp < dates.from.toISOString()) return false;
     if (dates.to && r.timestamp > dates.to.toISOString()) return false;
-    if (models.length && !models.includes(r.model)) return false;
+    if (models.length && !matchesModel(modelsSet, r.model, r.modelRoute)) return false;
     if (projects.length && !projects.includes(resolveCanonicalCwd(r.cwd))) return false;
     return true;
   });

@@ -142,7 +142,7 @@ ccgauge report --json                # machine-readable
 | `-g, --gran <gran>` | `day` | Trend bucket: `hour` / `day` / `week` / `month` |
 | `-n, --limit <n>` | `10` | Rows in the breakdown table |
 | `--since` / `--until` | — | ISO date range override (`YYYY-MM-DD`, local day-aligned) |
-| `-m, --model <pat>` | — | Filter records whose model contains `<pat>` |
+| `-m, --model <pat>` | — | Filter records whose model (or Codex relay route) contains `<pat>` |
 | `--project <pat>` | — | Filter by project basename / cwd substring |
 | `-d, --dashboard` | — | Rich one-screen TUI layout (KPI tiles + stacked trend + breakdown + heatmap) |
 | `--width <n>` | tty cols | Force output width — useful for screenshots / CI |

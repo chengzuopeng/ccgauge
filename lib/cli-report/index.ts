@@ -13,6 +13,7 @@ import {
 import { isUsageRange, rangeToDates } from '@/lib/range';
 import { ALL_PROVIDER_IDS, getProvider, isProviderId } from '@/lib/providers';
 import { ensurePricingLoaded } from '@/lib/pricing/store';
+import { joinModelRoute } from '@/lib/providers/codex/model-route.js';
 import type { ProviderId, AssistantRecord, ScanResult } from '@/lib/types';
 import { summarizeTurns } from '@/lib/turns';
 import { formatTokensCompact, formatUSD, formatPct } from '@/lib/utils';
@@ -97,7 +98,7 @@ export function filterRecordsForReport(
     if (!sourceSet.has(r.source)) return false;
     if (fromIso && r.timestamp < fromIso) return false;
     if (toIso && r.timestamp > toIso) return false;
-    if (modelNeedle && !r.model.toLowerCase().includes(modelNeedle)) return false;
+    if (modelNeedle && !joinModelRoute(r.model, r.modelRoute).toLowerCase().includes(modelNeedle)) return false;
     if (projectNeedle) {
       const cwd = (r.cwd || '').toLowerCase();
       const leaf = cwd.split(/[/\\]+/).pop() ?? '';
@@ -405,7 +406,7 @@ function withinSrcAndFilters(
   if (rec.source !== opts.source) return false;
   if (opts.from && rec.timestamp < opts.from.toISOString()) return false;
   if (opts.to && rec.timestamp > opts.to.toISOString()) return false;
-  if (o.model && !rec.model.toLowerCase().includes(o.model.toLowerCase())) return false;
+  if (o.model && !joinModelRoute(rec.model, rec.modelRoute).toLowerCase().includes(o.model.toLowerCase())) return false;
   if (o.project) {
     const needle = o.project.toLowerCase();
     const cwd = (rec.cwd || '').toLowerCase();

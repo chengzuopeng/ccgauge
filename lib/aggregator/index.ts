@@ -9,6 +9,7 @@ import type {
 } from '../types';
 import { costOfRecord, pricedCostOfRecord } from '../pricing/calculate';
 import { getProvider } from '../providers';
+import { matchesModel } from '../providers/codex/model-route.js';
 import { projectNameFromCwd } from '../utils';
 import { resolveProjectLabel } from '../project-label';
 
@@ -75,7 +76,7 @@ function withinRangePrepared(rec: AssistantRecord, p: PreparedOpts): boolean {
   if (rec.source !== p.source) return false;
   if (p.fromIso && rec.timestamp < p.fromIso) return false;
   if (p.toIso && rec.timestamp > p.toIso) return false;
-  if (p.models && !p.models.has(rec.model)) return false;
+  if (p.models && !matchesModel(p.models, rec.model, rec.modelRoute)) return false;
   if (p.projects && !p.projects.has(rec.cwd)) return false;
   return true;
 }
