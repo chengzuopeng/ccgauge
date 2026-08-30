@@ -62,6 +62,7 @@ const CALL_COLUMNS = [
   'source',
   'model',
   'model_short',
+  'model_route',
   'effort',
   'project_name',
   'project_path',
@@ -75,6 +76,7 @@ const CALL_COLUMNS = [
   'cache_create_tokens',
   'total_tokens',
   'cost_usd',
+  'unpriced',
 ] as const;
 
 const TURN_COLUMNS = [
@@ -98,6 +100,7 @@ const TURN_COLUMNS = [
   'cache_create_tokens',
   'total_tokens',
   'cost_usd',
+  'unpriced_calls',
 ] as const;
 
 function renderCallRow(turn: UsageTurnRow, r: UsageTableRow): string {
@@ -110,6 +113,7 @@ function renderCallRow(turn: UsageTurnRow, r: UsageTableRow): string {
     csvEscape(r.source),
     csvEscape(r.model),
     csvEscape(provider.shortenModel(r.model)),
+    csvEscape(r.modelRoute ?? ''),
     csvEscape(r.effort ?? ''),
     csvEscape(r.projectLabel || projectNameFromCwd(r.cwd)),
     csvEscape(r.cwd),
@@ -123,6 +127,7 @@ function renderCallRow(turn: UsageTurnRow, r: UsageTableRow): string {
     r.cacheCreationTokens,
     r.totalTokens,
     r.cost.toFixed(6),
+    r.unpriced ? 1 : 0,
   ].join(',');
 }
 
@@ -153,6 +158,7 @@ function renderTurnRow(turn: UsageTurnRow): string {
     turn.cacheCreationTokens,
     turn.totalTokens,
     turn.cost.toFixed(6),
+    turn.unpricedCallCount,
   ].join(',');
 }
 
