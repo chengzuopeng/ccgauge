@@ -227,6 +227,7 @@ export interface FlatModelEntry {
   cost_usd: number;
   saved_usd: number;
   pricing_resolved: boolean;
+  priced: boolean;
 }
 
 export function modelEntries(
@@ -260,6 +261,7 @@ export function modelEntries(
         cost_usd: m.cost,
         saved_usd: m.saved,
         pricing_resolved: m.pricingResolved,
+        priced: m.priced,
       });
     }
   }

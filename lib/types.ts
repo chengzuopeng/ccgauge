@@ -303,6 +303,7 @@ export interface ModelSummary {
   saved: number;
   pricing: Pricing | null;
   pricingResolved: boolean;
+  priced: boolean;
 }
 
 export type ToolDimension = 'tool' | 'skill' | 'mcp';

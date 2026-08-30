@@ -160,6 +160,7 @@ export function aggregateByModel(
         saved: 0,
         pricing,
         pricingResolved: matchType === 'exact' || matchType === 'date-stripped' || matchType === 'prefix-stripped',
+        priced: pricing !== null,
       };
       map.set(rec.model, s);
     }

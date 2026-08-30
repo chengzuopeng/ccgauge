@@ -88,10 +88,19 @@ export default async function ModelsPage({
                   </div>
                   <div className="num-mono text-xs text-text-tertiary">{m.model}</div>
                 </div>
-                {!m.pricingResolved && (
-                  <span className="pill bg-warning/10 text-warning border border-warning/20 text-[10px] whitespace-nowrap">
-                    {t('common.fallbackPrice')}
+                {!m.priced ? (
+                  <span
+                    className="pill bg-warning/10 text-warning border border-warning/20 text-[10px] whitespace-nowrap"
+                    title={t('common.unpricedHint')}
+                  >
+                    {t('common.unpriced')}
                   </span>
+                ) : (
+                  !m.pricingResolved && (
+                    <span className="pill bg-warning/10 text-warning border border-warning/20 text-[10px] whitespace-nowrap">
+                      {t('common.fallbackPrice')}
+                    </span>
+                  )
                 )}
               </div>
               <div className="num-hero">{formatUSD(m.cost)}</div>

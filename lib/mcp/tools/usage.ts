@@ -280,6 +280,7 @@ export function registerUsageTools(server: McpServer): void {
           matchType === 'exact' ||
           matchType === 'date-stripped' ||
           matchType === 'prefix-stripped',
+        priced: pricing !== null,
         pricing,
         usage,
         cost_breakdown: {
