@@ -8,6 +8,11 @@ export declare function keepModel(
   name: string,
   entry: Record<string, unknown> | null | undefined,
 ): boolean;
+export declare const RELAY_PROVIDERS: Set<string>;
+export declare function relayModelName(
+  name: string,
+  entry: Record<string, unknown> | null | undefined,
+): string | null;
 export declare function transformLiteLLMTable(raw: unknown): {
   claude: Record<string, Pricing>;
   openai: Record<string, Pricing>;

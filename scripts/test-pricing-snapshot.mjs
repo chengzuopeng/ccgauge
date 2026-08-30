@@ -13,6 +13,7 @@ const { BUILTIN_PRICING, FALLBACK_BY_FAMILY } = await import(join(root, 'lib/pri
 const { BUILTIN_PRICING_OPENAI, resolveCodexPricing } = await import(
   join(root, 'lib/providers/codex/pricing.ts')
 );
+const { transformLiteLLMTable } = await import(join(root, 'lib/pricing/litellm-transform.js'));
 
 // Both snapshot sections are populated.
 assert.ok(Object.keys(LITELLM_CLAUDE_PRICING).length > 5, 'claude snapshot non-empty');
@@ -103,5 +104,33 @@ for (const key of ['constructor', 'toString', '__proto__', 'hasOwnProperty', 'x-
   assert.equal(r.pricing, null, `${key}: resolves to no pricing`);
 }
 console.log('✓ inherited object keys never resolve as prices');
+
+{
+  const chat = (input, output, provider) => ({
+    litellm_provider: provider,
+    mode: 'chat',
+    input_cost_per_token: input,
+    output_cost_per_token: output,
+  });
+  const { openai } = transformLiteLLMTable({
+    'gpt-9': chat(1e-6, 2e-6, 'openai'),
+    'xai/grok-9': chat(3e-6, 6e-6, 'xai'),
+    'deepseek-v9': chat(1e-7, 2e-7, 'deepseek'),
+    'deepseek/deepseek-v9': chat(9e-6, 9e-6, 'deepseek'),
+    'xai/gpt-9': chat(7e-6, 7e-6, 'xai'),
+    'bedrock/moonshotai.kimi-k9': chat(1e-6, 1e-6, 'bedrock'),
+    'xai/grok-image-9': { ...chat(1e-6, 1e-6, 'xai'), mode: 'image_generation' },
+  });
+  assert.equal(openai['grok-9']?.input, 3, 'a relay provider model is kept under its bare id');
+  assert.equal(openai['deepseek-v9']?.input, 0.1, 'the first entry for a bare id wins');
+  assert.equal(openai['gpt-9'].input, 1, 'a relay provider never overrides an OpenAI entry');
+  assert.equal(openai['moonshotai.kimi-k9'], undefined, 'non-relay providers stay filtered out');
+  assert.equal(openai['grok-image-9'], undefined, 'non-chat modes stay filtered out');
+}
+for (const m of ['grok-4.6', 'kimi-k3', 'deepseek-v4-flash', 'deepseek-v4-pro', 'glm-5.3']) {
+  assert.equal(resolveCodexPricing(m).matchType, 'exact', `${m}: relay-served model priced from its provider entry`);
+}
+assert.equal(resolveCodexPricing('grok--grok-4.6').matchType, 'prefix-stripped', 'and through a relay route');
+console.log('✓ xAI / DeepSeek / Moonshot / Z.ai models served through relays are priced');
 
 console.log('\nAll pricing-snapshot assertions passed.');
