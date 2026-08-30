@@ -17,6 +17,7 @@ import type { UsageTableRow, UsageTurnRow, UsageTurnSummary } from '@/lib/serial
 import { useT, useI18n } from '@/lib/i18n/context';
 import type { Locale } from '@/lib/i18n/dict';
 import { HoverCard } from '@/components/hover-card';
+import { UnpricedBadge } from '@/components/unpriced-badge';
 import { ScrollShadows } from '@/components/scroll-shadows';
 import type { SortKey } from '@/lib/usage-query';
 import { usePendingNav } from '@/lib/use-pending-nav';
@@ -708,12 +709,10 @@ function renderTurnCell(
       return (
         <span className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
           {turn.unpricedCallCount > 0 && (
-            <span
-              className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold leading-none text-warning bg-bg-surface-hi/60 border border-border"
+            <UnpricedBadge
+              label={t('common.unpriced')}
               title={t('usage.badge.unpricedHint', { count: turn.unpricedCallCount, total: turn.callCount })}
-            >
-              {t('usage.badge.unpriced')}
-            </span>
+            />
           )}
           <span className="num-mono text-text-primary font-medium">
             {formatUSDPrecise(turn.cost)}
@@ -827,12 +826,11 @@ function renderChildCell(
         </HoverCard>
       );
     case 'cost':
-      return r.unpriced ? (
-        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold leading-none text-warning bg-bg-surface-hi/60 border border-border" title={t('usage.badge.unpricedHint', { count: 1, total: 1 })}>
-          {t('usage.badge.unpriced')}
+      return (
+        <span className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
+          {r.unpriced && <UnpricedBadge label={t('common.unpriced')} title={t('common.unpricedHint')} />}
+          <span className="num-mono">{formatUSDPrecise(r.cost)}</span>
         </span>
-      ) : (
-        <span className="num-mono">{formatUSDPrecise(r.cost)}</span>
       );
     case 'tools':
       return (

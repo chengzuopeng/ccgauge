@@ -2,6 +2,7 @@ import { getCachedScan } from '@/lib/data-loader/scan';
 import { aggregateByModel, aggregateByTime } from '@/lib/aggregator';
 import { Section, PageShell, EmptyState } from '@/components/section';
 import { TokenStackChart, type TokenStackDatum } from '@/components/charts/token-stack-chart';
+import { UnpricedBadge } from '@/components/unpriced-badge';
 import { formatTokensCompact, formatUSD, formatPct } from '@/lib/utils';
 import { getServerT, getServerLocale } from '@/lib/i18n/server';
 import { resolveSource, filterBySource, expandSources } from '@/lib/source';
@@ -89,12 +90,7 @@ export default async function ModelsPage({
                   <div className="num-mono text-xs text-text-tertiary">{m.model}</div>
                 </div>
                 {!m.priced ? (
-                  <span
-                    className="pill bg-warning/10 text-warning border border-warning/20 text-[10px] whitespace-nowrap"
-                    title={t('common.unpricedHint')}
-                  >
-                    {t('common.unpriced')}
-                  </span>
+                  <UnpricedBadge label={t('common.unpriced')} title={t('common.unpricedHint')} />
                 ) : (
                   !m.pricingResolved && (
                     <span className="pill bg-warning/10 text-warning border border-warning/20 text-[10px] whitespace-nowrap">
