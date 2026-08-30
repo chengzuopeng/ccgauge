@@ -238,8 +238,8 @@ function isClaudeModelShown(model: string): boolean {
 }
 
 function isCodexModelShown(model: string): boolean {
-  const m = model.toLowerCase();
-  return m.startsWith('gpt-5');
+  const m = model.toLowerCase().match(/^gpt-(\d+)/);
+  return !!m && Number(m[1]) >= 5;
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
