@@ -469,7 +469,7 @@ assert.ok(rangeToDates('7d').from instanceof Date);
   // can carry a default that disagrees with the turn actually running — 116 of
   // 477 such events disagree in real ~/.codex data. It must only fill in for
   // records that precede any turn_context, never override it: gpt-5.6-terra
-  // billed as gpt-5.6-sol is a 2x error (input 2.5/output 15 vs 5/30).
+  // billed as gpt-5.6-sol is a 2x input error (input 2/output 12 vs 4/20).
   const dir = mkdtempSync(join(tmpdir(), 'ccgauge-codex-model-'));
   const file = join(dir, 'model-precedence.jsonl');
   const tc = (ts, input) =>
