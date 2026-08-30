@@ -97,4 +97,11 @@ assert.equal(resolveCodexPricing('gpt-5.5').matchType, 'exact', 'gpt-5.5 resolve
 assert.equal(resolveCodexPricing('gpt-9-future').matchType, 'family-fallback', 'unknown gpt → fallback');
 console.log('✓ gap-model + family fallbacks resolve');
 
+for (const key of ['constructor', 'toString', '__proto__', 'hasOwnProperty', 'x--constructor']) {
+  const r = resolveCodexPricing(key);
+  assert.equal(r.matchType, 'none', `${key}: an inherited object key is not a price`);
+  assert.equal(r.pricing, null, `${key}: resolves to no pricing`);
+}
+console.log('✓ inherited object keys never resolve as prices');
+
 console.log('\nAll pricing-snapshot assertions passed.');

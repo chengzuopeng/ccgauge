@@ -60,11 +60,11 @@ export function resolveCodexPricing(model: string): PricingResolution {
     return inner.matchType === 'exact' ? { ...inner, matchType: 'prefix-stripped' } : inner;
   }
   const pricing = activeOpenAI();
-  if (pricing[model]) {
+  if (Object.hasOwn(pricing, model)) {
     return { pricing: pricing[model], matchType: 'exact', matchedKey: model };
   }
   const stripped = model.replace(dateSuffix, '');
-  if (pricing[stripped]) {
+  if (Object.hasOwn(pricing, stripped)) {
     return {
       pricing: pricing[stripped],
       matchType: 'date-stripped',
@@ -72,7 +72,7 @@ export function resolveCodexPricing(model: string): PricingResolution {
     };
   }
   const noPrefix = stripped.replace(prefixRe, '');
-  if (pricing[noPrefix]) {
+  if (Object.hasOwn(pricing, noPrefix)) {
     return {
       pricing: pricing[noPrefix],
       matchType: 'prefix-stripped',

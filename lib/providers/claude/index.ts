@@ -31,11 +31,11 @@ function activeClaudeFallback(): Record<string, Pricing> {
 function resolvePricing(model: string): PricingResolution {
   if (!model) return { pricing: null, matchType: 'none', matchedKey: null };
   const pricing = activeClaude();
-  if (pricing[model]) {
+  if (Object.hasOwn(pricing, model)) {
     return { pricing: pricing[model], matchType: 'exact', matchedKey: model };
   }
   const stripped = model.replace(dateSuffix, '');
-  if (pricing[stripped]) {
+  if (Object.hasOwn(pricing, stripped)) {
     return {
       pricing: pricing[stripped],
       matchType: 'date-stripped',
@@ -43,7 +43,7 @@ function resolvePricing(model: string): PricingResolution {
     };
   }
   const noPrefix = stripped.replace(prefixRe, '');
-  if (pricing[noPrefix]) {
+  if (Object.hasOwn(pricing, noPrefix)) {
     return {
       pricing: pricing[noPrefix],
       matchType: 'prefix-stripped',
