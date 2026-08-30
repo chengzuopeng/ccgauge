@@ -81,40 +81,6 @@ export interface UsageTableRow {
   directPrompt?: string;
 }
 
-export function recordsToTableRows(records: AssistantRecord[]): UsageTableRow[] {
-  return records.map((r) => {
-    const { cost: c, priced } = pricedCostOfRecord(r);
-    return {
-      uuid: r.uuid,
-      timestamp: r.timestamp,
-      source: r.source,
-      model: r.model,
-      modelRoute: r.modelRoute,
-      cwd: r.cwd,
-      projectLabel: resolveProjectLabel(r.cwd),
-      sessionId: r.sessionId,
-      inputTokens: r.usage.input_tokens,
-      outputTokens: r.usage.output_tokens,
-      cacheReadTokens: r.usage.cache_read_input_tokens,
-      cacheCreationTokens: r.usage.cache_creation_input_tokens,
-      reasoningTokens: r.usage.reasoning_tokens ?? 0,
-      totalTokens:
-        r.usage.input_tokens +
-        r.usage.output_tokens +
-        r.usage.cache_read_input_tokens +
-        r.usage.cache_creation_input_tokens,
-      cost: c.total,
-      costInput: c.input,
-      costOutput: c.output,
-      costCacheRead: c.cacheRead,
-      costCacheWrite: c.cacheCreation5m + c.cacheCreation1h,
-      unpriced: priced ? undefined : true,
-      toolNames: r.toolNames,
-      effort: r.effort,
-    };
-  });
-}
-
 export interface UsageTurnRow {
   turnId: string;
   /** Provider of this turn (all of a turn's calls share one session/source). */
