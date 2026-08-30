@@ -192,7 +192,8 @@ on 3737 by default.
     `user_message` sub-type, so a typed message produced no UserRecord and
     every call became its own "(no user text)" row)
     → `codex-v12-review-spawn-linkage` (see below)
-    → `codex-v13-model-route-split` (current; see below).
+    → `codex-v13-model-route-split` (see below)
+    → `codex-v14-model-route-guard` (current; see below).
 
     v12 is the one that is not a sub-agent problem at all. `codex review`
     run from inside a turn starts a separate TOP-LEVEL session, written as a
@@ -218,8 +219,16 @@ on 3737 by default.
     matched no price (every such call billed $0 without a warning), rendered
     as a garbled label, and split one model into a row per route. The parser
     now splits on the LAST `--`: `model` is the underlying id and
-    `modelRoute` keeps the route. Model ids never contain `--`, while routes
-    can carry `@` and `.`, which is why the split runs from the right.
+    `modelRoute` keeps the route. The relayed model ids carry no `--`, while
+    routes can carry `@` and `.`, which is why the split runs from the right.
+
+    v14 keeps that split from eating a real model id. A deployment name or
+    alias may put `--` after the model (`gpt-5--eastus`, `o3--team-a`); when
+    the left side looks like a model (`gpt-`, `claude-`, `codex-`, `o<digit>`)
+    and the right side does not, the id stays whole, so it still prices
+    through the gpt/o family fallback instead of becoming model `eastus`.
+    The rule lives in `lib/providers/codex/model-route.js`, shared with the
+    Codex price resolver.
 
     Two of the earlier versions exist because a Codex rollout's shape varies
     **within one `cli_version`**, which is the thing to internalise before

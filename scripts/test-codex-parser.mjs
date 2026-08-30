@@ -1102,6 +1102,22 @@ assert.ok(rangeToDates('7d').from instanceof Date);
   assert.deepEqual(splitModelRoute('--gpt-5.5'), { model: '--gpt-5.5', route: '' }, 'nothing before the separator');
   assert.deepEqual(splitModelRoute('llm-gateway--'), { model: 'llm-gateway--', route: '' }, 'nothing after the separator');
   assert.deepEqual(splitModelRoute('a--b--gpt-5.5'), { model: 'gpt-5.5', route: 'a--b' }, 'splits on the last separator');
+  assert.deepEqual(
+    splitModelRoute('gpt-5--eastus'),
+    { model: 'gpt-5--eastus', route: '' },
+    'a model id with a non-model suffix is not a route',
+  );
+  assert.deepEqual(splitModelRoute('o3--team-a'), { model: 'o3--team-a', route: '' }, 'o-series ids keep their suffix too');
+  assert.deepEqual(
+    splitModelRoute('gpt-proxy--gpt-5'),
+    { model: 'gpt-5', route: 'gpt-proxy' },
+    'a model-looking route still splits off a model',
+  );
+  assert.equal(
+    resolveCodexPricing('gpt-5--eastus').matchType,
+    'family-fallback',
+    'so an unsplit deployment id keeps its family price',
+  );
   assert.equal(joinModelRoute('gpt-5.6-sol', 'llm-gateway'), 'llm-gateway--gpt-5.6-sol', 'join restores the raw id');
   assert.equal(joinModelRoute('gpt-5.6-sol', undefined), 'gpt-5.6-sol', 'join without a route is the model');
   assert.equal(matchesModel(new Set(['gpt-5.6-sol']), 'gpt-5.6-sol', 'llm-gateway'), true, 'a bare filter matches routed calls');
