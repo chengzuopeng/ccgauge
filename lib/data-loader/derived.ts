@@ -49,16 +49,27 @@ export function getAllProjects(records: AssistantRecord[]): string[] {
  * free — no manual invalidation needed.
  */
 const TURNS_LRU_MAX = 16;
-type TurnsLruBucket = Map<string, UsageTurnRow[]>;
+interface TurnsLruBucket {
+  pricingState: unknown;
+  rows: Map<string, UsageTurnRow[]>;
+}
 const turnsByScan = new WeakMap<object, TurnsLruBucket>();
 
-function bucketFor(scan: object): TurnsLruBucket {
+function currentPricingState(): unknown {
+  return (
+    (globalThis as unknown as { __ccgaugePricing?: { state?: unknown } }).__ccgaugePricing?.state ??
+    null
+  );
+}
+
+function bucketFor(scan: object): Map<string, UsageTurnRow[]> {
+  const pricingState = currentPricingState();
   let b = turnsByScan.get(scan);
-  if (!b) {
-    b = new Map();
+  if (!b || b.pricingState !== pricingState) {
+    b = { pricingState, rows: new Map() };
     turnsByScan.set(scan, b);
   }
-  return b;
+  return b.rows;
 }
 
 /**

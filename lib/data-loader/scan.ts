@@ -1,5 +1,6 @@
 import { listProviders } from '../providers';
 import type { ProviderId } from '../providers';
+import { ensurePricingLoaded } from '../pricing/store';
 import type { ScanResult, ScanStatsBySource } from '../types';
 import { getIndexer, type IndexerStatus } from './indexer';
 
@@ -8,6 +9,7 @@ export interface ScanResultExtended extends ScanResult {
 }
 
 export async function getCachedScan(opts: { force?: boolean } = {}): Promise<ScanResultExtended> {
+  ensurePricingLoaded();
   const idx = getIndexer();
   if (opts.force) {
     return idx.forceRescan();
