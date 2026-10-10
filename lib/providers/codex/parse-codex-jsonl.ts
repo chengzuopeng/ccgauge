@@ -25,6 +25,12 @@ const TEXT_PREVIEW_MAX = 200;
 const SPAWN_BANNER_NEEDLE = 'session id: ';
 const SPAWN_BANNER =
   /session id: ([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi;
+const SPAWN_BANNER_NEEDLE_BYTES = Buffer.from(SPAWN_BANNER_NEEDLE);
+const USER_MESSAGE_BYTES = Buffer.from('"UserMessage"');
+const CLOSING_BRACE = 0x7d;
+const HEAD_BYTES = 240;
+const CODEX_LINE_HEAD =
+  /^\{"timestamp":"([^"]*)",(?:"ordinal":\d+,)?"type":"([a-z_]+)"(?:,"payload":\{"type":"([A-Za-z_]+)"(?:,"id":"[^"]*")?(?:,"role":"([a-z_]+)")?)?/;
 
 async function fileMtimeIso(file: string): Promise<string> {
   try {
@@ -199,6 +205,39 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
 
   let forkMirror = false;
   await forEachLine(file, (buf) => {
+    if (buf.length > 0 && buf[buf.length - 1] === CLOSING_BRACE) {
+      const head = CODEX_LINE_HEAD.exec(buf.toString('latin1', 0, Math.min(buf.length, HEAD_BYTES)));
+      if (head) {
+        const [, headTs, type, sub, role] = head;
+        let skip = false;
+        if (type === 'compacted' || type === 'world_state') {
+          skip = true;
+        } else if (type === 'response_item') {
+          if (sub === 'reasoning') {
+            turn.hasThinking = true;
+            skip = true;
+          } else if (sub === 'function_call_output' || sub === 'custom_tool_call_output') {
+            if (buf.indexOf(SPAWN_BANNER_NEEDLE_BYTES) !== -1) recordSpawnBanner(buf.toString('utf8'));
+            skip = true;
+          } else if (sub === 'image_generation_call') {
+            skip = true;
+          } else if (sub === 'message') {
+            skip = !!turn.pendingTextPreview || (!!role && role !== 'assistant');
+          }
+        } else if (type === 'event_msg') {
+          if (sub === 'agent_reasoning') {
+            turn.hasThinking = true;
+            skip = true;
+          } else if (sub === 'item_completed') {
+            skip = sawFlatUserMessage || buf.indexOf(USER_MESSAGE_BYTES) === -1;
+          }
+        }
+        if (skip) {
+          if (headTs) lastValidTs = headTs;
+          return;
+        }
+      }
+    }
     const line = buf.toString('utf8');
     if (!line.trim()) return;
     let evt: CodexEvent;

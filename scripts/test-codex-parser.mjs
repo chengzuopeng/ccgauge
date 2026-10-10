@@ -1135,4 +1135,80 @@ assert.ok(rangeToDates('7d').from instanceof Date);
   console.log('✓ relay route prefixes split off the model; unrouted models untouched');
 }
 
+{
+  const dir = mkdtempSync(join(tmpdir(), 'ccgauge-codex-skip-'));
+  try {
+    const child = '019fe02e-db7c-7a70-aaea-89e83e9b03d1';
+    const late = '019fe02e-0000-7a70-aaea-89e83e9b03d1';
+    const line = (ts, ordinal, type, payload) =>
+      JSON.stringify({ timestamp: ts, ...(ordinal === null ? {} : { ordinal }), type, payload });
+    const file = join(dir, 'skip.jsonl');
+    const truncated = line('2026-09-02T10:00:09Z', 11, 'response_item', {
+      type: 'function_call_output',
+      call_id: 'c2',
+      output: `session id: ${late} still being written`,
+    }).slice(0, -10);
+    writeFileSync(
+      file,
+      [
+        line('2026-09-02T10:00:00Z', 1, 'session_meta', { id: 'pf-1', cwd: '/tmp/p', cli_version: '0.147.0' }),
+        line('2026-09-02T10:00:01Z', null, 'turn_context', { turn_id: 't1', cwd: '/tmp/p', model: 'gpt-5.5' }),
+        line('2026-09-02T10:00:02Z', 2, 'event_msg', {
+          type: 'item_completed',
+          item: { type: 'UserMessage', content: [{ type: 'text', text: 'hello pf' }] },
+        }),
+        line('2026-09-02T10:00:03Z', 3, 'event_msg', {
+          type: 'item_completed',
+          item: { type: 'AgentMessage', content: [{ type: 'Text', text: 'not a user turn' }] },
+        }),
+        line('2026-09-02T10:00:04Z', 4, 'response_item', { type: 'reasoning', summary: [] }),
+        line('2026-09-02T10:00:05Z', 5, 'response_item', {
+          type: 'message',
+          role: 'user',
+          content: [{ type: 'input_text', text: 'context the user did not type' }],
+        }),
+        line('2026-09-02T10:00:06Z', 6, 'response_item', {
+          type: 'message',
+          id: 'msg_1',
+          role: 'assistant',
+          content: [{ type: 'output_text', text: 'preview text' }],
+        }),
+        line('2026-09-02T10:00:07Z', 7, 'response_item', { type: 'function_call', name: 'exec_command', arguments: '{}' }),
+        line('2026-09-02T10:00:08Z', 8, 'response_item', {
+          type: 'function_call_output',
+          call_id: 'c1',
+          output: `OpenAI Codex v0.147.0\n--------\nsession id: ${child}\n`,
+        }),
+        line('2026-09-02T10:05:00Z', 9, 'compacted', { message: '', replacement_history: [] }),
+        JSON.stringify({
+          type: 'event_msg',
+          payload: {
+            type: 'token_count',
+            info: { total_token_usage: { input_tokens: 100, cached_input_tokens: 0, output_tokens: 10, reasoning_output_tokens: 0 } },
+          },
+        }),
+        truncated,
+      ].join('\n') + '\n',
+      'utf8',
+    );
+    const parsed = await parseCodexJsonlFile(file);
+    assert.equal(parsed.user.length, 1, 'only the UserMessage envelope roots a turn');
+    assert.equal(parsed.user[0].textPreview, 'hello pf');
+    assert.equal(parsed.assistant.length, 1);
+    const [rec] = parsed.assistant;
+    assert.equal(rec.hasThinking, true, 'a skipped reasoning line still marks the call as thinking');
+    assert.equal(rec.textPreview, 'preview text', 'the assistant message is read; the user-role one is not');
+    assert.deepEqual(rec.toolNames, ['exec_command']);
+    assert.equal(rec.timestamp, '2026-09-02T10:05:00Z', 'a skipped line still advances the last-seen timestamp');
+    assert.deepEqual(
+      parsed.spawnedSessions,
+      [{ sessionId: child, parentUuid: parsed.user[0].uuid }],
+      'the spawn banner is found in a tool output without parsing it, and a truncated line is ignored',
+    );
+    console.log('✓ lines skipped by their head keep every effect the full parse had');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 console.log('\nAll codex parser + pricing assertions passed.');
