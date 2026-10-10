@@ -66,7 +66,7 @@ export function ToolLeaderboard({ rows, dimension, locale }: Props) {
                 <span className="num-mono text-xs text-text-tertiary w-5 shrink-0">{i + 1}</span>
                 <span
                   className={cn(
-                    'truncate text-sm text-text-primary',
+                    'truncate min-w-0 text-sm text-text-primary',
                     focus && 'font-semibold',
                   )}
                   title={r.key}
@@ -77,7 +77,7 @@ export function ToolLeaderboard({ rows, dimension, locale }: Props) {
                   {t(`tools.kind.${kind}`)}
                 </span>
                 {focus && (
-                  <span className="pill text-[10px] shrink-0 bg-warning/12 text-warning border border-warning/25">
+                  <span className="pill hidden sm:inline-flex text-[10px] shrink-0 bg-warning/12 text-warning border border-warning/25">
                     {t('tools.topConsumer')}
                   </span>
                 )}
