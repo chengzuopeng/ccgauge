@@ -279,6 +279,48 @@ try {
     console.log('✓ a cold index shows the recent window first and backfills older transcripts');
   }
 
+  {
+    const streamDir = join(home, '.claude', 'projects', 'stream');
+    mkdirSync(streamDir, { recursive: true });
+    const streamed = join(streamDir, 'streamed.jsonl');
+    const chunk = (uuid, ts, content) =>
+      JSON.stringify({
+        type: 'assistant',
+        uuid,
+        parentUuid: null,
+        timestamp: ts,
+        sessionId: 's-stream',
+        cwd: '/tmp/proj',
+        requestId: 'r-stream',
+        message: {
+          id: 'm-stream',
+          role: 'assistant',
+          model: 'claude-sonnet-4-6',
+          content,
+          usage: { input_tokens: 7, output_tokens: 3, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+        },
+      });
+    writeFileSync(
+      streamed,
+      [
+        chunk('c1', '2026-09-03T10:00:00.000Z', [{ type: 'thinking', thinking: 'hmm' }]),
+        chunk('c2', '2026-09-03T10:00:01.000Z', [{ type: 'tool_use', id: 'tu-9', name: 'Bash', input: {} }]),
+      ].join('\n') + '\n',
+      'utf8',
+    );
+    const name = 'refresh-compact';
+    const idx = m.getIndexer(name);
+    const snap = await idx.waitUntilFresh();
+    const recs = snap.records.filter((r) => r.sessionId === 's-stream');
+    assert.equal(recs.length, 1, 'streamed chunks of one message count once');
+    assert.deepEqual(recs[0].toolUses, [{ id: 'tu-9', name: 'Bash' }], 'with the tool uses of every chunk');
+    await delay(2500);
+    const entry = (await m.loadPersistedIndex(name)).files.find((f) => f.filePath === streamed);
+    assert.equal(entry.assistantRecords.length, 1, 'the cache stores the merged record, not each chunk');
+    idx.dispose();
+    console.log('✓ streamed chunks are merged per file before they are cached');
+  }
+
   console.log('\nAll indexer-refresh assertions passed.');
 } finally {
   rmSync(dir, { recursive: true, force: true });
