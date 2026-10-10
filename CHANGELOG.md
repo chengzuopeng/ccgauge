@@ -5,6 +5,52 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.7] — 2026-10-10
+
+### Added
+
+- **Indexing progress banner.** While ccgauge indexes with no usable cache,
+  or reparses history after an upgrade, a banner under the nav shows file
+  and byte progress, says which figures are still partial, and refreshes the
+  page when indexing finishes. It is backed by a new `/api/scan/status`
+  endpoint that never waits on the index.
+- `CCGAUGE_PARSE_WORKERS` sets how many worker threads parse transcripts
+  (default: CPU cores − 1, at most 6; `0` parses on the main thread).
+
+### Changed
+
+- **The first open after an upgrade no longer waits for a full reparse.**
+  When a new version changes how transcripts are parsed, the previous index
+  is served at once and history is reparsed in the background, then swapped
+  in. On 6GB of Codex rollouts the first page went from 19s to about 2s. The
+  CLI report, the CSV export and the MCP server still wait for fresh data.
+- **Much faster cold start.** With no cache at all, transcripts touched in
+  the last 30 days (and this month) are read first, so the overview and
+  every range up to 30 days are exact as soon as the first page shows; older
+  history fills in behind the banner. Parsing itself got faster too: lines
+  are cut from byte chunks instead of readline, Codex lines the parser never
+  reads skip `JSON.parse`, image tool results are measured without being
+  serialized, and transcripts are parsed on worker threads. On 8.8GB of
+  transcripts the first page now arrives in about 4s instead of 35s, with
+  everything indexed about a second later.
+- **A smaller cache that is cheap to update.** The on-disk index is now 64
+  shard files under `~/.ccgauge/cache/index-v3/` (`index-mcp-v3/` for MCP)
+  instead of one large JSON file. Streamed message chunks are merged per
+  transcript before caching, only shards that changed are rewritten, and an
+  unchanged cache is no longer rewritten on every start. On one machine the
+  cache went from 267MB to 159MB, a warm start from about 2s to under 1s,
+  and saving one changed transcript from a full rewrite with a 0.6–0.9s
+  stall to about 100ms.
+- **Active Claude sessions are parsed incrementally.** When a transcript
+  grows, only the appended lines are parsed: a one-line append to a 259MB
+  transcript costs 1ms instead of 379ms. Codex rollouts are still parsed in
+  full.
+- The settings page's "records parsed" count now counts merged message
+  records, so it is lower than before.
+- No `parserVersion` change. The existing `index-v2.json` cache is migrated
+  to shards on first start without a reparse, then removed; going back to
+  1.4.6 afterwards rebuilds its cache from scratch.
+
 ## [1.4.6] — 2026-09-14
 
 ### Added
@@ -1972,6 +2018,10 @@ of HTML to the browser.
 - Initial public release as `ccgauge`: local Next.js dashboard for
   Claude Code token usage, cost, and 5-hour block tracking.
 
+[1.4.7]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.6...v1.4.7
+[1.4.6]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.5...v1.4.6
+[1.4.5]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.4...v1.4.5
+[1.4.4]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.3...v1.4.4
 [1.4.3]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.0...v1.4.1
