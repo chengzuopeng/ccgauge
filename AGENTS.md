@@ -164,6 +164,18 @@ on 3737 by default.
      `lib/data-loader/index-persist.ts` (which drops the cache) rather than
      only `parserVersion`. Files that changed on disk are still reparsed
      before the first snapshot.
+   - **A cold index shows the recent window first.** Files with no usable
+     cache entry are split by mtime at `recentCutoffMs()` (the earlier of
+     30 days ago and the start of this month, minus one day). Newer files are
+     parsed before the first snapshot (`progress.phase === 'indexing'`);
+     older ones are parsed by the same background pass
+     (`reason: 'backfill'`). This is exact, not an estimate: a record is
+     written to its transcript when it happens, so a file last modified
+     before the cutoff holds nothing newer, and the overview plus every range
+     up to 30 days are identical before and after the backfill (checked on
+     real data: requests, cost, per-day buckets and turn grouping). Only
+     all-time and longer ranges are partial until it finishes. A manual
+     rescan (`forceRescan`) parses everything before returning.
 
 2. **Turn grouping walks the JSONL parent chain.**
    `lib/turns.ts` resolves each assistant record to its turn by walking

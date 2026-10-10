@@ -359,6 +359,11 @@ const en: Dict = {
   'settings.indexer.idle': 'idle',
   'index.refreshing':
     'Parsing rules changed in this version — re-reading {total} transcript file(s). Figures below come from the previous index until this finishes, then the page refreshes itself.',
+  'index.indexing':
+    'Building the index from your transcripts. This takes a while on first run or after the cache is cleared; the page appears once the last 30 days are read.',
+  'index.backfilling':
+    'The last 30 days are complete. Reading {total} older transcript file(s) in the background — all-time and long-range figures are partial until this finishes, then the page refreshes itself.',
+  'index.counter': '{done} / {total} files · {doneSize} / {totalSize}',
   'settings.indexer.recentErrors': 'Recent indexer errors',
   'common.yes': 'yes',
   'common.no': 'no',
@@ -722,6 +727,11 @@ const zh: Dict = {
   'settings.indexer.idle': '空闲',
   'index.refreshing':
     '这个版本更新了解析规则，正在重新解析 {total} 个会话文件。完成前下面显示的是上一次的索引数据，完成后页面会自动刷新。',
+  'index.indexing':
+    '正在根据会话记录建立索引。首次运行或缓存被清空后需要一些时间，读完最近 30 天的记录后页面就会显示。',
+  'index.backfilling':
+    '最近 30 天的数据已完整，正在后台读取更早的 {total} 个会话文件。完成前「全部」等长时间范围的统计还不完整，完成后页面会自动刷新。',
+  'index.counter': '{done} / {total} 个文件 · {doneSize} / {totalSize}',
   'settings.indexer.recentErrors': '最近的索引错误',
   'common.yes': '是',
   'common.no': '否',

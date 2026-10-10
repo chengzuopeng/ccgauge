@@ -2,7 +2,7 @@
 import { build } from 'esbuild';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, statSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
 
@@ -143,7 +143,9 @@ try {
     assert.equal(modelOf(first, 's-changed'), 'claude-sonnet-4-6', 'a file that changed on disk is reparsed before the first snapshot');
     const busy = idx.getStatus();
     assert.equal(busy.progress.phase, 'refreshing', 'the outdated file is reparsed in the background');
+    assert.equal(busy.progress.reason, 'upgrade', 'and the refresh is reported as a parser upgrade');
     assert.equal(busy.progress.filesTotal, 1, 'only the outdated, unchanged file is queued');
+    assert.equal(busy.progress.bytesTotal, statSync(unchanged).size, 'its size is the refresh total');
     assert.equal(busy.isIndexing, true, 'status reports indexing while the refresh runs');
 
     const fresh = await idx.waitUntilFresh();
@@ -200,6 +202,45 @@ try {
     );
     idx.dispose();
     console.log('✓ an up-to-date cache is used without a refresh');
+  }
+
+  {
+    const coldDir = join(home, '.claude', 'projects', 'cold');
+    mkdirSync(coldDir, { recursive: true });
+    const older = join(coldDir, 'older.jsonl');
+    writeFileSync(older, claudeTranscript('s-older', 'claude-opus-4-8'), 'utf8');
+    const longAgo = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000);
+    utimesSync(older, longAgo, longAgo);
+
+    const name = 'refresh-cold';
+    const idx = m.getIndexer(name);
+    await idx.init();
+    const first = idx.getSnapshot();
+    const sessions = (snap) => new Set(snap.records.map((r) => r.sessionId));
+    assert.ok(sessions(first).has('s-unchanged'), 'recently modified transcripts are parsed before the first snapshot');
+    assert.ok(!sessions(first).has('s-older'), 'a transcript last modified before the recent window is left for later');
+    const busy = idx.getStatus().progress;
+    assert.equal(busy.phase, 'refreshing');
+    assert.equal(busy.reason, 'backfill', 'the deferred history is reported as a backfill');
+    assert.equal(busy.filesTotal, 1);
+    assert.equal(busy.bytesTotal, statSync(older).size);
+
+    const fresh = await idx.waitUntilFresh();
+    assert.ok(sessions(fresh).has('s-older'), 'the backfill adds the older transcript');
+    assert.equal(idx.getStatus().progress.phase, 'idle');
+
+    await delay(2500);
+    const persisted = await m.loadPersistedIndex(name);
+    assert.ok(
+      persisted.files.some((f) => f.filePath === older),
+      'the backfilled transcript is persisted',
+    );
+
+    const rescanned = await idx.forceRescan();
+    assert.ok(sessions(rescanned).has('s-older'), 'a manual rescan reads everything before returning');
+    assert.equal(idx.getStatus().progress.phase, 'idle', 'and leaves nothing for the background');
+    idx.dispose();
+    console.log('✓ a cold index shows the recent window first and backfills older transcripts');
   }
 
   console.log('\nAll indexer-refresh assertions passed.');
