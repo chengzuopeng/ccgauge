@@ -8,6 +8,51 @@ interface CacheCreationBlock {
   ephemeral_1h_input_tokens?: number;
 }
 
+const JSON_ESCAPED_CHAR = /["\\\u0000-\u001f\ud800-\udfff]/;
+
+function jsonStringLength(s: string): number {
+  return JSON_ESCAPED_CHAR.test(s) ? JSON.stringify(s).length : s.length + 2;
+}
+
+function isOmittedJsonValue(v: unknown): boolean {
+  return v === undefined || typeof v === 'function' || typeof v === 'symbol';
+}
+
+export function jsonLength(v: unknown): number {
+  if (v === null) return 4;
+  switch (typeof v) {
+    case 'string':
+      return jsonStringLength(v);
+    case 'number':
+      return Number.isFinite(v) ? String(v).length : 4;
+    case 'boolean':
+      return v ? 4 : 5;
+    case 'object': {
+      if (typeof (v as { toJSON?: unknown }).toJSON === 'function') return safeStringLen(v);
+      if (Array.isArray(v)) {
+        let n = 2;
+        for (let i = 0; i < v.length; i += 1) {
+          if (i > 0) n += 1;
+          n += isOmittedJsonValue(v[i]) ? 4 : jsonLength(v[i]);
+        }
+        return n;
+      }
+      let n = 2;
+      let first = true;
+      for (const key of Object.keys(v)) {
+        const value = (v as Record<string, unknown>)[key];
+        if (isOmittedJsonValue(value)) continue;
+        if (!first) n += 1;
+        first = false;
+        n += jsonStringLength(key) + 1 + jsonLength(value);
+      }
+      return n;
+    }
+    default:
+      return 0;
+  }
+}
+
 function safeStringLen(v: unknown): number {
   try {
     return JSON.stringify(v)?.length ?? 0;
@@ -26,7 +71,7 @@ function contentChars(content: unknown): number {
     for (const b of content) {
       if (b && typeof b === 'object') {
         const t = (b as Record<string, unknown>).text;
-        n += typeof t === 'string' ? t.length : safeStringLen(b);
+        n += typeof t === 'string' ? t.length : jsonLength(b);
       } else if (typeof b === 'string') {
         n += b.length;
       }
