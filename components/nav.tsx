@@ -103,7 +103,7 @@ export function Nav({ availableProviders, initialSource, providerInfos }: Props)
 
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-bg-base/85 backdrop-blur-md supports-[backdrop-filter]:bg-bg-base/70">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 flex items-center gap-2 sm:gap-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 pt-2.5 lg:pt-0 lg:h-14 flex flex-wrap lg:flex-nowrap items-center gap-x-2 sm:gap-x-4">
         <Link
           href="/"
           className="flex items-center gap-2 font-semibold tracking-tight whitespace-nowrap shrink-0 text-text-primary hover:opacity-90 transition-opacity"
@@ -114,10 +114,10 @@ export function Nav({ availableProviders, initialSource, providerInfos }: Props)
         </Link>
         <nav
           ref={navRef}
-          className="relative flex-1 min-w-0 flex items-center gap-0.5 overflow-x-auto nav-scroller"
+          className="relative order-last w-full h-11 lg:order-none lg:w-auto lg:h-auto lg:self-stretch lg:flex-1 min-w-0 flex items-center gap-0.5 overflow-x-auto nav-scroller"
           aria-label="Primary"
         >
-          <TabIndicator rect={rect} variant="underline" />
+          <TabIndicator rect={rect} variant="underline" className="bottom-0" />
           {PRIMARY.map(renderTab)}
           <HoverCard
             align="left"
@@ -205,7 +205,7 @@ export function Nav({ availableProviders, initialSource, providerInfos }: Props)
             </svg>
           </a>
         </nav>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="ml-auto flex items-center gap-2 shrink-0">
           <SourceSwitcher
             available={availableProviders}
             initial={initialSource}

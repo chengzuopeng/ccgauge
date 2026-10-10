@@ -99,6 +99,8 @@ export function SourceSwitcher({ available, initial, providers }: Props) {
             type="button"
             onClick={() => select(p.id)}
             aria-pressed={isActive}
+            aria-label={label}
+            title={label}
             disabled={pending}
             className={`px-2.5 h-6 text-xs font-medium inline-flex items-center gap-1.5 rounded transition-colors ${
               isActive
@@ -107,7 +109,7 @@ export function SourceSwitcher({ available, initial, providers }: Props) {
             }`}
           >
             <ProviderMark provider={p} />
-            <span>{label}</span>
+            <span className="hidden sm:inline">{label}</span>
           </button>
         );
       })}
@@ -155,6 +157,8 @@ function AllButton({
       type="button"
       onClick={onSelect}
       aria-pressed={active}
+      aria-label={label}
+      title={label}
       disabled={disabled}
       className={`px-2.5 h-6 text-xs font-medium inline-flex items-center gap-1.5 rounded transition-colors ${
         active
@@ -197,7 +201,7 @@ function AllButton({
           );
         })}
       </span>
-      <span>{label}</span>
+      <span className="hidden sm:inline">{label}</span>
     </button>
   );
 }
