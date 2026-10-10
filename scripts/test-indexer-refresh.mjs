@@ -412,6 +412,38 @@ try {
     console.log('✓ appended transcripts are parsed from where the cache left off');
   }
 
+  {
+    const rollout = (id) =>
+      [
+        { timestamp: '2026-09-05T08:00:00Z', type: 'session_meta', payload: { id, cwd: '/tmp/p', cli_version: '0.147.0' } },
+        { timestamp: '2026-09-05T08:00:01Z', type: 'turn_context', payload: { turn_id: 't-shared', cwd: '/tmp/p', model: 'gpt-5.5' } },
+        { timestamp: '2026-09-05T08:00:02Z', type: 'event_msg', payload: { type: 'user_message', message: 'shared history' } },
+        {
+          timestamp: '2026-09-05T08:00:03Z',
+          type: 'event_msg',
+          payload: {
+            type: 'token_count',
+            info: { total_token_usage: { input_tokens: 40, cached_input_tokens: 0, output_tokens: 4, reasoning_output_tokens: 0 } },
+          },
+        },
+      ]
+        .map((l) => JSON.stringify(l))
+        .join('\n') + '\n';
+    const liveDir = join(home, '.codex', 'sessions', '2026', '09', '05');
+    const archivedDir = join(home, '.codex', 'archived_sessions');
+    mkdirSync(liveDir, { recursive: true });
+    mkdirSync(archivedDir, { recursive: true });
+    writeFileSync(join(liveDir, 'rollout-2026-09-05T08-00-00-live-1.jsonl'), rollout('live-1'), 'utf8');
+    writeFileSync(join(archivedDir, 'rollout-2026-09-05T08-00-00-archived-1.jsonl'), rollout('archived-1'), 'utf8');
+    const idx = m.getIndexer('refresh-scan-order');
+    const snap = await idx.waitUntilFresh();
+    const shared = snap.records.filter((r) => r.source === 'codex' && r.requestId.startsWith('t-shared'));
+    assert.equal(shared.length, 1, 'a conversation present in both copies is counted once');
+    assert.equal(shared[0].sessionId, 'live-1', 'and stays on the copy in sessions/, not the archived one');
+    idx.dispose();
+    console.log('✓ duplicated Codex history stays on the live session copy');
+  }
+
   console.log('\nAll indexer-refresh assertions passed.');
 } finally {
   rmSync(dir, { recursive: true, force: true });

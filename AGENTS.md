@@ -193,8 +193,14 @@ on 3737 by default.
      like the rest of the CLI. A worker result must equal
      `provider.parseFile` exactly (`scripts/test-parse-pool.mjs`); a missing
      or crashing worker falls back to in-thread parsing. Snapshots merge
-     files in path order, so the result never depends on which worker
-     finished first.
+     files in scan order (data dirs in `getDirs()` order, then the order
+     each dir lists its files), so the result never depends on which worker
+     finished first. The order matters: dedup keeps the first of two equal
+     records, and a Codex conversation can exist twice — in `sessions/` and,
+     under another session id, in `archived_sessions/` — so scan order is
+     what keeps the shared history on the live copy. Sorting by full path
+     would put `archived_sessions/` first and split such a conversation in
+     two on the sessions page.
    - **A cold index shows the recent window first.** Files with no usable
      cache entry are split by mtime at `recentCutoffMs()` (the earlier of
      30 days ago and the start of this month, minus one day). Newer files are

@@ -146,6 +146,7 @@ class FileIndexer {
 
   private readonly cacheName: string;
   private files = new Map<string, FileEntry>();
+  private scanOrder = new Map<string, number>();
   private snapshot: SnapshotExtended | null = null;
   private watchers = new Map<string, FSWatcher>();
   private pollTimer: NodeJS.Timeout | null = null;
@@ -381,6 +382,7 @@ class FileIndexer {
     }
 
     const seenPaths = new Set<string>(fileTasks.map((t) => t.file));
+    this.recordScanOrder(fileTasks);
     const outdated: SizedTask[] = [];
     const toParse: SizedTask[] = [];
     let reused = 0;
@@ -456,6 +458,15 @@ class FileIndexer {
     return { outdated, backfill, parsed: now.length, reused };
   }
 
+  private recordScanOrder(tasks: ScanTask[]): void {
+    this.scanOrder = new Map(tasks.map((t, i) => [t.file, i]));
+  }
+
+  private filesInScanOrder(): string[] {
+    const rank = (p: string) => this.scanOrder.get(p) ?? Number.MAX_SAFE_INTEGER;
+    return Array.from(this.files.keys()).sort((a, b) => rank(a) - rank(b) || (a < b ? -1 : a > b ? 1 : 0));
+  }
+
   private syncWatchersToDirs(): void {
 
     for (const [dir, watcher] of this.watchers) {
@@ -515,6 +526,7 @@ class FileIndexer {
         for (const f of files) fileTasks.push({ file: f, provider });
       }
       const seenPaths = new Set<string>(fileTasks.map((t) => t.file));
+      this.recordScanOrder(fileTasks);
       await forEachLimited(
         fileTasks,
         SCAN_CONCURRENCY,
@@ -648,7 +660,7 @@ class FileIndexer {
       bySource[provider.id].scannedDirs.push(dir);
     }
 
-    for (const filePath of Array.from(this.files.keys()).sort()) {
+    for (const filePath of this.filesInScanOrder()) {
       const entry = this.files.get(filePath)!;
       // Appended one by one rather than with `push(...arr)`: the spread passes
       // every record as a separate argument, so a single long transcript is
