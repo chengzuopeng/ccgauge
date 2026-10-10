@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useT, useI18n } from '@/lib/i18n/context';
 import { tFn } from '@/lib/i18n/dict';
@@ -78,6 +78,32 @@ function cacheSet(url: string, payload: TurnsPayload): void {
   }
 }
 
+let shownTurnCount: number | null = null;
+const turnCountListeners = new Set<() => void>();
+
+function publishTurnCount(next: number | null): void {
+  if (shownTurnCount === next) return;
+  shownTurnCount = next;
+  for (const listener of turnCountListeners) listener();
+}
+
+function subscribeTurnCount(listener: () => void): () => void {
+  turnCountListeners.add(listener);
+  return () => {
+    turnCountListeners.delete(listener);
+  };
+}
+
+export function UsageSubtitle() {
+  const t = useT();
+  const count = useSyncExternalStore(
+    subscribeTurnCount,
+    () => shownTurnCount,
+    () => null,
+  );
+  return <>{t('usage.subtitle', { count: count === null ? '—' : count.toLocaleString() })}</>;
+}
+
 interface InitialBundle {
   payload: TurnsPayload;
   url: string;
@@ -151,6 +177,12 @@ export function UsageDataIsland({ initial, costFootnote }: Props) {
     window.addEventListener('ccgauge:refresh', onRefresh);
     return () => window.removeEventListener('ccgauge:refresh', onRefresh);
   }, [url]);
+
+  const turnCount = data ? data.totalCount : null;
+  useEffect(() => {
+    publishTurnCount(turnCount);
+    return () => publishTurnCount(null);
+  }, [turnCount]);
 
   if (!data) {
     if (error) {

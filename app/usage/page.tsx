@@ -12,7 +12,7 @@ import { AutoRefresh } from '@/components/auto-refresh';
 import { OverviewToggle } from '@/components/overview-toggle';
 import { getAllModels, getAllProjects } from '@/lib/data-loader/derived';
 import { Suspense } from 'react';
-import { UsageDataIsland, IslandSkeleton } from '@/components/usage-data-island';
+import { UsageDataIsland, IslandSkeleton, UsageSubtitle } from '@/components/usage-data-island';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -73,7 +73,7 @@ export default async function UsagePage({
   return (
     <PageShell
       title={t('usage.title')}
-      desc={t('usage.subtitle', { count: totalRecords.toLocaleString() })}
+      desc={totalRecords === 0 ? t('usage.subtitle', { count: '0' }) : <UsageSubtitle />}
       right={
         <div className="flex items-center gap-3 flex-wrap">
           <OverviewToggle />
