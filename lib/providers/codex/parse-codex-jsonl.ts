@@ -1,8 +1,8 @@
-import { createReadStream, promises as fs } from 'node:fs';
-import readline from 'node:readline';
+import { promises as fs } from 'node:fs';
 import type { AssistantRecord, UserRecord } from '@/lib/types';
 import type { ParsedFile, SpawnedSessionLink } from '../types';
 import { splitModelRoute } from './model-route.js';
+import { forEachLine } from '../../data-loader/read-lines.js';
 
 const TEXT_PREVIEW_MAX = 200;
 
@@ -115,9 +115,6 @@ function extractMessageText(payload: Record<string, unknown>): string {
 }
 
 export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
-  const stream = createReadStream(file, { encoding: 'utf8' });
-  const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
-
   const assistant: AssistantRecord[] = [];
   const user: UserRecord[] = [];
   const parentLinks: Array<[string, string | null]> = [];
@@ -200,15 +197,17 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
     }
   }
 
-  for await (const line of rl) {
-    if (!line.trim()) continue;
+  let forkMirror = false;
+  await forEachLine(file, (buf) => {
+    const line = buf.toString('utf8');
+    if (!line.trim()) return;
     let evt: CodexEvent;
     try {
       evt = JSON.parse(line) as CodexEvent;
     } catch {
-      continue;
+      return;
     }
-    if (!evt || typeof evt !== 'object' || !evt.type) continue;
+    if (!evt || typeof evt !== 'object' || !evt.type) return;
     const payload = (evt.payload ?? {}) as Record<string, unknown>;
     const rawTs = asString(evt.timestamp);
     const ts = rawTs || lastValidTs;
@@ -217,13 +216,12 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
     if (evt.type === 'session_meta') {
       // Replayed history re-emits the SOURCE thread's session_meta mid-file.
       // Rebinding identity there stamps our tail with the parent's session id.
-      if (sessionMetaSeen) continue;
+      if (sessionMetaSeen) return;
       sessionMetaSeen = true;
 
       if (isSubagentForkMirror(payload)) {
-        rl.close();
-        stream.destroy();
-        return { assistant: [], user: [], parentLinks: [] };
+        forkMirror = true;
+        return false;
       }
 
       sessionId = asString(payload.id);
@@ -237,7 +235,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
       const metaTs = asString(payload.timestamp);
       if (metaTs) lastValidTs = metaTs;
       if (!turn.cwd) turn.cwd = defaultCwd;
-      continue;
+      return;
     }
 
     if (evt.type === 'turn_context') {
@@ -253,7 +251,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
       turn.toolNames = [];
       turn.hasThinking = false;
       turn.pendingTextPreview = '';
-      continue;
+      return;
     }
 
     if (evt.type === 'event_msg') {
@@ -264,13 +262,13 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
       // rollout in a 3-month history (5/5, cli_version 0.144.1 and 0.147.0).
       if (sub === 'entered_review_mode') {
         reviewLauncher = true;
-        continue;
+        return;
       }
 
       if (sub === 'user_message') {
         sawFlatUserMessage = true;
         pushUserMessage(extractMessageText(payload), ts);
-        continue;
+        return;
       }
 
       // Codex 0.147's interactive TUI (`originator: codex-tui`) wraps events in
@@ -287,11 +285,11 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
         // Belt and braces: the two shapes have never appeared in one session,
         // but if a transitional build emits both, the flat event wins and this
         // doesn't add a second copy of the same turn.
-        if (sawFlatUserMessage) continue;
+        if (sawFlatUserMessage) return;
         const item = payload.item as Record<string, unknown> | null | undefined;
-        if (!item || asString(item.type) !== 'UserMessage') continue;
+        if (!item || asString(item.type) !== 'UserMessage') return;
         pushUserMessage(extractMessageText(item), ts);
-        continue;
+        return;
       }
 
       if (sub === 'agent_message') {
@@ -299,12 +297,12 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
         if (text && !turn.pendingTextPreview) {
           turn.pendingTextPreview = text.slice(0, TEXT_PREVIEW_MAX);
         }
-        continue;
+        return;
       }
 
       if (sub === 'agent_reasoning') {
         turn.hasThinking = true;
-        continue;
+        return;
       }
 
       // Fallback only: rescues records that precede any `turn_context` (replayed
@@ -313,16 +311,16 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
       // real rollouts disagrees with the active turn 116 times out of 477,
       // which would bill e.g. a gpt-5.6-terra turn at gpt-5.6-sol's 2x rate.
       if (sub === 'thread_settings_applied') {
-        if (turn.modelFromTurnContext) continue;
+        if (turn.modelFromTurnContext) return;
         const settings = payload.thread_settings as Record<string, unknown> | null | undefined;
         const m = settings ? asString(settings.model) : '';
         if (m) turn.model = m;
-        continue;
+        return;
       }
 
       if (sub === 'token_count') {
         const info = payload.info as Record<string, unknown> | null | undefined;
-        if (!info) continue;
+        if (!info) return;
         const total = info.total_token_usage as Record<string, unknown> | undefined;
         const last = info.last_token_usage as Record<string, unknown> | undefined;
 
@@ -360,7 +358,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
             deltaOutput === 0 &&
             deltaReasoning === 0
           ) {
-            continue;
+            return;
           }
 
           if (prevTotal === null) {
@@ -384,7 +382,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
             deltaOutput === 0 &&
             deltaReasoning === 0
           ) {
-            continue;
+            return;
           }
           if (prevTotal === null) {
             prevTotal = {
@@ -402,7 +400,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
             };
           }
         } else {
-          continue;
+          return;
         }
 
         const uuid = `${sessionId}::a${assistantIdx++}`;
@@ -453,9 +451,9 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
         turn.toolNames = [];
         turn.hasThinking = false;
         turn.pendingTextPreview = '';
-        continue;
+        return;
       }
-      continue;
+      return;
     }
 
     if (evt.type === 'response_item') {
@@ -464,12 +462,12 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
       if (sub === 'function_call' || sub === 'custom_tool_call') {
         const name = asString(payload.name);
         if (name) turn.toolNames.push(name);
-        continue;
+        return;
       }
 
       if (sub === 'reasoning') {
         turn.hasThinking = true;
-        continue;
+        return;
       }
 
       if (sub === 'message') {
@@ -480,7 +478,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
             turn.pendingTextPreview = text.slice(0, TEXT_PREVIEW_MAX);
           }
         }
-        continue;
+        return;
       }
 
       // Scanned on the raw line rather than the parsed payload: the banner sits
@@ -488,11 +486,12 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
       // tool result to reach it costs far more than one substring check.
       if (sub === 'function_call_output' || sub === 'custom_tool_call_output') {
         if (line.includes(SPAWN_BANNER_NEEDLE)) recordSpawnBanner(line);
-        continue;
+        return;
       }
-      continue;
+      return;
     }
-  }
+  });
 
+  if (forkMirror) return { assistant: [], user: [], parentLinks: [] };
   return { assistant, user, parentLinks, spawnedSessions };
 }

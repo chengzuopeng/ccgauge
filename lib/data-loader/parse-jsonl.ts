@@ -1,6 +1,5 @@
-import { createReadStream } from 'node:fs';
-import readline from 'node:readline';
 import type { AssistantRecord, RawRecord, ToolUseRef, UserRecord } from '../types';
+import { forEachLine } from './read-lines.js';
 
 const TEXT_PREVIEW_MAX = 200;
 
@@ -79,21 +78,20 @@ export async function parseJsonlFile(file: string): Promise<{
   user: UserRecord[];
   parentLinks: Array<[string, string | null]>;
 }> {
-  const stream = createReadStream(file, { encoding: 'utf8' });
-  const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });
   const assistant: AssistantRecord[] = [];
   const user: UserRecord[] = [];
   const parentLinks: Array<[string, string | null]> = [];
 
-  for await (const line of rl) {
-    if (!line.trim()) continue;
+  await forEachLine(file, (buf) => {
+    const line = buf.toString('utf8');
+    if (!line.trim()) return;
     let raw: RawRecord;
     try {
       raw = JSON.parse(line) as RawRecord;
     } catch {
-      continue;
+      return;
     }
-    if (!raw || typeof raw !== 'object') continue;
+    if (!raw || typeof raw !== 'object') return;
 
     if (raw.uuid) parentLinks.push([raw.uuid, raw.parentUuid ?? null]);
 
@@ -104,7 +102,7 @@ export async function parseJsonlFile(file: string): Promise<{
       const u = parseUser(raw, file);
       if (u) user.push(u);
     }
-  }
+  });
 
   return { assistant, user, parentLinks };
 }
