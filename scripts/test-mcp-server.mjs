@@ -53,6 +53,7 @@ child.on('exit', (code) => {
     process.exit(1);
   }
 });
+const exited = new Promise((resolve) => child.once('exit', resolve));
 
 function rpc(method, params) {
   const id = nextId++;
@@ -71,10 +72,20 @@ function rpc(method, params) {
   });
 }
 
+const STDIN_CLOSE_EXIT_MS = 5_000;
+
+async function closeStdinAndWait() {
+  const started = Date.now();
+  child.stdin.end();
+  const outcome = await Promise.race([
+    exited.then(() => 'exited'),
+    new Promise((resolve) => setTimeout(() => resolve('timeout'), STDIN_CLOSE_EXIT_MS)),
+  ]);
+  return { outcome, ms: Date.now() - started };
+}
+
 function shutdown(code = 0) {
-  try {
-    child.stdin.end();
-  } catch {  }
+  if (child.exitCode === null && child.signalCode === null) child.kill();
   setTimeout(() => process.exit(code), 250);
 }
 
@@ -288,6 +299,15 @@ try {
     'invalid daily_summary date "2026-02-31"',
   );
   console.log('strict validation OK · invalid range/from/date all rejected');
+
+  const close = await closeStdinAndWait();
+  assert.equal(
+    close.outcome,
+    'exited',
+    `server should exit within ${STDIN_CLOSE_EXIT_MS}ms of its stdin closing`,
+  );
+  assert.equal(child.exitCode, 0, 'server should exit cleanly when its stdin closes');
+  console.log(`stdin close OK · server exited ${close.ms}ms after stdin closed`);
 
   console.log('\nAll MCP smoke assertions passed.');
   shutdown(0);

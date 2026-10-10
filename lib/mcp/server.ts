@@ -3,10 +3,12 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { registerUsageTools } from './tools/usage';
 import { registerActivityTools } from './tools/activity';
 import { registerProvidersResource } from './resources/providers';
-import { getMcpIndexerReady } from './context';
+import { getMcpIndexerReady, MCP_INDEX_NAME } from './context';
+import { getIndexer } from '@/lib/data-loader/indexer';
 import { ensurePricingLoaded } from '@/lib/pricing/store';
 
 const SERVER_NAME = 'ccgauge';
+const SHUTDOWN_FLUSH_MS = 3_000;
 
 declare const __SERVER_VERSION__: string;
 const SERVER_VERSION =
@@ -52,14 +54,23 @@ export async function runStdioServer(): Promise<void> {
   const server = createServer();
   const transport = new StdioServerTransport();
 
-  const shutdown = () => {
-    log('shutting down');
+  let closing = false;
+  const shutdown = (reason: string) => {
+    if (closing) return;
+    closing = true;
+    log(`shutting down (${reason})`);
     transport.close().catch(() => {});
-    process.exit(0);
+    const deadline = new Promise<void>((resolve) => setTimeout(resolve, SHUTDOWN_FLUSH_MS));
+    void Promise.race([getIndexer(MCP_INDEX_NAME).flushPersist(), deadline]).finally(() =>
+      process.exit(0),
+    );
   };
-  process.on('SIGINT', shutdown);
-  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
 
   await server.connect(transport);
+  server.server.onclose = () => shutdown('transport closed');
+  process.stdin.once('end', () => shutdown('stdin ended'));
+  process.stdin.once('close', () => shutdown('stdin closed'));
   log(`v${SERVER_VERSION} listening on stdio`);
 }

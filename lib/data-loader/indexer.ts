@@ -798,42 +798,55 @@ class FileIndexer {
     if (this.persistTimer) clearTimeout(this.persistTimer);
     this.persistTimer = setTimeout(() => {
       this.persistTimer = null;
-      const full = this.fullPersist;
-      const dirty = this.dirtyPaths;
-      this.fullPersist = false;
-      this.dirtyPaths = new Set();
-      if (!full && dirty.size === 0) return;
-      const entries: PersistedFileEntry[] = [];
-      for (const [filePath, entry] of this.files) {
-        entries.push({
-          filePath,
-          source: entry.source,
-          parserVersion: entry.parserVersion,
-          mtimeMs: entry.mtimeMs,
-          size: entry.size,
-          assistantRecords: entry.assistantRecords,
-          userRecords: entry.userRecords,
-          parentLinks: entry.parentLinks,
-          spawnedSessions: entry.spawnedSessions,
-          parsedBytes: entry.parsedBytes,
-          tailHash: entry.tailHash,
-        });
-      }
-      this.persistChain = this.persistChain
-        .then(() =>
-          savePersistedIndex(
-            { savedAt: new Date().toISOString(), files: entries },
-            this.cacheName,
-            full ? {} : { dirtyPaths: dirty },
-          ),
-        )
-        .catch((err) => {
-          this.recordError(`persist: ${(err as Error).message}`);
-          if (full) this.fullPersist = true;
-          for (const p of dirty) this.dirtyPaths.add(p);
-        });
+      this.writePersist();
     }, PERSIST_DEBOUNCE_MS);
     this.persistTimer.unref?.();
+  }
+
+  async flushPersist(): Promise<void> {
+    if (this.persistTimer) {
+      clearTimeout(this.persistTimer);
+      this.persistTimer = null;
+      this.writePersist();
+    }
+    await this.persistChain;
+  }
+
+  private writePersist(): void {
+    const full = this.fullPersist;
+    const dirty = this.dirtyPaths;
+    this.fullPersist = false;
+    this.dirtyPaths = new Set();
+    if (!full && dirty.size === 0) return;
+    const entries: PersistedFileEntry[] = [];
+    for (const [filePath, entry] of this.files) {
+      entries.push({
+        filePath,
+        source: entry.source,
+        parserVersion: entry.parserVersion,
+        mtimeMs: entry.mtimeMs,
+        size: entry.size,
+        assistantRecords: entry.assistantRecords,
+        userRecords: entry.userRecords,
+        parentLinks: entry.parentLinks,
+        spawnedSessions: entry.spawnedSessions,
+        parsedBytes: entry.parsedBytes,
+        tailHash: entry.tailHash,
+      });
+    }
+    this.persistChain = this.persistChain
+      .then(() =>
+        savePersistedIndex(
+          { savedAt: new Date().toISOString(), files: entries },
+          this.cacheName,
+          full ? {} : { dirtyPaths: dirty },
+        ),
+      )
+      .catch((err) => {
+        this.recordError(`persist: ${(err as Error).message}`);
+        if (full) this.fullPersist = true;
+        for (const p of dirty) this.dirtyPaths.add(p);
+      });
   }
 
   private recordError(msg: string): void {
