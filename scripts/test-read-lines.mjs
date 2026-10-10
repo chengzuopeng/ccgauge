@@ -35,6 +35,28 @@ try {
 
   assert.deepEqual(await lines('a\nb\nc\n', 2), ['a', 'b'], 'returning false stops reading');
   console.log('✓ forEachLine splits, joins and stops like readline did');
+
+  const offsetsFile = join(dir, 'offsets.jsonl');
+  writeFileSync(offsetsFile, 'ab\r\ncd\nef');
+  const seen = [];
+  await forEachLine(offsetsFile, (buf, end, terminated) => {
+    seen.push([buf.toString('utf8'), end, terminated]);
+  });
+  assert.deepEqual(
+    seen,
+    [
+      ['ab', 4, true],
+      ['cd', 7, true],
+      ['ef', 9, false],
+    ],
+    'each line reports the byte offset after it and whether a newline ended it',
+  );
+  const fromMiddle = [];
+  await forEachLine(offsetsFile, (buf, end) => {
+    fromMiddle.push([buf.toString('utf8'), end]);
+  }, { start: 4 });
+  assert.deepEqual(fromMiddle, [['cd', 7], ['ef', 9]], 'reading can start at a byte offset, keeping absolute offsets');
+  console.log('✓ forEachLine reports absolute line-end offsets and can start mid-file');
   console.log('\nAll read-lines assertions passed.');
 } finally {
   rmSync(dir, { recursive: true, force: true });

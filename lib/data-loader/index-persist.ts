@@ -24,6 +24,8 @@ export interface PersistedFileEntry {
   // Optional: absent in caches written before this field existed. Those are
   // discarded anyway on the `parserVersion` bump that introduced it.
   spawnedSessions?: SpawnedSessionLink[];
+  parsedBytes?: number;
+  tailHash?: string;
 }
 
 export interface PersistedIndex {

@@ -40,6 +40,8 @@ export interface ParsedFile {
   user: UserRecord[];
   parentLinks: Array<[string, string | null]>;
   spawnedSessions?: SpawnedSessionLink[];
+  parsedBytes?: number;
+  tailHash?: string;
 }
 
 export interface ProviderAdapter {
@@ -56,6 +58,8 @@ export interface ProviderAdapter {
   getDirs(): string[];
   shouldSkipDir(name: string): boolean;
   parseFile(file: string): Promise<ParsedFile>;
+  parseAppended?(file: string, fromByte: number): Promise<ParsedFile>;
+  tailHash?(file: string, endByte: number): Promise<string>;
 
   resolvePricing(model: string): PricingResolution;
   shortenModel(model: string): string;

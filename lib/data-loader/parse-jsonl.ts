@@ -1,5 +1,21 @@
+import { promises as fs } from 'node:fs';
+import { createHash } from 'node:crypto';
 import type { AssistantRecord, RawRecord, ToolUseRef, UserRecord } from '../types';
 import { forEachLine } from './read-lines.js';
+
+const TAIL_HASH_BYTES = 256;
+
+export async function readTailHash(file: string, endByte: number): Promise<string> {
+  const start = Math.max(0, endByte - TAIL_HASH_BYTES);
+  const buf = Buffer.alloc(endByte - start);
+  const fh = await fs.open(file, 'r');
+  try {
+    const { bytesRead } = await fh.read(buf, 0, buf.length, start);
+    return createHash('sha1').update(buf.subarray(0, bytesRead)).digest('hex').slice(0, 16);
+  } finally {
+    await fh.close();
+  }
+}
 
 const TEXT_PREVIEW_MAX = 200;
 
@@ -118,38 +134,54 @@ function skillNameFromText(text: string): string | null {
   return base || null;
 }
 
-export async function parseJsonlFile(file: string): Promise<{
+export async function parseJsonlFile(
+  file: string,
+  opts: { fromByte?: number } = {},
+): Promise<{
   assistant: AssistantRecord[];
   user: UserRecord[];
   parentLinks: Array<[string, string | null]>;
+  parsedBytes: number;
+  tailHash: string;
 }> {
   const assistant: AssistantRecord[] = [];
   const user: UserRecord[] = [];
   const parentLinks: Array<[string, string | null]> = [];
+  const fromByte = opts.fromByte ?? 0;
+  let parsedBytes = fromByte;
 
-  await forEachLine(file, (buf) => {
-    const line = buf.toString('utf8');
-    if (!line.trim()) return;
-    let raw: RawRecord;
-    try {
-      raw = JSON.parse(line) as RawRecord;
-    } catch {
-      return;
-    }
-    if (!raw || typeof raw !== 'object') return;
+  await forEachLine(
+    file,
+    (buf, end, terminated) => {
+      const line = buf.toString('utf8');
+      if (!line.trim()) {
+        if (terminated) parsedBytes = end;
+        return;
+      }
+      let raw: RawRecord;
+      try {
+        raw = JSON.parse(line) as RawRecord;
+      } catch {
+        if (terminated) parsedBytes = end;
+        return;
+      }
+      parsedBytes = end;
+      if (!raw || typeof raw !== 'object') return;
 
-    if (raw.uuid) parentLinks.push([raw.uuid, raw.parentUuid ?? null]);
+      if (raw.uuid) parentLinks.push([raw.uuid, raw.parentUuid ?? null]);
 
-    if (raw.type === 'assistant') {
-      const a = parseAssistant(raw, file);
-      if (a) assistant.push(a);
-    } else if (raw.type === 'user') {
-      const u = parseUser(raw, file);
-      if (u) user.push(u);
-    }
-  });
+      if (raw.type === 'assistant') {
+        const a = parseAssistant(raw, file);
+        if (a) assistant.push(a);
+      } else if (raw.type === 'user') {
+        const u = parseUser(raw, file);
+        if (u) user.push(u);
+      }
+    },
+    { start: fromByte },
+  );
 
-  return { assistant, user, parentLinks };
+  return { assistant, user, parentLinks, parsedBytes, tailHash: await readTailHash(file, parsedBytes) };
 }
 
 function parseAssistant(raw: RawRecord, file: string): AssistantRecord | null {

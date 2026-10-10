@@ -1,6 +1,6 @@
 import path from 'node:path';
 import os from 'node:os';
-import { parseJsonlFile } from '@/lib/data-loader/parse-jsonl';
+import { parseJsonlFile, readTailHash } from '@/lib/data-loader/parse-jsonl';
 import { BUILTIN_PRICING, FALLBACK_BY_FAMILY } from '@/lib/pricing/builtin';
 import { costFromUsage } from '@/lib/pricing/cost-from-usage';
 import { shortenClaudeModel } from './shorten-model';
@@ -97,6 +97,8 @@ export const claudeAdapter: ProviderAdapter = {
     const parsed = await parseJsonlFile(file);
     return parsed;
   },
+  parseAppended: (file, fromByte) => parseJsonlFile(file, { fromByte }),
+  tailHash: readTailHash,
   resolvePricing,
   shortenModel: shortenClaudeModel,
   costFromUsage,

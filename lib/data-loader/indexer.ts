@@ -31,6 +31,8 @@ interface FileEntry {
   userRecords: UserRecord[];
   parentLinks: Array<[string, string | null]>;
   spawnedSessions: SpawnedSessionLink[];
+  parsedBytes?: number;
+  tailHash?: string;
 }
 
 interface SnapshotExtended extends ScanResult {
@@ -45,6 +47,7 @@ interface ScanTask {
 interface SizedTask extends ScanTask {
   mtimeMs: number;
   size: number;
+  previous?: Omit<FileEntry, 'spawnedSessions'> & { spawnedSessions?: SpawnedSessionLink[] };
 }
 
 export interface IndexerProgress {
@@ -275,21 +278,59 @@ class FileIndexer {
     };
   }
 
+  private async readEntry(task: SizedTask): Promise<FileEntry> {
+    const { file, provider, mtimeMs, size, previous } = task;
+    if (
+      previous &&
+      previous.source === provider.id &&
+      previous.parserVersion === provider.parserVersion &&
+      previous.parsedBytes !== undefined &&
+      previous.tailHash !== undefined &&
+      size >= previous.parsedBytes &&
+      provider.parseAppended &&
+      provider.tailHash
+    ) {
+      const appendOnly = await provider
+        .tailHash(file, previous.parsedBytes)
+        .then((hash) => hash === previous.tailHash)
+        .catch(() => false);
+      if (appendOnly) {
+        const tail = await provider.parseAppended(file, previous.parsedBytes);
+        return {
+          source: provider.id,
+          parserVersion: provider.parserVersion,
+          mtimeMs,
+          size,
+          assistantRecords: dedupAssistantRecords([...previous.assistantRecords, ...tail.assistant]),
+          userRecords: [...previous.userRecords, ...tail.user],
+          parentLinks: [...previous.parentLinks, ...tail.parentLinks],
+          spawnedSessions: [...(previous.spawnedSessions ?? []), ...(tail.spawnedSessions ?? [])],
+          parsedBytes: tail.parsedBytes,
+          tailHash: tail.tailHash,
+        };
+      }
+    }
+    const parsed = await parseTranscript(provider, file);
+    return {
+      source: provider.id,
+      parserVersion: provider.parserVersion,
+      mtimeMs,
+      size,
+      assistantRecords: dedupAssistantRecords(parsed.assistant),
+      userRecords: parsed.user,
+      parentLinks: parsed.parentLinks,
+      spawnedSessions: parsed.spawnedSessions ?? [],
+      parsedBytes: parsed.parsedBytes,
+      tailHash: parsed.tailHash,
+    };
+  }
+
   private async parseInto(task: SizedTask, label: string): Promise<void> {
-    const { file, provider, mtimeMs, size } = task;
+    const { file, size } = task;
     try {
-      const parsed = await parseTranscript(provider, file);
+      const entry = await this.readEntry(task);
       this.dirtyPaths.add(file);
-      this.files.set(file, {
-        source: provider.id,
-        parserVersion: provider.parserVersion,
-        mtimeMs,
-        size,
-        assistantRecords: dedupAssistantRecords(parsed.assistant),
-        userRecords: parsed.user,
-        parentLinks: parsed.parentLinks,
-        spawnedSessions: parsed.spawnedSessions ?? [],
-      });
+      this.files.set(file, entry);
     } catch (err) {
       this.recordError(`${label} ${file}: ${(err as Error).message}`);
     } finally {
@@ -367,6 +408,8 @@ class FileIndexer {
               userRecords: persistedEntry.userRecords,
               parentLinks: persistedEntry.parentLinks,
               spawnedSessions: persistedEntry.spawnedSessions ?? [],
+              parsedBytes: persistedEntry.parsedBytes,
+              tailHash: persistedEntry.tailHash,
             });
             reused += 1;
             if (persistedEntry.parserVersion !== provider.parserVersion) {
@@ -374,7 +417,13 @@ class FileIndexer {
             }
             return;
           }
-          toParse.push({ file, provider, mtimeMs: stat.mtimeMs, size: stat.size });
+          toParse.push({
+            file,
+            provider,
+            mtimeMs: stat.mtimeMs,
+            size: stat.size,
+            previous: persistedEntry?.source === provider.id ? persistedEntry : undefined,
+          });
         } catch (err) {
           this.recordError(`stat ${file}: ${(err as Error).message}`);
         }
@@ -476,18 +525,15 @@ class FileIndexer {
             if (existing && existing.mtimeMs === stat.mtimeMs && existing.size === stat.size) {
               return;
             }
-            const parsed = await parseTranscript(provider, file);
-            this.dirtyPaths.add(file);
-            this.files.set(file, {
-              source: provider.id,
-              parserVersion: provider.parserVersion,
+            const entry = await this.readEntry({
+              file,
+              provider,
               mtimeMs: stat.mtimeMs,
               size: stat.size,
-              assistantRecords: dedupAssistantRecords(parsed.assistant),
-              userRecords: parsed.user,
-              parentLinks: parsed.parentLinks,
-              spawnedSessions: parsed.spawnedSessions ?? [],
+              previous: existing,
             });
+            this.dirtyPaths.add(file);
+            this.files.set(file, entry);
             changed = true;
           } catch (err) {
             this.recordError(`poll-parse ${file}: ${(err as Error).message}`);
@@ -546,18 +592,15 @@ class FileIndexer {
         return;
       }
       try {
-        const parsed = await parseTranscript(provider, filePath);
-        this.dirtyPaths.add(filePath);
-        this.files.set(filePath, {
-          source: provider.id,
-          parserVersion: provider.parserVersion,
+        const entry = await this.readEntry({
+          file: filePath,
+          provider,
           mtimeMs: stat.mtimeMs,
           size: stat.size,
-          assistantRecords: dedupAssistantRecords(parsed.assistant),
-          userRecords: parsed.user,
-          parentLinks: parsed.parentLinks,
-          spawnedSessions: parsed.spawnedSessions ?? [],
+          previous: existing,
         });
+        this.dirtyPaths.add(filePath);
+        this.files.set(filePath, entry);
         this.lastWorkStart = workStart;
         this.scheduleSnapshotRebuild();
         this.schedulePersist();
@@ -760,6 +803,8 @@ class FileIndexer {
           userRecords: entry.userRecords,
           parentLinks: entry.parentLinks,
           spawnedSessions: entry.spawnedSessions,
+          parsedBytes: entry.parsedBytes,
+          tailHash: entry.tailHash,
         });
       }
       this.persistChain = this.persistChain

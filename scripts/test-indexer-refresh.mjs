@@ -355,6 +355,63 @@ try {
     console.log('✓ streamed chunks are merged per file before they are cached');
   }
 
+  {
+    const appendDir = join(home, '.claude', 'projects', 'append');
+    mkdirSync(appendDir, { recursive: true });
+    const growing = join(appendDir, 'growing.jsonl');
+    const rewritten = join(appendDir, 'rewritten.jsonl');
+    writeFileSync(growing, claudeTranscript('s-grow', 'claude-sonnet-4-6'), 'utf8');
+    writeFileSync(rewritten, claudeTranscript('s-rewrite', 'claude-sonnet-4-6'), 'utf8');
+
+    const name = 'refresh-append';
+    const first = m.getIndexer(name);
+    await first.waitUntilFresh();
+    await delay(2500);
+    first.dispose();
+    const cached = await m.loadPersistedIndex(name);
+    const marked = cached.files.map((f) => ({
+      ...f,
+      assistantRecords: f.assistantRecords.map((r) => ({ ...r, model: 'cached-model' })),
+    }));
+    await m.savePersistedIndex({ savedAt: new Date().toISOString(), files: marked }, name);
+
+    const extra = JSON.stringify({
+      type: 'assistant',
+      uuid: 's-grow-a2',
+      parentUuid: 's-grow-a1',
+      timestamp: '2026-09-01T10:00:05.000Z',
+      sessionId: 's-grow',
+      cwd: '/tmp/proj',
+      requestId: 's-grow-req2',
+      message: {
+        id: 's-grow-msg2',
+        role: 'assistant',
+        model: 'claude-opus-4-8',
+        content: [{ type: 'text', text: 'more' }],
+        usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+      },
+    });
+    writeFileSync(growing, claudeTranscript('s-grow', 'claude-sonnet-4-6') + extra + '\n', 'utf8');
+    writeFileSync(rewritten, claudeTranscript('s-rewrite', 'claude-haiku-4-5') + extra.replaceAll('s-grow', 's-rewrite') + '\n', 'utf8');
+
+    const second = m.getIndexer(`${name}-2`);
+    await m.savePersistedIndex({ savedAt: new Date().toISOString(), files: marked }, `${name}-2`);
+    const snap = await second.waitUntilFresh();
+    const models = (sid) => snap.records.filter((r) => r.sessionId === sid).map((r) => r.model).sort();
+    assert.deepEqual(
+      models('s-grow'),
+      ['cached-model', 'claude-opus-4-8'],
+      'an appended transcript keeps its cached records and parses only the new lines',
+    );
+    assert.deepEqual(
+      models('s-rewrite'),
+      ['claude-haiku-4-5', 'claude-opus-4-8'],
+      'a transcript whose earlier bytes changed is parsed again in full',
+    );
+    second.dispose();
+    console.log('✓ appended transcripts are parsed from where the cache left off');
+  }
+
   console.log('\nAll indexer-refresh assertions passed.');
 } finally {
   rmSync(dir, { recursive: true, force: true });

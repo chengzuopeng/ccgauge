@@ -158,6 +158,15 @@ on 3737 by default.
      restored on load), and each file's streamed chunks are already merged.
      With no shards on disk the previous single-file `index-v2.json` is read
      once and migrated, so upgrading needs no reparse.
+   - **Growing Claude transcripts are parsed from where the cache stopped.**
+     Each entry keeps `parsedBytes` (the end of the last line consumed) and
+     `tailHash` (a hash of the 256 bytes before it). When a transcript grew
+     and those bytes still hash the same, only the appended lines are parsed
+     (`parseAppended`) and merged; otherwise it is parsed in full. This
+     relies on the Claude parser being per-line stateless — a change that
+     makes one line's output depend on another must drop `parseAppended`
+     from the adapter. Codex rollouts carry turn state across lines and are
+     always parsed in full.
    - **An outdated `parserVersion` is served first, then replaced.** On
      startup, a cached file whose mtime and size still match but whose
      `parserVersion` is behind keeps its old records in the first snapshot;
