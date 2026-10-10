@@ -5,6 +5,31 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.8] — 2026-10-10
+
+### Fixed
+
+- **The MCP server kept running after its client went away.** It only
+  stopped on SIGINT/SIGTERM, so every ended Claude Code session could leave
+  a `ccgauge mcp` process behind, contending for the cache. It now exits as
+  soon as its stdin closes, after saving any index changes still waiting to
+  be written, so a short session no longer throws away a freshly built
+  index.
+- **The usage subtitle showed the wrong number.** "N turns in selected
+  range" counted every record of the source over all time. It now shows
+  the turns matching the current range and filters, the same number as the
+  table's row count.
+- **The header hid its tabs on phones and tablets.** The source, language,
+  theme and GitHub controls never shrank, so on a phone the tabs were
+  squeezed to nothing and the page scrolled sideways. Below 1024px the
+  header now takes two rows with the tabs in a row of their own, and on
+  phones the source buttons show only their logos. The active tab is also
+  underlined again at every width.
+- **The tools page scrolled sideways on narrow phones** because of the top
+  consumer's row. It now fits.
+- **Old bookmarks with a relay model id had a garbled filter label.**
+  `?models=llm-gateway--gpt-6-astra` now reads "GPT-6 astra · llm-gateway".
+
 ## [1.4.7] — 2026-10-10
 
 ### Added
@@ -2018,6 +2043,7 @@ of HTML to the browser.
 - Initial public release as `ccgauge`: local Next.js dashboard for
   Claude Code token usage, cost, and 5-hour block tracking.
 
+[1.4.8]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.7...v1.4.8
 [1.4.7]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.6...v1.4.7
 [1.4.6]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.5...v1.4.6
 [1.4.5]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.4...v1.4.5
