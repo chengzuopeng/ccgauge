@@ -18,6 +18,7 @@ import {
   type PersistedFileEntry,
 } from './index-persist';
 import { linkSidechainParents, detectSubagentKind } from './link-sidechain';
+import { parseTranscript } from './parse-pool';
 import { sanitizeForUser } from '../sanitize';
 
 interface FileEntry {
@@ -271,7 +272,7 @@ class FileIndexer {
   private async parseInto(task: SizedTask, label: string): Promise<void> {
     const { file, provider, mtimeMs, size } = task;
     try {
-      const parsed = await provider.parseFile(file);
+      const parsed = await parseTranscript(provider, file);
       this.files.set(file, {
         source: provider.id,
         parserVersion: provider.parserVersion,
@@ -463,7 +464,7 @@ class FileIndexer {
             if (existing && existing.mtimeMs === stat.mtimeMs && existing.size === stat.size) {
               return;
             }
-            const parsed = await provider.parseFile(file);
+            const parsed = await parseTranscript(provider, file);
             this.files.set(file, {
               source: provider.id,
               parserVersion: provider.parserVersion,
@@ -530,7 +531,7 @@ class FileIndexer {
         return;
       }
       try {
-        const parsed = await provider.parseFile(filePath);
+        const parsed = await parseTranscript(provider, filePath);
         this.files.set(filePath, {
           source: provider.id,
           parserVersion: provider.parserVersion,
@@ -588,7 +589,8 @@ class FileIndexer {
       bySource[provider.id].scannedDirs.push(dir);
     }
 
-    for (const entry of this.files.values()) {
+    for (const filePath of Array.from(this.files.keys()).sort()) {
+      const entry = this.files.get(filePath)!;
       // Appended one by one rather than with `push(...arr)`: the spread passes
       // every record as a separate argument, so a single long transcript is
       // enough to blow the argument limit and throw "Maximum call stack size

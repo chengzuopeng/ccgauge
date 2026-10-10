@@ -164,6 +164,19 @@ on 3737 by default.
      `lib/data-loader/index-persist.ts` (which drops the cache) rather than
      only `parserVersion`. Files that changed on disk are still reparsed
      before the first snapshot.
+   - **Transcripts are parsed on worker threads when `CCGAUGE_PARSE_WORKER`
+     names the bundled worker.** `bin/cli.mjs` points it at
+     `dist/workers/parse-worker.mjs` (built by `pnpm build` /
+     `pnpm build:workers`), so the dashboard, the MCP server and the report
+     all parse in parallel (`CCGAUGE_PARSE_WORKERS` sets the count, `0`
+     turns it off). `pnpm dev` and the test scripts leave it unset and parse
+     on the main thread, so they always run the current parser source — a
+     parser change needs `pnpm build` before `node bin/cli.mjs` reflects it,
+     like the rest of the CLI. A worker result must equal
+     `provider.parseFile` exactly (`scripts/test-parse-pool.mjs`); a missing
+     or crashing worker falls back to in-thread parsing. Snapshots merge
+     files in path order, so the result never depends on which worker
+     finished first.
    - **A cold index shows the recent window first.** Files with no usable
      cache entry are split by mtime at `recentCutoffMs()` (the earlier of
      30 days ago and the start of this month, minus one day). Newer files are

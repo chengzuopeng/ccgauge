@@ -12,6 +12,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const packageRoot = resolve(__dirname, '..');
 const pkg = require(join(packageRoot, 'package.json'));
+const PARSE_WORKER = join(packageRoot, 'dist', 'workers', 'parse-worker.mjs');
+if (!process.env.CCGAUGE_PARSE_WORKER && existsSync(PARSE_WORKER)) {
+  process.env.CCGAUGE_PARSE_WORKER = PARSE_WORKER;
+}
 
 const { Command } = await import('commander');
 async function loadGetPort() {
@@ -539,6 +543,7 @@ async function doctor() {
     'CCGAUGE_STATE_DIR',
     'CCGAUGE_MCP_PRETTY',
     'CCGAUGE_POLL_FALLBACK',
+    'CCGAUGE_PARSE_WORKERS',
     'CLAUDE_CONFIG_DIR',
     'CODEX_HOME',
     'NO_COLOR',
@@ -558,6 +563,7 @@ async function doctor() {
     ['Dashboard',     join(packageRoot, '.next', 'standalone', 'server.js'), 'pnpm build'],
     ['MCP bundle',    join(packageRoot, 'dist', 'mcp', 'server.mjs'),         'pnpm build:mcp'],
     ['Report bundle', join(packageRoot, 'dist', 'report', 'index.mjs'),       'pnpm build:report'],
+    ['Parse worker',  PARSE_WORKER,                                          'pnpm build:workers'],
   ];
   lines.push('artifacts:');
   for (const [label, p, cmd] of artifacts) {

@@ -229,6 +229,7 @@ ccgauge 自动识别标准路径：
 | `CCGAUGE_PRICING_OFFLINE=1` | 同上，更明确的命名 |
 | `CCGAUGE_PRICING_TTL_MS` | 价格缓存有效期（毫秒，默认 24 小时） |
 | `CCGAUGE_POLL_FALLBACK` | `1` 强制开启索引器的轮询兜底，`0` 关闭（默认：除 MCP 外都开） |
+| `CCGAUGE_PARSE_WORKERS` | 解析会话记录用的工作线程数（默认 CPU 核数 − 1，最多 6；设为 `0` 则在主线程解析） |
 | `CCGAUGE_MCP_PRETTY=1` | MCP 的 JSON 输出格式化，调客户端时好读 |
 | `CCGAUGE_DEBUG` | 索引器详细诊断输出到 stderr |
 

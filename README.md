@@ -229,6 +229,7 @@ Override / extend via environment variables:
 | `CCGAUGE_PRICING_OFFLINE=1` | Same as above, scoped name |
 | `CCGAUGE_PRICING_TTL_MS` | Price-cache lifetime in ms (default 24 h) |
 | `CCGAUGE_POLL_FALLBACK` | `1` force the indexer's polling fallback on, `0` off (default: on except for MCP) |
+| `CCGAUGE_PARSE_WORKERS` | Worker threads used to parse transcripts (default: CPU cores − 1, at most 6; `0` parses on the main thread) |
 | `CCGAUGE_MCP_PRETTY=1` | Pretty-print MCP JSON payloads — easier to read while debugging a client |
 | `CCGAUGE_DEBUG` | Verbose indexer diagnostics on stderr |
 
