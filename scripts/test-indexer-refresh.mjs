@@ -185,10 +185,14 @@ try {
 
   {
     const name = 'refresh-current';
+    const savedAt = '2026-01-01T00:00:00.000Z';
     await m.savePersistedIndex(
       {
-        savedAt: new Date().toISOString(),
-        files: [staleEntry(unchanged, 's-unchanged', { parserVersion: current })],
+        savedAt,
+        files: [
+          staleEntry(unchanged, 's-unchanged', { parserVersion: current }),
+          staleEntry(changed, 's-changed', { parserVersion: current }),
+        ],
       },
       name,
     );
@@ -200,8 +204,40 @@ try {
       'stale-model',
       'and is trusted as-is',
     );
+    await delay(2500);
+    assert.equal(
+      (await m.loadPersistedIndex(name)).savedAt,
+      savedAt,
+      'an unchanged cache is not rewritten on startup',
+    );
     idx.dispose();
-    console.log('✓ an up-to-date cache is used without a refresh');
+    console.log('✓ an up-to-date cache is used without a refresh and left as it is on disk');
+  }
+
+  {
+    const name = 'refresh-pruned';
+    const ghost = join(home, '.claude', 'projects', 'proj', 'deleted.jsonl');
+    await m.savePersistedIndex(
+      {
+        savedAt: '2026-01-01T00:00:00.000Z',
+        files: [
+          staleEntry(unchanged, 's-unchanged', { parserVersion: current }),
+          staleEntry(changed, 's-changed', { parserVersion: current }),
+          { ...staleEntry(unchanged, 's-ghost', { parserVersion: current }), filePath: ghost },
+        ],
+      },
+      name,
+    );
+    const idx = m.getIndexer(name);
+    await idx.init();
+    await delay(2500);
+    const persisted = await m.loadPersistedIndex(name);
+    assert.ok(
+      !persisted.files.some((f) => f.filePath === ghost),
+      'a cache entry for a transcript that no longer exists is dropped on disk',
+    );
+    idx.dispose();
+    console.log('✓ the cache is rewritten when a transcript disappeared');
   }
 
   {

@@ -208,8 +208,7 @@ class FileIndexer {
         this.rebuildSnapshotNow();
         this.indexDurationMs = Date.now() - start;
         this.lastIndexedAt = new Date().toISOString();
-        const deferred = result.outdated.length + result.backfill.length;
-        if (result.parsed > 0 || deferred === 0) this.schedulePersist();
+        if (result.parsed > 0 || result.reused < persistedMap.size) this.schedulePersist();
         return result;
       });
       this.syncWatchersToDirs();
@@ -325,7 +324,7 @@ class FileIndexer {
   private async fullScan(
     persistedMap: Map<string, PersistedFileEntry>,
     opts: { deferOlder: boolean },
-  ): Promise<{ outdated: SizedTask[]; backfill: SizedTask[]; parsed: number }> {
+  ): Promise<{ outdated: SizedTask[]; backfill: SizedTask[]; parsed: number; reused: number }> {
     const fileTasks: ScanTask[] = [];
     for (const [dir, provider] of this.dirToProvider) {
       const files = await listJsonlFiles(dir, provider);
@@ -335,6 +334,7 @@ class FileIndexer {
     const seenPaths = new Set<string>(fileTasks.map((t) => t.file));
     const outdated: SizedTask[] = [];
     const toParse: SizedTask[] = [];
+    let reused = 0;
 
     await forEachLimited(
       fileTasks,
@@ -360,6 +360,7 @@ class FileIndexer {
               parentLinks: persistedEntry.parentLinks,
               spawnedSessions: persistedEntry.spawnedSessions ?? [],
             });
+            reused += 1;
             if (persistedEntry.parserVersion !== provider.parserVersion) {
               outdated.push({ file, provider, mtimeMs: stat.mtimeMs, size: stat.size });
             }
@@ -392,7 +393,7 @@ class FileIndexer {
     };
     await forEachLimited(now, SCAN_CONCURRENCY, (task) => this.parseInto(task, 'parse'));
 
-    return { outdated, backfill, parsed: now.length };
+    return { outdated, backfill, parsed: now.length, reused };
   }
 
   private syncWatchersToDirs(): void {
