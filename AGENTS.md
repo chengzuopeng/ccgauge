@@ -149,6 +149,21 @@ on 3737 by default.
    - The MCP server uses a **separate** named cache (`index-mcp-v2.json`) for
      its own indexer, but the module-level default indexer also fires when
      the MCP entry is imported — that's where the contention comes from.
+   - **An outdated `parserVersion` is served first, then replaced.** On
+     startup, a cached file whose mtime and size still match but whose
+     `parserVersion` is behind keeps its old records in the first snapshot;
+     the indexer reparses those files in the background and swaps in one new
+     snapshot when all of them are done (`progress.phase === 'refreshing'`,
+     shown as a banner that refreshes the page on completion). This turns the
+     first open after an upgrade from a 20–35s full reparse into a normal
+     ~2s start. Two consequences: callers that must not see the old records
+     — the CLI report, the CSV export, the MCP server — use
+     `getCachedScan({ fresh: true })` / `waitUntilFresh()`; and old records
+     must stay readable by the new code for those seconds. A change to the
+     record SHAPE that new code can't read has to bump `SCHEMA_VERSION` in
+     `lib/data-loader/index-persist.ts` (which drops the cache) rather than
+     only `parserVersion`. Files that changed on disk are still reparsed
+     before the first snapshot.
 
 2. **Turn grouping walks the JSONL parent chain.**
    `lib/turns.ts` resolves each assistant record to its turn by walking

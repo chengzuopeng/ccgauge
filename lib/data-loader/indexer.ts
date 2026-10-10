@@ -36,6 +36,19 @@ interface SnapshotExtended extends ScanResult {
   bySource: ScanStatsBySource[];
 }
 
+interface ScanTask {
+  file: string;
+  provider: ProviderAdapter;
+}
+
+export interface IndexerProgress {
+  phase: 'idle' | 'refreshing';
+  filesTotal: number;
+  filesDone: number;
+}
+
+const IDLE_PROGRESS: IndexerProgress = { phase: 'idle', filesTotal: 0, filesDone: 0 };
+
 export interface IndexerStatus {
   initialized: boolean;
   isIndexing: boolean;
@@ -48,6 +61,7 @@ export interface IndexerStatus {
   errors: string[];
   pendingReconciles: number;
   loadedFromDisk: boolean;
+  progress: IndexerProgress;
 }
 
 const RECONCILE_DEBOUNCE_MS = 200;
@@ -118,6 +132,9 @@ class FileIndexer {
 
   private rescanPromise: Promise<SnapshotExtended> | null = null;
 
+  private refreshPromise: Promise<void> | null = null;
+  private progress: IndexerProgress = IDLE_PROGRESS;
+
   private mutationTail: Promise<unknown> = Promise.resolve();
 
   constructor(cacheName: string = DEFAULT_INDEX_NAME) {
@@ -155,18 +172,68 @@ class FileIndexer {
         for (const entry of persisted.files) persistedMap.set(entry.filePath, entry);
       }
 
-      await this.runExclusive(async () => {
-        await this.fullScan(persistedMap);
+      const outdated = await this.runExclusive(async () => {
+        const stale = await this.fullScan(persistedMap);
         this.rebuildSnapshotNow();
         this.indexDurationMs = Date.now() - start;
         this.lastIndexedAt = new Date().toISOString();
-        this.schedulePersist();
+        if (stale.length === 0) this.schedulePersist();
+        return stale;
       });
       this.syncWatchersToDirs();
       this.setupPolling();
+      if (outdated.length > 0) this.startRefresh(outdated);
     } finally {
-      this.isIndexing = false;
+      this.isIndexing = this.refreshPromise !== null;
     }
+  }
+
+  private startRefresh(tasks: ScanTask[]): void {
+    this.progress = { phase: 'refreshing', filesTotal: tasks.length, filesDone: 0 };
+    this.isIndexing = true;
+    const run = this.runExclusive(async () => {
+      const start = Date.now();
+      await forEachLimited(tasks, SCAN_CONCURRENCY, async ({ file, provider }) => {
+        try {
+          const existing = this.files.get(file);
+          if (!existing || existing.parserVersion === provider.parserVersion) return;
+          const stat = await fs.stat(file);
+          const parsed = await provider.parseFile(file);
+          this.files.set(file, {
+            source: provider.id,
+            parserVersion: provider.parserVersion,
+            mtimeMs: stat.mtimeMs,
+            size: stat.size,
+            assistantRecords: parsed.assistant,
+            userRecords: parsed.user,
+            parentLinks: parsed.parentLinks,
+            spawnedSessions: parsed.spawnedSessions ?? [],
+          });
+        } catch (err) {
+          this.recordError(`refresh ${file}: ${(err as Error).message}`);
+        } finally {
+          this.progress = { ...this.progress, filesDone: this.progress.filesDone + 1 };
+        }
+      });
+      this.lastWorkStart = start;
+      this.rebuildSnapshotNow();
+      this.indexDurationMs = Date.now() - start;
+      this.lastIndexedAt = new Date().toISOString();
+      this.schedulePersist();
+    });
+    this.refreshPromise = run
+      .catch((err) => this.recordError(`refresh: ${(err as Error).message}`))
+      .finally(() => {
+        this.refreshPromise = null;
+        this.progress = IDLE_PROGRESS;
+        this.isIndexing = false;
+      });
+  }
+
+  async waitUntilFresh(): Promise<SnapshotExtended> {
+    await this.init();
+    while (this.refreshPromise) await this.refreshPromise;
+    return this.getSnapshot();
   }
 
   private async detectProviderDirs(): Promise<{ added: string[]; removed: string[] }> {
@@ -195,14 +262,15 @@ class FileIndexer {
     return { added, removed };
   }
 
-  private async fullScan(persistedMap: Map<string, PersistedFileEntry>): Promise<void> {
-    const fileTasks: Array<{ file: string; provider: ProviderAdapter }> = [];
+  private async fullScan(persistedMap: Map<string, PersistedFileEntry>): Promise<ScanTask[]> {
+    const fileTasks: ScanTask[] = [];
     for (const [dir, provider] of this.dirToProvider) {
       const files = await listJsonlFiles(dir, provider);
       for (const f of files) fileTasks.push({ file: f, provider });
     }
 
     const seenPaths = new Set<string>(fileTasks.map((t) => t.file));
+    const outdated: ScanTask[] = [];
 
     await forEachLimited(
       fileTasks,
@@ -215,13 +283,12 @@ class FileIndexer {
           if (
             persistedEntry &&
             persistedEntry.source === provider.id &&
-            persistedEntry.parserVersion === provider.parserVersion &&
             persistedEntry.mtimeMs === stat.mtimeMs &&
             persistedEntry.size === stat.size
           ) {
             this.files.set(file, {
               source: provider.id,
-              parserVersion: provider.parserVersion,
+              parserVersion: persistedEntry.parserVersion,
               mtimeMs: stat.mtimeMs,
               size: stat.size,
               assistantRecords: persistedEntry.assistantRecords,
@@ -229,6 +296,9 @@ class FileIndexer {
               parentLinks: persistedEntry.parentLinks,
               spawnedSessions: persistedEntry.spawnedSessions ?? [],
             });
+            if (persistedEntry.parserVersion !== provider.parserVersion) {
+              outdated.push({ file, provider });
+            }
             return;
           }
           const parsed = await provider.parseFile(file);
@@ -251,6 +321,7 @@ class FileIndexer {
     for (const tracked of Array.from(this.files.keys())) {
       if (!seenPaths.has(tracked)) this.files.delete(tracked);
     }
+    return outdated;
   }
 
   private syncWatchersToDirs(): void {
@@ -520,7 +591,7 @@ class FileIndexer {
 
     await this.init();
 
-    if (isFirstInit) return this.snapshot!;
+    if (isFirstInit) return this.waitUntilFresh();
 
     if (this.rescanPromise) return this.rescanPromise;
     this.rescanPromise = this.runRescan();
@@ -574,6 +645,7 @@ class FileIndexer {
       errors: this.errors.slice(-MAX_ERROR_HISTORY),
       pendingReconciles: this.fileDebouncers.size,
       loadedFromDisk: this.loadedFromDisk,
+      progress: this.progress,
     };
   }
 

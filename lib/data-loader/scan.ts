@@ -8,14 +8,24 @@ export interface ScanResultExtended extends ScanResult {
   bySource: ScanStatsBySource[];
 }
 
-export async function getCachedScan(opts: { force?: boolean } = {}): Promise<ScanResultExtended> {
+export async function getCachedScan(
+  opts: { force?: boolean; fresh?: boolean } = {},
+): Promise<ScanResultExtended> {
   ensurePricingLoaded();
   const idx = getIndexer();
   if (opts.force) {
     return idx.forceRescan();
   }
+  if (opts.fresh) {
+    return idx.waitUntilFresh();
+  }
   await idx.init();
   return idx.getSnapshot();
+}
+
+export function startIndexing(): void {
+  ensurePricingLoaded();
+  void getIndexer().init();
 }
 
 export async function scanAll(opts: { force?: boolean } = {}): Promise<ScanResultExtended> {

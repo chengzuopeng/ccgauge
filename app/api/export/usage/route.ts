@@ -183,7 +183,7 @@ export const GET = withApiErrorHandling(async (req: Request) => {
   const sortKey: SortKey = sortRaw && isSortKey(sortRaw) ? sortRaw : 'timestamp';
   const sortDir: 'asc' | 'desc' = url.searchParams.get('dir') === 'asc' ? 'asc' : 'desc';
 
-  const scan = await getCachedScan();
+  const scan = await getCachedScan({ fresh: true });
   const sourceRecords = filterBySource(scan.records, source);
   const sourceUsers = filterBySource(scan.userRecords, source);
 

@@ -69,7 +69,7 @@ export const DEFAULT_REPORT: ReportOptions = {
 export async function runReport(opts: ReportOptions): Promise<string> {
   ensurePricingLoaded();
   const filled = normalizeReportOptions(opts);
-  const scan = await getCachedScan();
+  const scan = await getCachedScan({ fresh: true });
   const sources: ProviderId[] =
     filled.source === 'all' ? ALL_PROVIDER_IDS : [filled.source];
 

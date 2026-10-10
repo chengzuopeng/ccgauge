@@ -357,6 +357,8 @@ const en: Dict = {
   'settings.indexer.status': 'Status',
   'settings.indexer.indexing': 'indexing…',
   'settings.indexer.idle': 'idle',
+  'index.refreshing':
+    'Parsing rules changed in this version — re-reading {total} transcript file(s). Figures below come from the previous index until this finishes, then the page refreshes itself.',
   'settings.indexer.recentErrors': 'Recent indexer errors',
   'common.yes': 'yes',
   'common.no': 'no',
@@ -718,6 +720,8 @@ const zh: Dict = {
   'settings.indexer.status': '状态',
   'settings.indexer.indexing': '索引中…',
   'settings.indexer.idle': '空闲',
+  'index.refreshing':
+    '这个版本更新了解析规则，正在重新解析 {total} 个会话文件。完成前下面显示的是上一次的索引数据，完成后页面会自动刷新。',
   'settings.indexer.recentErrors': '最近的索引错误',
   'common.yes': '是',
   'common.no': '否',

@@ -9,6 +9,7 @@ import { tFn } from '@/lib/i18n/dict';
 import { detectAvailableProviders, listProviders } from '@/lib/providers';
 import { resolveSource } from '@/lib/source';
 import { PricingWarmup } from '@/components/pricing-warmup';
+import { IndexStatusBanner } from '@/components/index-status-banner';
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getServerLocale();
@@ -57,6 +58,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             initialSource={initialSource}
             providerInfos={providerInfos}
           />
+          <IndexStatusBanner />
           <main>{children}</main>
           <PricingWarmup />
         </Providers>

@@ -6,7 +6,7 @@ export const MCP_INDEX_NAME = 'mcp';
 
 export async function getMcpIndexerReady() {
   const idx = getIndexer(MCP_INDEX_NAME);
-  await idx.init();
+  await idx.waitUntilFresh();
   return idx;
 }
 
