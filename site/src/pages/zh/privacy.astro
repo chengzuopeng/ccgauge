@@ -27,13 +27,13 @@ const reads: Array<{ what: string; where: string; why: string }> = [
 const writes: Array<{ what: string; where: string; why: string }> = [
   {
     what: '磁盘解析缓存',
-    where: '~/.ccgauge/cache/index-v2.json',
-    why: '记忆已解析的 JSONL，让仪表盘启动更快。parserVersion bump 时会失效。',
+    where: '~/.ccgauge/cache/index-v3/',
+    why: '把已解析的 JSONL 分成 64 个分片缓存，让仪表盘启动更快，且只重写有变化的分片。parserVersion bump 后会在后台重新解析。',
   },
   {
     what: 'MCP 独立缓存',
-    where: '~/.ccgauge/cache/index-mcp-v2.json',
-    why: '`ccgauge mcp` 单独用的索引文件，避免 MCP 进程和仪表盘抢同一份缓存。',
+    where: '~/.ccgauge/cache/index-mcp-v3/',
+    why: '`ccgauge mcp` 单独用的索引缓存，避免 MCP 进程和仪表盘抢同一份缓存。',
   },
   {
     what: '后台服务状态',

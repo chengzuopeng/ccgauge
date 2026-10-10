@@ -60,7 +60,7 @@ Release notes live in [CHANGELOG.md](https://github.com/chengzuopeng/ccgauge/blo
 - `ccgauge mcp` — stdio JSON-RPC server. Plug into Claude Desktop / Cursor / Cline / your own agent.
 - **9 tools** for usage summary, time-series, per-model / project / session breakdowns, daily / weekly summaries, recent activity, hypothetical cost estimator.
 - Reasoning-token breakdown for models that emit one.
-- Separate cache (`index-mcp-v2.json`) so MCP and the dashboard never fight.
+- Separate cache (`index-mcp-v3/`) so MCP and the dashboard never fight.
 
 ### Cost transparency
 - **Cache savings** quantified as a dollar figure on the overview.

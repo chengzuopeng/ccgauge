@@ -27,13 +27,13 @@ const reads: Array<{ what: string; where: string; why: string }> = [
 const writes: Array<{ what: string; where: string; why: string }> = [
   {
     what: 'On-disk parser cache',
-    where: '~/.ccgauge/cache/index-v2.json',
-    why: 'Memoizes parsed JSONL so the dashboard starts fast. Invalidated on parserVersion bump.',
+    where: '~/.ccgauge/cache/index-v3/',
+    why: 'Memoizes parsed JSONL in 64 shard files so the dashboard starts fast and only rewrites what changed. Reparsed in the background after a parserVersion bump.',
   },
   {
     what: 'MCP-specific cache',
-    where: '~/.ccgauge/cache/index-mcp-v2.json',
-    why: 'Separate file used only when running `ccgauge mcp`, so MCP doesn\'t contend with the dashboard.',
+    where: '~/.ccgauge/cache/index-mcp-v3/',
+    why: 'Separate cache used only when running `ccgauge mcp`, so MCP doesn\'t contend with the dashboard.',
   },
   {
     what: 'Background-service state',

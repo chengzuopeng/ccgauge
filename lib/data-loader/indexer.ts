@@ -148,6 +148,9 @@ class FileIndexer {
   private pollTimer: NodeJS.Timeout | null = null;
   private snapshotRebuildTimer: NodeJS.Timeout | null = null;
   private persistTimer: NodeJS.Timeout | null = null;
+  private dirtyPaths = new Set<string>();
+  private fullPersist = false;
+  private persistChain: Promise<void> = Promise.resolve();
   private fileDebouncers = new Map<string, NodeJS.Timeout>();
   private initPromise: Promise<void> | null = null;
   private isIndexing = false;
@@ -208,7 +211,11 @@ class FileIndexer {
         this.rebuildSnapshotNow();
         this.indexDurationMs = Date.now() - start;
         this.lastIndexedAt = new Date().toISOString();
-        if (result.parsed > 0 || result.reused < persistedMap.size) this.schedulePersist();
+        if (persisted?.legacy) this.fullPersist = true;
+        for (const cached of persistedMap.keys()) {
+          if (!this.files.has(cached)) this.dirtyPaths.add(cached);
+        }
+        if (this.fullPersist || this.dirtyPaths.size > 0) this.schedulePersist();
         return result;
       });
       this.syncWatchersToDirs();
@@ -272,6 +279,7 @@ class FileIndexer {
     const { file, provider, mtimeMs, size } = task;
     try {
       const parsed = await parseTranscript(provider, file);
+      this.dirtyPaths.add(file);
       this.files.set(file, {
         source: provider.id,
         parserVersion: provider.parserVersion,
@@ -374,7 +382,10 @@ class FileIndexer {
     );
 
     for (const tracked of Array.from(this.files.keys())) {
-      if (!seenPaths.has(tracked)) this.files.delete(tracked);
+      if (!seenPaths.has(tracked)) {
+        this.files.delete(tracked);
+        this.dirtyPaths.add(tracked);
+      }
     }
 
     const cutoff = recentCutoffMs();
@@ -466,6 +477,7 @@ class FileIndexer {
               return;
             }
             const parsed = await parseTranscript(provider, file);
+            this.dirtyPaths.add(file);
             this.files.set(file, {
               source: provider.id,
               parserVersion: provider.parserVersion,
@@ -485,6 +497,7 @@ class FileIndexer {
       for (const tracked of Array.from(this.files.keys())) {
         if (!seenPaths.has(tracked)) {
           this.files.delete(tracked);
+          this.dirtyPaths.add(tracked);
           changed = true;
         }
       }
@@ -521,6 +534,7 @@ class FileIndexer {
       if (!stat || !stat.isFile()) {
         if (this.files.has(filePath)) {
           this.files.delete(filePath);
+          this.dirtyPaths.add(filePath);
           this.lastWorkStart = workStart;
           this.scheduleSnapshotRebuild();
           this.schedulePersist();
@@ -533,6 +547,7 @@ class FileIndexer {
       }
       try {
         const parsed = await parseTranscript(provider, filePath);
+        this.dirtyPaths.add(filePath);
         this.files.set(filePath, {
           source: provider.id,
           parserVersion: provider.parserVersion,
@@ -690,6 +705,7 @@ class FileIndexer {
           this.persistTimer = null;
         }
         this.files.clear();
+        this.fullPersist = true;
         await this.detectProviderDirs();
         await this.fullScan(new Map(), { deferOlder: false });
         this.rebuildSnapshotNow();
@@ -727,6 +743,11 @@ class FileIndexer {
     if (this.persistTimer) clearTimeout(this.persistTimer);
     this.persistTimer = setTimeout(() => {
       this.persistTimer = null;
+      const full = this.fullPersist;
+      const dirty = this.dirtyPaths;
+      this.fullPersist = false;
+      this.dirtyPaths = new Set();
+      if (!full && dirty.size === 0) return;
       const entries: PersistedFileEntry[] = [];
       for (const [filePath, entry] of this.files) {
         entries.push({
@@ -741,13 +762,19 @@ class FileIndexer {
           spawnedSessions: entry.spawnedSessions,
         });
       }
-      savePersistedIndex(
-        {
-          savedAt: new Date().toISOString(),
-          files: entries,
-        },
-        this.cacheName,
-      ).catch((err) => this.recordError(`persist: ${(err as Error).message}`));
+      this.persistChain = this.persistChain
+        .then(() =>
+          savePersistedIndex(
+            { savedAt: new Date().toISOString(), files: entries },
+            this.cacheName,
+            full ? {} : { dirtyPaths: dirty },
+          ),
+        )
+        .catch((err) => {
+          this.recordError(`persist: ${(err as Error).message}`);
+          if (full) this.fullPersist = true;
+          for (const p of dirty) this.dirtyPaths.add(p);
+        });
     }, PERSIST_DEBOUNCE_MS);
     this.persistTimer.unref?.();
   }

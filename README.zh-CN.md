@@ -60,7 +60,7 @@ ccgauge 读取 Claude Code 和 Codex CLI 本地已经写下的 JSONL 会话文�
 - `ccgauge mcp` —— stdio JSON-RPC 服务，接进 Claude Desktop / Cursor / Cline / 自建 agent。
 - **9 个 tool**：usage summary、time-series、按模型 / 项目 / 会话拆分、daily / weekly summary、recent activity、假设请求成本估算。
 - 模型有 reasoning token 时单独折算。
-- 独立缓存（`index-mcp-v2.json`），MCP 进程和看板永远不抢同一份磁盘索引。
+- 独立缓存（`index-mcp-v3/`），MCP 进程和看板永远不抢同一份磁盘索引。
 
 ### 成本透明
 - **缓存节省** 单独成卡，量化 Anthropic prompt caching 节省的美元。

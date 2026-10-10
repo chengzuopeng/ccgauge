@@ -134,7 +134,7 @@ on 3737 by default.
    which is a side effect at import time. Anything that imports this module —
    even just to call `getCachedScan()` — spins up a long-lived indexer that
    watches `~/.claude/projects` / `~/.codex/sessions` and writes
-   `~/.ccgauge/cache/index-v2.json`. Implications:
+   `~/.ccgauge/cache/index-v3/`. Implications:
    - **In `pnpm dev`, the singleton survives HMR.** If you change parser code,
      the module is reloaded but the existing indexer's in-memory `files` map
      still holds records parsed by the **old** code. Bump the provider's
@@ -144,11 +144,20 @@ on 3737 by default.
    - **Stale MCP processes contend with the dashboard for the same on-disk
      cache.** If a user has zombie `ccgauge mcp` processes from old Claude
      Code sessions, they keep writing old-shape entries back into
-     `index-v2.json` and silently undo your fix. When debugging "the change
+     their cache and silently undo your fix. When debugging "the change
      didn't take effect", `ps -ef | grep ccgauge` and kill stragglers first.
-   - The MCP server uses a **separate** named cache (`index-mcp-v2.json`) for
+   - The MCP server uses a **separate** named cache (`index-mcp-v3/`) for
      its own indexer, but the module-level default indexer also fires when
      the MCP entry is imported — that's where the contention comes from.
+   - **The cache is 64 shard files, not one JSON.** Entries are bucketed by
+     a hash of the transcript path (`shardOf` in
+     `lib/data-loader/index-persist.ts`); the indexer records which paths
+     changed and rewrites only their shards, so a session growing by one
+     message costs a ~3MB write instead of re-serializing everything.
+     Records are stored without their `filePath` (the entry's path is
+     restored on load), and each file's streamed chunks are already merged.
+     With no shards on disk the previous single-file `index-v2.json` is read
+     once and migrated, so upgrading needs no reparse.
    - **An outdated `parserVersion` is served first, then replaced.** On
      startup, a cached file whose mtime and size still match but whose
      `parserVersion` is behind keeps its old records in the first snapshot;
@@ -406,7 +415,7 @@ A short pre-flight checklist:
 | "CSV opens with mojibake in Excel" | `app/api/export/usage/route.ts` (BOM, encoding) |
 | "Theme flashes on load" | `components/no-flash-script.tsx` |
 | "Pricing wrong for new model" | `pnpm update-pricing` to refresh `lib/pricing/litellm-pricing.generated.js`; gap-fill in `lib/pricing/builtin.ts`; family fallback in each provider's `resolvePricing()` |
-| "MCP tool returns nothing" | `lib/mcp/tools/` and check `~/.ccgauge/cache/index-mcp-v2.json` exists |
+| "MCP tool returns nothing" | `lib/mcp/tools/` and check `~/.ccgauge/cache/index-mcp-v3/` exists |
 
 ## Don't break end-users
 

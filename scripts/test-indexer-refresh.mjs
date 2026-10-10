@@ -2,7 +2,7 @@
 import { build } from 'esbuild';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, statSync, utimesSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, statSync, utimesSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
 
@@ -212,6 +212,40 @@ try {
     );
     idx.dispose();
     console.log('✓ an up-to-date cache is used without a refresh and left as it is on disk');
+  }
+
+  {
+    const name = 'refresh-legacy';
+    const cacheDir = join(stateDir, 'cache');
+    const legacyFile = join(cacheDir, `index-${name}-v2.json`);
+    mkdirSync(cacheDir, { recursive: true });
+    writeFileSync(
+      legacyFile,
+      JSON.stringify({
+        schemaVersion: 2,
+        savedAt: '2026-08-01T00:00:00.000Z',
+        files: [
+          staleEntry(unchanged, 's-unchanged', { parserVersion: current }),
+          staleEntry(changed, 's-changed', { parserVersion: current }),
+        ],
+      }),
+      'utf8',
+    );
+    const idx = m.getIndexer(name);
+    await idx.init();
+    assert.equal(idx.getStatus().progress.phase, 'idle');
+    assert.equal(
+      idx.getSnapshot().records.find((r) => r.sessionId === 's-unchanged')?.model,
+      'stale-model',
+      'entries from the previous single-file cache are reused, not reparsed',
+    );
+    await delay(2500);
+    assert.ok(!existsSync(legacyFile), 'the previous cache file is replaced');
+    const migrated = await m.loadPersistedIndex(name);
+    assert.equal(migrated.legacy, undefined, 'by shards');
+    assert.equal(migrated.files.length, 2);
+    idx.dispose();
+    console.log('✓ a single-file cache from the previous version is migrated without reparsing');
   }
 
   {
