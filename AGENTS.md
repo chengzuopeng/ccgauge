@@ -257,7 +257,8 @@ on 3737 by default.
     every call became its own "(no user text)" row)
     → `codex-v12-review-spawn-linkage` (see below)
     → `codex-v13-model-route-split` (see below)
-    → `codex-v14-model-route-guard` (current; see below).
+    → `codex-v14-model-route-guard` (see below)
+    → `codex-v15-user-fork-first-delta` (current; see below).
 
     v12 is the one that is not a sub-agent problem at all. `codex review`
     run from inside a turn starts a separate TOP-LEVEL session, written as a
@@ -294,6 +295,16 @@ on 3737 by default.
     The rule lives in `lib/providers/codex/model-route.js`, shared with the
     Codex price resolver.
 
+    v15 is the user-fork prefix. A user-initiated fork (`thread_source: 'user'`
+    with `forked_from_id`) opens its counter at the parent's whole history, so
+    its first `total_token_usage` already holds that prefix. v14 billed the
+    whole prefix on the fork's first call: 426,343 output for a call that made
+    358. The first delta now comes from that event's `last_token_usage`, and the
+    total still seeds `prevTotal`, so every later delta is unchanged. The
+    prefix is the parent's own counter at the fork's timestamp, an exact match
+    in the parent's rollout. In the local rollouts, every non-fork file opens
+    with a total equal to its first `last_token_usage`, so those parse as before.
+
     Two of the earlier versions exist because a Codex rollout's shape varies
     **within one `cli_version`**, which is the thing to internalise before
     debugging this parser. v7's `forked_from_id` is present on some
@@ -314,7 +325,10 @@ on 3737 by default.
 4. **Codex token math has a known gotcha.**
    The JSONL emits cumulative `total_token_usage` per `token_count` event.
    We compute forward-only deltas (`Math.max(0, cur - prev)` per field) and
-   skip duplicate refresh events. See `lib/providers/codex/parse-codex-jsonl.ts`
+   skip duplicate refresh events. The first event of a user fork
+   (`forked_from_id`) is the exception: its delta is `last_token_usage`,
+   because its first total holds the parent's history (v15). See
+   `lib/providers/codex/parse-codex-jsonl.ts`
    — bumping `parserVersion` if you touch this is mandatory or users will
    see double-counted totals against stale cache.
 

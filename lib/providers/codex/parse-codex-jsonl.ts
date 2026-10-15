@@ -94,9 +94,14 @@ function asNumber(v: unknown): number {
  * scripts/test-codex-parser.mjs pins both shapes so the rule can't be
  * "simplified" on the false assumption that this is a version split.
  *
- * KNOWN GAP: user-initiated forks (`thread_source: 'user'` + `forked_from_id`)
- * replay the source's history too, then DIVERGE into genuinely new spend, so they
- * can't be dropped wholesale. Their replayed prefix stays double-counted.
+ * User-initiated forks (`thread_source: 'user'` + `forked_from_id`) DIVERGE into
+ * genuinely new spend, so they can't be dropped wholesale. Their counter opens at
+ * the parent's whole history, and that prefix is already billed in the parent's
+ * own rollout, so the first delta comes from `last_token_usage` and the total only
+ * seeds `prevTotal`. KNOWN GAP, still open: a fork whose history replays
+ * `token_count` events (none seen locally) bills each replayed delta a second time,
+ * and one whose first `token_count` lacks `last_token_usage` falls back to the
+ * total and bills the prefix.
  */
 function isSubagentForkMirror(payload: Record<string, unknown>): boolean {
   return asString(payload.thread_source) === 'subagent' && !!asString(payload.forked_from_id);
@@ -140,6 +145,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
   // its user messages is a prompt Codex synthesised ("Review the code changes
   // against the base branch …"), so none of them may root a turn.
   let reviewLauncher = false;
+  let inheritsHistory = false;
   let cliVersion: string | undefined;
   let defaultCwd = '';
   let userIdx = 0;
@@ -264,6 +270,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
       }
 
       sessionId = asString(payload.id);
+      inheritsHistory = !!asString(payload.forked_from_id);
       if (asString(payload.thread_source) === 'subagent') {
         subagentLineageRoot =
           asString(payload.session_id) || asString(payload.parent_thread_id) || '';
@@ -379,16 +386,23 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
 
         if (cur) {
           if (prevTotal === null) {
-
-            deltaInput = cur.input;
-            deltaCached = cur.cached;
-            deltaOutput = cur.output;
-            deltaReasoning = cur.reasoning;
+            const own = inheritsHistory ? last : undefined;
+            deltaInput = own ? asNumber(own.input_tokens) : cur.input;
+            deltaCached = own ? asNumber(own.cached_input_tokens) : cur.cached;
+            deltaOutput = own ? asNumber(own.output_tokens) : cur.output;
+            deltaReasoning = own ? asNumber(own.reasoning_output_tokens) : cur.reasoning;
+            prevTotal = { ...cur };
           } else {
             deltaInput = Math.max(0, cur.input - prevTotal.input);
             deltaCached = Math.max(0, cur.cached - prevTotal.cached);
             deltaOutput = Math.max(0, cur.output - prevTotal.output);
             deltaReasoning = Math.max(0, cur.reasoning - prevTotal.reasoning);
+            prevTotal = {
+              input: Math.max(prevTotal.input, cur.input),
+              cached: Math.max(prevTotal.cached, cur.cached),
+              output: Math.max(prevTotal.output, cur.output),
+              reasoning: Math.max(prevTotal.reasoning, cur.reasoning),
+            };
           }
 
           if (
@@ -398,17 +412,6 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
             deltaReasoning === 0
           ) {
             return;
-          }
-
-          if (prevTotal === null) {
-            prevTotal = { ...cur };
-          } else {
-            prevTotal = {
-              input: Math.max(prevTotal.input, cur.input),
-              cached: Math.max(prevTotal.cached, cur.cached),
-              output: Math.max(prevTotal.output, cur.output),
-              reasoning: Math.max(prevTotal.reasoning, cur.reasoning),
-            };
           }
         } else if (last) {
           deltaInput = asNumber(last.input_tokens);

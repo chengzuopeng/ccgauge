@@ -465,6 +465,142 @@ assert.ok(rangeToDates('7d').from instanceof Date);
 }
 
 {
+  const dir = mkdtempSync(join(tmpdir(), 'ccgauge-codex-user-fork-'));
+  const usage = (input, cached, output, reasoning) => ({
+    input_tokens: input,
+    cached_input_tokens: cached,
+    output_tokens: output,
+    reasoning_output_tokens: reasoning,
+  });
+  const tokenCount = (ts, total, last) =>
+    JSON.stringify({
+      timestamp: ts,
+      type: 'event_msg',
+      payload: {
+        type: 'token_count',
+        info: { total_token_usage: total, ...(last ? { last_token_usage: last } : {}) },
+      },
+    });
+  const forkHead = [
+    JSON.stringify({
+      timestamp: '2026-10-14T03:50:37Z',
+      type: 'session_meta',
+      payload: {
+        id: 'user-fork-1',
+        session_id: 'user-fork-1',
+        forked_from_id: 'parent-thread-1',
+        thread_source: 'user',
+        cli_version: '0.162.0-alpha.17.2',
+        cwd: '/tmp/proj',
+      },
+    }),
+    JSON.stringify({
+      timestamp: '2026-10-14T03:52:13Z',
+      type: 'turn_context',
+      payload: { turn_id: 'uf-1', cwd: '/tmp/proj', model: 'gpt-5.6-sol' },
+    }),
+    JSON.stringify({
+      timestamp: '2026-10-14T03:52:14Z',
+      type: 'event_msg',
+      payload: { type: 'user_message', message: 'continue' },
+    }),
+  ];
+
+  const forkFile = join(dir, 'user-fork.jsonl');
+  writeFileSync(
+    forkFile,
+    [
+      ...forkHead,
+      tokenCount(
+        '2026-10-14T03:52:27Z',
+        usage(80_896_824, 74_230_648, 426_343, 206_633),
+        usage(188_764, 0, 358, 0),
+      ),
+      tokenCount(
+        '2026-10-14T03:52:45Z',
+        usage(81_090_791, 74_419_409, 426_905, 207_149),
+        usage(193_967, 188_761, 562, 516),
+      ),
+    ].join('\n') + '\n',
+    'utf8',
+  );
+  const forked = await parseCodexJsonlFile(forkFile);
+  assert.equal(forked.user.length, 1, 'a user fork keeps its own user turn');
+  assert.equal(forked.assistant.length, 2, 'a user fork is billed, unlike a subagent mirror');
+  const [firstCall, secondCall] = forked.assistant;
+  assert.equal(firstCall.usage.input_tokens, 188_764, 'first call bills its own input, not the inherited prefix');
+  assert.equal(firstCall.usage.cache_read_input_tokens, 0, 'inherited cached tokens are not billed as cache read');
+  assert.equal(firstCall.usage.output_tokens, 358, 'first call bills its own output, not the 426,343 total');
+  assert.equal(secondCall.usage.input_tokens, 5_206, 'later deltas still come from the cumulative total');
+  assert.equal(secondCall.usage.cache_read_input_tokens, 188_761);
+  assert.equal(secondCall.usage.output_tokens, 562);
+  assert.equal(secondCall.usage.reasoning_tokens, 516);
+
+  const zeroFirstFile = join(dir, 'user-fork-zero-first.jsonl');
+  writeFileSync(
+    zeroFirstFile,
+    [
+      ...forkHead,
+      tokenCount(
+        '2026-10-14T03:52:27Z',
+        usage(80_708_060, 74_230_648, 425_985, 206_633),
+        usage(0, 0, 0, 0),
+      ),
+      tokenCount('2026-10-14T03:52:45Z', usage(80_708_160, 74_230_648, 425_995, 206_633)),
+    ].join('\n') + '\n',
+    'utf8',
+  );
+  const zeroFirst = await parseCodexJsonlFile(zeroFirstFile);
+  rmSync(dir, { recursive: true, force: true });
+  assert.equal(zeroFirst.assistant.length, 1, 'a first event with no own usage emits nothing');
+  assert.equal(zeroFirst.assistant[0].usage.input_tokens, 100, 'but its total still seeds the baseline');
+  assert.equal(zeroFirst.assistant[0].usage.output_tokens, 10, 'so the inherited prefix is never billed later');
+
+  console.log('✓ user fork: inherited prefix not billed; first delta from last_token_usage');
+}
+
+{
+  const dir = mkdtempSync(join(tmpdir(), 'ccgauge-codex-first-delta-'));
+  const usage = (input, cached, output, reasoning) => ({
+    input_tokens: input,
+    cached_input_tokens: cached,
+    output_tokens: output,
+    reasoning_output_tokens: reasoning,
+  });
+  const line = (timestamp, type, payload) => JSON.stringify({ timestamp, type, payload });
+  const file = join(dir, 'plain.jsonl');
+  writeFileSync(
+    file,
+    [
+      line('2026-10-14T03:50:37Z', 'session_meta', {
+        id: 'plain-1',
+        session_id: 'plain-1',
+        thread_source: 'user',
+        cli_version: '0.162.0',
+        cwd: '/tmp/proj',
+      }),
+      line('2026-10-14T03:52:14Z', 'event_msg', { type: 'user_message', message: 'continue' }),
+      line('2026-10-14T03:52:27Z', 'event_msg', {
+        type: 'token_count',
+        info: {
+          total_token_usage: usage(5_000, 1_000, 900, 100),
+          last_token_usage: usage(2_000, 500, 300, 50),
+        },
+      }),
+    ].join('\n') + '\n',
+    'utf8',
+  );
+  const parsed = await parseCodexJsonlFile(file);
+  rmSync(dir, { recursive: true, force: true });
+  assert.equal(parsed.assistant.length, 1);
+  const [call] = parsed.assistant;
+  assert.equal(call.usage.input_tokens, 4_000, 'a session that is not a fork bills its whole opening total');
+  assert.equal(call.usage.cache_read_input_tokens, 1_000);
+  assert.equal(call.usage.output_tokens, 900);
+  console.log('✓ non-fork session: first delta is the opening total, not last_token_usage');
+}
+
+{
   // `thread_settings_applied` is thread-level and fires BETWEEN turns, so it
   // can carry a default that disagrees with the turn actually running — 116 of
   // 477 such events disagree in real ~/.codex data. It must only fill in for

@@ -5,6 +5,16 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **A forked Codex session no longer bills its parent's history on its first
+  call.** A user-initiated fork opens its token counter at the parent's whole
+  history, and that prefix was charged to the fork's first call (426,343
+  output tokens for a call that produced 358). The first call now bills its
+  own usage. Later calls and sessions that are not forks are unchanged.
+
 ## [1.4.8] — 2026-10-10
 
 ### Fixed
