@@ -5,7 +5,7 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.4.9] — 2026-10-15
 
 ### Added
 
@@ -14,7 +14,15 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   clock runs from the moment the model has its input to its last output
   token, so it includes first-token latency and excludes tool execution and
   waiting. Calls under 50 output tokens are not timed. The CSV export gains
-  `output_tokens_per_sec` and `generation_seconds` columns.
+  `output_tokens_per_sec` and `generation_seconds` columns. History is
+  reparsed once in the background after upgrading, and speeds appear for
+  older calls when that finishes.
+
+### Changed
+
+- **Project and session pages show a skeleton while their data loads.** They
+  had no loading state of their own; they now use the same page skeleton as
+  the rest of the app.
 
 ### Fixed
 
@@ -2067,6 +2075,7 @@ of HTML to the browser.
 - Initial public release as `ccgauge`: local Next.js dashboard for
   Claude Code token usage, cost, and 5-hour block tracking.
 
+[1.4.9]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.8...v1.4.9
 [1.4.8]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.7...v1.4.8
 [1.4.7]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.6...v1.4.7
 [1.4.6]: https://github.com/chengzuopeng/ccgauge/compare/v1.4.5...v1.4.6
