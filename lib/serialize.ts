@@ -3,6 +3,7 @@ import type { AssistantRecord, ProviderId, UserRecord } from './types';
 import { pricedCostOfRecord } from './pricing/calculate';
 import { buildTurnIndex } from './turns';
 import { resolveProjectLabel } from './project-label';
+import { generationStartOf, generationWindowMs, summarizeTimedCalls, tokensPerSecond } from './output-speed';
 
 export interface SerializedProgress {
   hasBlock: boolean;
@@ -79,6 +80,9 @@ export interface UsageTableRow {
   isWorkflowSubagent?: boolean;
 
   directPrompt?: string;
+  generationMs: number | null;
+  generationOutputTokens: number | null;
+  outputSpeed: number | null;
 }
 
 export interface UsageTurnRow {
@@ -118,6 +122,9 @@ export interface UsageTurnRow {
    *  calls). 0 when none. */
   workflowSubagentCount: number;
   unpricedCallCount: number;
+  generationMs: number | null;
+  generationOutputTokens: number | null;
+  outputSpeed: number | null;
   userText: string;
   children: UsageTableRow[];
 }
@@ -134,6 +141,7 @@ export function recordsToTurnRows(
   assistants: AssistantRecord[],
   users: UserRecord[],
   parentMap: Record<string, string | null>,
+  assistantUuids: ReadonlySet<string> = new Set(assistants.map((a) => a.uuid)),
 ): UsageTurnRow[] {
   const turnIndex = buildTurnIndex(assistants, users, parentMap);
   const userMap = new Map<string, UserRecord>();
@@ -186,6 +194,8 @@ export function recordsToTurnRows(
       }
       set.add(r.filePath);
     }
+    const windowMs = generationWindowMs(generationStartOf(r, userMap, parentMap, assistantUuids), r.endTimestamp);
+    const callOutput = r.callOutputTokens ?? r.usage.output_tokens;
     const child: UsageTableRow = {
       uuid: r.uuid,
       timestamp: r.timestamp,
@@ -215,6 +225,9 @@ export function recordsToTurnRows(
       effort: r.effort,
       isWorkflowSubagent: r.isWorkflowSubagent || undefined,
       directPrompt: direct || undefined,
+      generationMs: windowMs,
+      generationOutputTokens: windowMs === null ? null : callOutput,
+      outputSpeed: tokensPerSecond(callOutput, windowMs),
     };
     const list = groups.get(turnId);
     if (list) list.push(child);
@@ -289,6 +302,7 @@ export function recordsToTurnRows(
       hasWorkflowSubagents: (workflowFilesByTurn.get(turnId)?.size ?? 0) > 0,
       workflowSubagentCount: workflowFilesByTurn.get(turnId)?.size ?? 0,
       unpricedCallCount,
+      ...summarizeTimedCalls(children),
       userText: userRec?.textPreview ?? '',
       children,
     });

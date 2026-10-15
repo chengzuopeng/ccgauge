@@ -8,6 +8,7 @@ import {
   formatDateTime,
   formatDuration,
   formatTokensCompact,
+  formatOutputSpeed,
   shortHash,
   shortenModel,
   projectNameFromCwd,
@@ -20,6 +21,7 @@ import { HoverCard } from '@/components/hover-card';
 import { UnpricedBadge } from '@/components/unpriced-badge';
 import { ScrollShadows } from '@/components/scroll-shadows';
 import type { SortKey } from '@/lib/usage-query';
+import { MIN_TIMED_OUTPUT_TOKENS } from '@/lib/output-speed';
 import { usePendingNav } from '@/lib/use-pending-nav';
 
 type ColumnId =
@@ -35,6 +37,7 @@ type ColumnId =
   | 'cacheRead'
   | 'cacheWrite'
   | 'total'
+  | 'speed'
   | 'cost'
   | 'tools';
 
@@ -43,6 +46,7 @@ interface ColumnDef {
   labelKey: string;
   align?: 'left' | 'right';
   sortKey?: SortKey;
+  helpKey?: string;
   defaultVisible: boolean;
 }
 
@@ -59,6 +63,7 @@ const COLUMNS: ColumnDef[] = [
   { id: 'cacheRead', labelKey: 'usage.col.cacheRead', align: 'right', sortKey: 'cacheReadTokens', defaultVisible: false },
   { id: 'cacheWrite', labelKey: 'usage.col.cacheWrite', align: 'right', sortKey: 'cacheCreationTokens', defaultVisible: false },
   { id: 'total', labelKey: 'usage.col.total', align: 'right', sortKey: 'totalTokens', defaultVisible: true },
+  { id: 'speed', labelKey: 'usage.col.speed', align: 'right', sortKey: 'outputSpeed', helpKey: 'usage.speed.help', defaultVisible: true },
   { id: 'cost', labelKey: 'usage.col.cost', align: 'right', sortKey: 'cost', defaultVisible: false },
   { id: 'tools', labelKey: 'usage.col.tools', defaultVisible: false },
 ];
@@ -395,6 +400,7 @@ export function UsageTable({ rows, totalCount, page, pageCount, sort, query, cod
                     sorted={c.sortKey ? sort.key === c.sortKey : false}
                     dir={sort.dir}
                     onClick={c.sortKey ? () => applySort(c.sortKey!) : undefined}
+                    title={c.helpKey ? t(c.helpKey, { min: MIN_TIMED_OUTPUT_TOKENS }) : undefined}
                   >
                     {t(c.labelKey)}
                   </Th>
@@ -705,6 +711,15 @@ function renderTurnCell(
           </span>
         </HoverCard>
       );
+    case 'speed':
+      return (
+        <span
+          className="num-mono text-text-secondary whitespace-nowrap"
+          title={turn.outputSpeed === null ? undefined : speedHint(turn.generationOutputTokens, turn.generationMs, t, locale)}
+        >
+          {formatOutputSpeed(turn.outputSpeed)}
+        </span>
+      );
     case 'cost':
       return (
         <span className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
@@ -825,6 +840,15 @@ function renderChildCell(
           </span>
         </HoverCard>
       );
+    case 'speed':
+      return (
+        <span
+          className="num-mono text-xs"
+          title={r.outputSpeed === null ? undefined : speedHint(r.generationOutputTokens, r.generationMs, t, locale)}
+        >
+          {formatOutputSpeed(r.outputSpeed)}
+        </span>
+      );
     case 'cost':
       return (
         <span className="inline-flex items-center justify-end gap-1.5 whitespace-nowrap">
@@ -839,6 +863,19 @@ function renderChildCell(
         </span>
       );
   }
+}
+
+function speedHint(
+  tokens: number | null,
+  windowMs: number | null,
+  t: Translator,
+  locale: Locale,
+): string | undefined {
+  if (tokens === null || windowMs === null) return undefined;
+  return t('usage.speed.hint', {
+    tokens: formatTokensCompact(tokens, locale),
+    seconds: (windowMs / 1000).toFixed(1),
+  });
 }
 
 type BreakdownInput = Pick<
@@ -962,12 +999,14 @@ function Th({
   sorted,
   dir,
   onClick,
+  title,
 }: {
   children: React.ReactNode;
   align?: 'left' | 'right';
   sorted?: boolean;
   dir?: 'asc' | 'desc';
   onClick?: () => void;
+  title?: string;
 }) {
   return (
     <th
@@ -977,6 +1016,7 @@ function Th({
         onClick && 'cursor-pointer hover:text-text-primary select-none',
       )}
       onClick={onClick}
+      title={title}
     >
       <span className="inline-flex items-center gap-1">
         {children}

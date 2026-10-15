@@ -12,6 +12,7 @@ import {
   USAGE_PAGE_SIZE,
   isSortKey,
   parseUsagePageParam,
+  sortTurns,
   type SortKey,
 } from '@/lib/usage-query';
 import { badRequest, withApiErrorHandling } from '@/lib/api/error-handler';
@@ -47,17 +48,6 @@ function filterTurnsByQuery(turns: UsageTurnRow[], q: string): UsageTurnRow[] {
       ) ||
       t.toolNames.some((tool) => tool.toLowerCase().includes(needle)),
   );
-}
-
-function sortTurns(turns: UsageTurnRow[], key: SortKey, dir: 'asc' | 'desc'): UsageTurnRow[] {
-  const arr = turns.slice();
-  arr.sort((a, b) => {
-    const av = key === 'timestamp' ? a.timestamp : (a[key] as number);
-    const bv = key === 'timestamp' ? b.timestamp : (b[key] as number);
-    if (av === bv) return 0;
-    return (dir === 'asc' ? 1 : -1) * (av < bv ? -1 : 1);
-  });
-  return arr;
 }
 
 export const GET = withApiErrorHandling(async (req: Request) => {

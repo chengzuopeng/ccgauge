@@ -7,6 +7,15 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+### Added
+
+- **Output speed on the usage page.** A new `Output speed` column, shown by
+  default, reports output tokens per second for each call and each turn. The
+  clock runs from the moment the model has its input to its last output
+  token, so it includes first-token latency and excludes tool execution and
+  waiting. Calls under 50 output tokens are not timed. The CSV export gains
+  `output_tokens_per_sec` and `generation_seconds` columns.
+
 ### Fixed
 
 - **A forked Codex session no longer bills its parent's history on its first

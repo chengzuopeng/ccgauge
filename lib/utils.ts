@@ -51,6 +51,12 @@ export function formatPct(n: number, frac = 1): string {
   return `${(n * 100).toFixed(frac)}%`;
 }
 
+export function formatOutputSpeed(tokensPerSec: number | null): string {
+  if (tokensPerSec === null || !Number.isFinite(tokensPerSec)) return '—';
+  const tenth = Math.round(tokensPerSec * 10) / 10;
+  return `${tenth < 10 ? tenth.toFixed(1) : Math.round(tokensPerSec)} tok/s`;
+}
+
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   const sec = Math.floor(ms / 1000);

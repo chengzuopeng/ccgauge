@@ -1,5 +1,5 @@
 import { getCachedScan } from '@/lib/data-loader/scan';
-import { recordsToTurnRowsCached } from '@/lib/data-loader/derived';
+import { getAssistantUuids, recordsToTurnRowsCached } from '@/lib/data-loader/derived';
 import { isUsageRange, rangeToDates, parseCustomRange, type UsageRange } from '@/lib/range';
 import { resolveSource, filterBySource } from '@/lib/source';
 import { resolveCanonicalCwd } from '@/lib/project-label';
@@ -111,6 +111,7 @@ export async function loadTurnScope(f: TurnFilters): Promise<TurnScope> {
     filteredRecords,
     allSourceUsers,
     scan.parentMap,
+    getAssistantUuids(scan.records),
   );
 
   return {

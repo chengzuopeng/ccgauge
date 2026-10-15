@@ -1,9 +1,10 @@
 import { getCachedScan } from '@/lib/data-loader/scan';
+import { getAssistantUuids } from '@/lib/data-loader/derived';
 import { recordsToTurnRows } from '@/lib/serialize';
 import { isUsageRange, rangeToDates, parseCustomRange } from '@/lib/range';
 import { resolveSource, filterBySource } from '@/lib/source';
 import type { UsageTableRow, UsageTurnRow } from '@/lib/serialize';
-import { isSortKey, type SortKey } from '@/lib/usage-query';
+import { isSortKey, sortTurns, type SortKey } from '@/lib/usage-query';
 import { badRequest, withApiErrorHandling } from '@/lib/api/error-handler';
 import { getProvider } from '@/lib/providers';
 import { projectNameFromCwd } from '@/lib/utils';
@@ -46,125 +47,75 @@ function filterTurnsByQuery(turns: UsageTurnRow[], q: string): UsageTurnRow[] {
   );
 }
 
-function sortTurns(turns: UsageTurnRow[], key: SortKey, dir: 'asc' | 'desc'): UsageTurnRow[] {
-  const arr = turns.slice();
-  arr.sort((a, b) => {
+const speedCell = (tokensPerSec: number | null): string =>
+  tokensPerSec === null ? '' : tokensPerSec.toFixed(2);
 
-    const av = key === 'timestamp' ? a.timestamp : (a[key] as number);
-    const bv = key === 'timestamp' ? b.timestamp : (b[key] as number);
-    if (av === bv) return 0;
-    return (dir === 'asc' ? 1 : -1) * (av < bv ? -1 : 1);
-  });
-  return arr;
-}
+const secondsCell = (ms: number | null): string => (ms === null ? '' : (ms / 1000).toFixed(3));
 
-const CALL_COLUMNS = [
-  'turn_id',
-  'turn_started_at',
-  'turn_ended_at',
-  'timestamp',
-  'source',
-  'model',
-  'model_short',
-  'model_route',
-  'effort',
-  'project_name',
-  'project_path',
-  'session',
-  'user_prompt',
-  'tool_names',
-  'input_tokens',
-  'output_tokens',
-  'reasoning_tokens',
-  'cache_read_tokens',
-  'cache_create_tokens',
-  'total_tokens',
-  'cost_usd',
-  'unpriced',
-] as const;
-
-const TURN_COLUMNS = [
-  'turn_id',
-  'started_at',
-  'ended_at',
-  'duration_seconds',
-  'source',
-  'models',
-  'effort',
-  'project_name',
-  'project_path',
-  'session',
-  'user_prompt',
-  'call_count',
-  'tool_names',
-  'input_tokens',
-  'output_tokens',
-  'reasoning_tokens',
-  'cache_read_tokens',
-  'cache_create_tokens',
-  'total_tokens',
-  'cost_usd',
-  'unpriced_calls',
-] as const;
-
-function renderCallRow(turn: UsageTurnRow, r: UsageTableRow): string {
-  const provider = getProvider(r.source);
-  return [
-    csvEscape(turn.turnId),
-    csvEscape(turn.timestamp),
-    csvEscape(turn.endTimestamp),
-    csvEscape(r.timestamp),
-    csvEscape(r.source),
-    csvEscape(r.model),
-    csvEscape(provider.shortenModel(r.model)),
-    csvEscape(r.modelRoute ?? ''),
-    csvEscape(r.effort ?? ''),
-    csvEscape(r.projectLabel || projectNameFromCwd(r.cwd)),
-    csvEscape(r.cwd),
-    csvEscape(r.sessionId),
-    csvEscape(singleLine(turn.userText)),
-    csvEscape(r.toolNames.join(';')),
-    r.inputTokens,
-    r.outputTokens,
-    r.reasoningTokens,
-    r.cacheReadTokens,
-    r.cacheCreationTokens,
-    r.totalTokens,
-    r.cost.toFixed(6),
-    r.unpriced ? 1 : 0,
-  ].join(',');
-}
-
-function renderTurnRow(turn: UsageTurnRow): string {
+function turnDurationSeconds(turn: UsageTurnRow): number {
   const startMs = new Date(turn.timestamp).getTime();
   const endMs = new Date(turn.endTimestamp).getTime();
-  const durationSec = Number.isFinite(startMs) && Number.isFinite(endMs)
+  return Number.isFinite(startMs) && Number.isFinite(endMs)
     ? Math.max(0, Math.round((endMs - startMs) / 1000))
     : 0;
-  return [
-    csvEscape(turn.turnId),
-    csvEscape(turn.timestamp),
-    csvEscape(turn.endTimestamp),
-    durationSec,
-    csvEscape(turn.children[0]?.source ?? ''),
-    csvEscape(turn.models.join(';')),
-    csvEscape(turn.efforts.join(';')),
-    csvEscape(turn.projectLabel || projectNameFromCwd(turn.cwd)),
-    csvEscape(turn.cwd),
-    csvEscape(turn.sessionId),
-    csvEscape(singleLine(turn.userText)),
-    turn.callCount,
-    csvEscape(turn.toolNames.join(';')),
-    turn.inputTokens,
-    turn.outputTokens,
-    turn.reasoningTokens,
-    turn.cacheReadTokens,
-    turn.cacheCreationTokens,
-    turn.totalTokens,
-    turn.cost.toFixed(6),
-    turn.unpricedCallCount,
-  ].join(',');
 }
+
+type CsvCell = string | number;
+type CallColumn = readonly [name: string, cell: (turn: UsageTurnRow, call: UsageTableRow) => CsvCell];
+type TurnColumn = readonly [name: string, cell: (turn: UsageTurnRow) => CsvCell];
+
+const CALL_COLUMNS: readonly CallColumn[] = [
+  ['turn_id', (turn) => csvEscape(turn.turnId)],
+  ['turn_started_at', (turn) => csvEscape(turn.timestamp)],
+  ['turn_ended_at', (turn) => csvEscape(turn.endTimestamp)],
+  ['timestamp', (_turn, r) => csvEscape(r.timestamp)],
+  ['source', (_turn, r) => csvEscape(r.source)],
+  ['model', (_turn, r) => csvEscape(r.model)],
+  ['model_short', (_turn, r) => csvEscape(getProvider(r.source).shortenModel(r.model))],
+  ['model_route', (_turn, r) => csvEscape(r.modelRoute ?? '')],
+  ['effort', (_turn, r) => csvEscape(r.effort ?? '')],
+  ['project_name', (_turn, r) => csvEscape(r.projectLabel || projectNameFromCwd(r.cwd))],
+  ['project_path', (_turn, r) => csvEscape(r.cwd)],
+  ['session', (_turn, r) => csvEscape(r.sessionId)],
+  ['user_prompt', (turn) => csvEscape(singleLine(turn.userText))],
+  ['tool_names', (_turn, r) => csvEscape(r.toolNames.join(';'))],
+  ['input_tokens', (_turn, r) => r.inputTokens],
+  ['output_tokens', (_turn, r) => r.outputTokens],
+  ['reasoning_tokens', (_turn, r) => r.reasoningTokens],
+  ['cache_read_tokens', (_turn, r) => r.cacheReadTokens],
+  ['cache_create_tokens', (_turn, r) => r.cacheCreationTokens],
+  ['total_tokens', (_turn, r) => r.totalTokens],
+  ['cost_usd', (_turn, r) => r.cost.toFixed(6)],
+  ['unpriced', (_turn, r) => (r.unpriced ? 1 : 0)],
+  ['output_tokens_per_sec', (_turn, r) => speedCell(r.outputSpeed)],
+  ['generation_seconds', (_turn, r) => secondsCell(r.generationMs)],
+];
+
+const TURN_COLUMNS: readonly TurnColumn[] = [
+  ['turn_id', (turn) => csvEscape(turn.turnId)],
+  ['started_at', (turn) => csvEscape(turn.timestamp)],
+  ['ended_at', (turn) => csvEscape(turn.endTimestamp)],
+  ['duration_seconds', turnDurationSeconds],
+  ['source', (turn) => csvEscape(turn.children[0]?.source ?? '')],
+  ['models', (turn) => csvEscape(turn.models.join(';'))],
+  ['effort', (turn) => csvEscape(turn.efforts.join(';'))],
+  ['project_name', (turn) => csvEscape(turn.projectLabel || projectNameFromCwd(turn.cwd))],
+  ['project_path', (turn) => csvEscape(turn.cwd)],
+  ['session', (turn) => csvEscape(turn.sessionId)],
+  ['user_prompt', (turn) => csvEscape(singleLine(turn.userText))],
+  ['call_count', (turn) => turn.callCount],
+  ['tool_names', (turn) => csvEscape(turn.toolNames.join(';'))],
+  ['input_tokens', (turn) => turn.inputTokens],
+  ['output_tokens', (turn) => turn.outputTokens],
+  ['reasoning_tokens', (turn) => turn.reasoningTokens],
+  ['cache_read_tokens', (turn) => turn.cacheReadTokens],
+  ['cache_create_tokens', (turn) => turn.cacheCreationTokens],
+  ['total_tokens', (turn) => turn.totalTokens],
+  ['cost_usd', (turn) => turn.cost.toFixed(6)],
+  ['unpriced_calls', (turn) => turn.unpricedCallCount],
+  ['output_tokens_per_sec', (turn) => speedCell(turn.outputSpeed)],
+  ['generation_seconds', (turn) => secondsCell(turn.generationMs)],
+];
 
 export const GET = withApiErrorHandling(async (req: Request) => {
   const url = new URL(req.url);
@@ -214,12 +165,12 @@ export const GET = withApiErrorHandling(async (req: Request) => {
     return true;
   });
 
-  const allTurns = recordsToTurnRows(filteredRecords, sourceUsers, scan.parentMap);
+  const allTurns = recordsToTurnRows(filteredRecords, sourceUsers, scan.parentMap, getAssistantUuids(scan.records));
   const searched = filterTurnsByQuery(allTurns, query);
   const sorted = sortTurns(searched, sortKey, sortDir);
   const totalRows = sorted.reduce((s, t) => s + t.callCount, 0);
 
-  const headers = level === 'turn' ? TURN_COLUMNS : CALL_COLUMNS;
+  const header = (level === 'turn' ? TURN_COLUMNS : CALL_COLUMNS).map(([name]) => name).join(',');
 
   const now = new Date();
   const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -259,13 +210,13 @@ export const GET = withApiErrorHandling(async (req: Request) => {
         if (query) push(`# search=${query.replace(/[,\n\r]/g, ' ')}`);
         push(`# turns=${sorted.length}`);
         push(`# rows=${level === 'turn' ? sorted.length : totalRows}`);
-        push(headers.join(','));
+        push(header);
 
         if (level === 'turn') {
-          for (const turn of sorted) push(renderTurnRow(turn));
+          for (const turn of sorted) push(TURN_COLUMNS.map(([, cell]) => cell(turn)).join(','));
         } else {
           for (const turn of sorted) {
-            for (const r of turn.children) push(renderCallRow(turn, r));
+            for (const r of turn.children) push(CALL_COLUMNS.map(([, cell]) => cell(turn, r)).join(','));
           }
         }
 

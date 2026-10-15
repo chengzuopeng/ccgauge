@@ -17,6 +17,7 @@ const {
   summarizeTimedCalls,
   tokensPerSecond,
 } = await import(join(root, 'lib/output-speed.ts'));
+const { formatOutputSpeed } = await import(join(root, 'lib/utils.ts'));
 const { parseJsonlFile } = await import(join(root, 'lib/data-loader/parse-jsonl.ts'));
 const { parseCodexJsonlFile } = await import(join(root, 'lib/providers/codex/parse-codex-jsonl.ts'));
 
@@ -45,6 +46,17 @@ function jsonl(lines) {
   assert.deepEqual(summarizeTimedCalls([call(5_000, 20, null), call(null, null, null)]), empty);
   assert.deepEqual(summarizeTimedCalls([]), empty);
   console.log('✓ turn speed summary: only timed calls count, empty and untimed turns stay null');
+}
+
+{
+  assert.equal(formatOutputSpeed(null), '—');
+  assert.equal(formatOutputSpeed(Number.NaN), '—');
+  assert.equal(formatOutputSpeed(0.17), '0.2 tok/s');
+  assert.equal(formatOutputSpeed(9.94), '9.9 tok/s');
+  assert.equal(formatOutputSpeed(9.96), '10 tok/s');
+  assert.equal(formatOutputSpeed(58.4), '58 tok/s');
+  assert.equal(formatOutputSpeed(199.6), '200 tok/s');
+  console.log('✓ formatted speed: one decimal below 10, whole numbers from 10');
 }
 
 {

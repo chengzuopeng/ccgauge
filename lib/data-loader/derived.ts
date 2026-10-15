@@ -19,6 +19,7 @@ import { resolveCanonicalCwd } from '../project-label';
 
 const allModelsCache = new WeakMap<object, string[]>();
 const allProjectsCache = new WeakMap<object, string[]>();
+const assistantUuidsCache = new WeakMap<object, Set<string>>();
 
 export function getAllModels(records: AssistantRecord[]): string[] {
   const cached = allModelsCache.get(records);
@@ -72,6 +73,14 @@ function bucketFor(scan: object): Map<string, UsageTurnRow[]> {
   return b.rows;
 }
 
+export function getAssistantUuids(records: AssistantRecord[]): Set<string> {
+  const cached = assistantUuidsCache.get(records);
+  if (cached) return cached;
+  const out = new Set(records.map((r) => r.uuid));
+  assistantUuidsCache.set(records, out);
+  return out;
+}
+
 /**
  * Cached `recordsToTurnRows`. Caller supplies the stable `scan` object plus a
  * `filterKey` that uniquely identifies the filter combo (source, from, to,
@@ -84,6 +93,7 @@ export function recordsToTurnRowsCached(
   records: AssistantRecord[],
   users: UserRecord[],
   parentMap: Record<string, string | null>,
+  assistantUuids?: ReadonlySet<string>,
 ): UsageTurnRow[] {
   const bucket = bucketFor(scan);
   const hit = bucket.get(filterKey);
@@ -93,7 +103,7 @@ export function recordsToTurnRowsCached(
     bucket.set(filterKey, hit);
     return hit;
   }
-  const value = recordsToTurnRows(records, users, parentMap);
+  const value = recordsToTurnRows(records, users, parentMap, assistantUuids);
   bucket.set(filterKey, value);
   while (bucket.size > TURNS_LRU_MAX) {
     const firstKey = bucket.keys().next().value;
