@@ -29,6 +29,14 @@ const SPAWN_BANNER_NEEDLE_BYTES = Buffer.from(SPAWN_BANNER_NEEDLE);
 const USER_MESSAGE_BYTES = Buffer.from('"UserMessage"');
 const CLOSING_BRACE = 0x7d;
 const HEAD_BYTES = 240;
+const OUTPUT_ITEM_TYPES = new Set([
+  'reasoning',
+  'function_call',
+  'custom_tool_call',
+  'tool_search_call',
+  'web_search_call',
+  'image_generation_call',
+]);
 const CODEX_LINE_HEAD =
   /^\{"timestamp":"([^"]*)",(?:"ordinal":\d+,)?"type":"([a-z_]+)"(?:,"payload":\{"type":"([A-Za-z_]+)"(?:,"id":"[^"]*")?(?:,"role":"([a-z_]+)")?)?/;
 
@@ -160,6 +168,31 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
 
   let prevTotal: { input: number; cached: number; output: number; reasoning: number } | null = null;
 
+  let genStart: string | null = null;
+  let awaitingInput = true;
+  let lastOutputTs: string | null = null;
+
+  function noteInput(ts: string): void {
+    if (!ts || !awaitingInput) return;
+    if (!genStart || ts > genStart) genStart = ts;
+  }
+
+  function noteOutput(ts: string): void {
+    awaitingInput = false;
+    if (ts && (!lastOutputTs || ts > lastOutputTs)) lastOutputTs = ts;
+  }
+
+  function noteResponseItem(sub: string, role: string, ts: string): void {
+    if (sub === 'message') {
+      if (role === 'assistant') noteOutput(ts);
+      else if (role) noteInput(ts);
+    } else if (sub === 'function_call_output' || sub === 'custom_tool_call_output' || sub === 'tool_search_output') {
+      noteInput(ts);
+    } else if (OUTPUT_ITEM_TYPES.has(sub)) {
+      noteOutput(ts);
+    }
+  }
+
   const fileMtime = await fileMtimeIso(file);
   let lastValidTs = fileMtime;
 
@@ -176,6 +209,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
 
   // Shared by both event shapes a user turn can arrive in.
   function pushUserMessage(text: string, timestamp: string): void {
+    noteInput(timestamp);
     if (!text) return;
     const uuid = `${sessionId}::u${userIdx++}`;
     user.push({
@@ -235,7 +269,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
           } else if (sub === 'image_generation_call') {
             skip = true;
           } else if (sub === 'message') {
-            skip = !!turn.pendingTextPreview || (!!role && role !== 'assistant');
+            skip = role ? role !== 'assistant' || !!turn.pendingTextPreview : false;
           }
         } else if (type === 'event_msg') {
           if (sub === 'agent_reasoning') {
@@ -247,6 +281,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
         }
         if (skip) {
           if (headTs) lastValidTs = headTs;
+          if (type === 'response_item') noteResponseItem(sub, role ?? '', headTs);
           return;
         }
       }
@@ -309,6 +344,11 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
 
     if (evt.type === 'event_msg') {
       const sub = asString(payload.type);
+      if (sub === 'task_started') {
+        genStart = ts;
+        awaitingInput = true;
+        lastOutputTs = null;
+      }
 
       // Always the first event of a `codex review` launcher, so it lands before
       // the synthesised prompts it has to suppress. Verified on every such
@@ -464,6 +504,9 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
           uuid,
           parentUuid: turn.userUuid,
           timestamp: ts,
+          ...(genStart ? { startTimestamp: genStart } : {}),
+          endTimestamp: lastOutputTs && lastOutputTs <= ts ? lastOutputTs : ts,
+          ...(last ? { callOutputTokens: asNumber(last.output_tokens) } : {}),
           sessionId,
           requestId,
           cwd: turn.cwd || defaultCwd,
@@ -496,6 +539,9 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
             : {}),
         });
         parentLinks.push([uuid, turn.userUuid]);
+        genStart = ts;
+        awaitingInput = true;
+        lastOutputTs = null;
 
         turn.toolNames = [];
         turn.hasThinking = false;
@@ -507,6 +553,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
 
     if (evt.type === 'response_item') {
       const sub = asString(payload.type);
+      noteResponseItem(sub, asString(payload.role), ts);
 
       if (sub === 'function_call' || sub === 'custom_tool_call') {
         const name = asString(payload.name);

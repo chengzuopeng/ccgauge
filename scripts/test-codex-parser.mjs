@@ -531,6 +531,7 @@ assert.ok(rangeToDates('7d').from instanceof Date);
   assert.equal(firstCall.usage.input_tokens, 188_764, 'first call bills its own input, not the inherited prefix');
   assert.equal(firstCall.usage.cache_read_input_tokens, 0, 'inherited cached tokens are not billed as cache read');
   assert.equal(firstCall.usage.output_tokens, 358, 'first call bills its own output, not the 426,343 total');
+  assert.equal(firstCall.callOutputTokens, 358);
   assert.equal(secondCall.usage.input_tokens, 5_206, 'later deltas still come from the cumulative total');
   assert.equal(secondCall.usage.cache_read_input_tokens, 188_761);
   assert.equal(secondCall.usage.output_tokens, 562);

@@ -103,6 +103,9 @@ export interface AssistantRecord {
   uuid: string;
   parentUuid: string | null;
   timestamp: string;
+  endTimestamp?: string;
+  startTimestamp?: string;
+  callOutputTokens?: number;
   sessionId: string;
   requestId: string;
   cwd: string;

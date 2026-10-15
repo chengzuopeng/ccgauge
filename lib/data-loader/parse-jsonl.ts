@@ -212,12 +212,14 @@ function parseAssistant(raw: RawRecord, file: string): AssistantRecord | null {
     }
   }
 
+  const timestamp = raw.timestamp ?? new Date().toISOString();
   return {
     type: 'assistant',
     source: 'claude',
     uuid: raw.uuid ?? messageId,
     parentUuid: raw.parentUuid ?? null,
-    timestamp: raw.timestamp ?? new Date().toISOString(),
+    timestamp,
+    endTimestamp: timestamp,
     sessionId: raw.sessionId ?? '',
     requestId: raw.requestId ?? '',
     cwd: raw.cwd ?? '',

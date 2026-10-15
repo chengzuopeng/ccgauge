@@ -25,7 +25,8 @@ export function dedupAssistantRecords(records: AssistantRecord[]): AssistantReco
     // (they'd become "(unknown)"). See lib/aggregator/tools.ts.
     const winner = r.timestamp < existing.timestamp ? r : existing;
     const other = winner === r ? existing : r;
-    seen.set(k, mergeToolUses(winner, other));
+    const end = laterTimestamp(winner.endTimestamp, other.endTimestamp);
+    seen.set(k, mergeToolUses(end === winner.endTimestamp ? winner : { ...winner, endTimestamp: end }, other));
   }
   return Array.from(seen.values());
 }
@@ -40,4 +41,9 @@ function mergeToolUses(winner: AssistantRecord, other: AssistantRecord): Assista
   const add = other.toolUses.filter((t) => !have.has(t.id));
   if (!add.length) return winner;
   return { ...winner, toolUses: [...(winner.toolUses ?? []), ...add] };
+}
+
+function laterTimestamp(a: string | undefined, b: string | undefined): string | undefined {
+  if (a === undefined || b === undefined) return undefined;
+  return a > b ? a : b;
 }

@@ -232,6 +232,7 @@ on 3737 by default.
     See `lib/providers/claude/index.ts#parserVersion` history:
     `claude-v3-synthetic-flag` → `claude-v4-sidechain-merge` →
     `claude-v5-task-notification-synthetic` → `claude-v6-tool-result-sizes`
+    → `claude-v7-meta-injected-synthetic` → `claude-v8-request-end-timestamp`
     (current). Touch this path? Bump `parserVersion` again — stale-cache
     entries are invisible failures, and `scripts/check-parser-versions.mjs`
     (run by `pnpm test`) fails when the code version drifts from
@@ -259,7 +260,8 @@ on 3737 by default.
     → `codex-v13-model-route-split` (see below)
     → `codex-v14-model-route-guard` (see below)
     → `codex-v15-user-fork-first-delta` (see below)
-    → `codex-v16-guardian-review-lineage` (current).
+    → `codex-v16-guardian-review-lineage`
+    → `codex-v17-request-timing` (current).
 
     v12 is the one that is not a sub-agent problem at all. `codex review`
     run from inside a turn starts a separate TOP-LEVEL session, written as a
