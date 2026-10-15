@@ -107,6 +107,13 @@ function isSubagentForkMirror(payload: Record<string, unknown>): boolean {
   return asString(payload.thread_source) === 'subagent' && !!asString(payload.forked_from_id);
 }
 
+function isSubagentThread(payload: Record<string, unknown>): boolean {
+  const threadSource = asString(payload.thread_source);
+  if (threadSource === 'subagent' || threadSource === 'guardian_review') return true;
+  const source = payload.source;
+  return typeof source === 'object' && source !== null && 'subagent' in source;
+}
+
 function extractMessageText(payload: Record<string, unknown>): string {
   const msg = payload.message;
   if (typeof msg === 'string') return msg;
@@ -271,7 +278,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
 
       sessionId = asString(payload.id);
       inheritsHistory = !!asString(payload.forked_from_id);
-      if (asString(payload.thread_source) === 'subagent') {
+      if (isSubagentThread(payload)) {
         subagentLineageRoot =
           asString(payload.session_id) || asString(payload.parent_thread_id) || '';
       }

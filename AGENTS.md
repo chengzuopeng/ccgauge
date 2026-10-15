@@ -258,7 +258,8 @@ on 3737 by default.
     → `codex-v12-review-spawn-linkage` (see below)
     → `codex-v13-model-route-split` (see below)
     → `codex-v14-model-route-guard` (see below)
-    → `codex-v15-user-fork-first-delta` (current; see below).
+    → `codex-v15-user-fork-first-delta` (see below)
+    → `codex-v16-guardian-review-lineage` (current).
 
     v12 is the one that is not a sub-agent problem at all. `codex review`
     run from inside a turn starts a separate TOP-LEVEL session, written as a

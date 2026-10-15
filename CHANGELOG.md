@@ -14,6 +14,11 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
   history, and that prefix was charged to the fork's first call (426,343
   output tokens for a call that produced 358). The first call now bills its
   own usage. Later calls and sessions that are not forks are unchanged.
+- **Codex auto-review calls no longer appear as "(no user text)" rows.**
+  Codex 0.162 labels guardian reviews `thread_source: "guardian_review"`, which
+  the parser did not treat as a sub-agent, so every review was its own turn
+  with no prompt. Reviews now fold into the turn that triggered them. Totals,
+  cost and call counts do not change; only the grouping does.
 
 ## [1.4.8] — 2026-10-10
 
