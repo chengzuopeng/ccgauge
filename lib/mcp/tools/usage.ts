@@ -16,7 +16,7 @@ import {
 } from '../formatters';
 import { asTextResult } from '../text-result';
 import { safeMcpHandler } from '../safe-handler';
-import { getProvider } from '@/lib/providers';
+import { isResolvedMatch, resolvePricing } from '@/lib/pricing/resolve';
 import { costFromUsage } from '@/lib/pricing/cost-from-usage';
 
 export function registerUsageTools(server: McpServer): void {
@@ -239,7 +239,7 @@ export function registerUsageTools(server: McpServer): void {
         model: z
           .string()
           .min(1)
-          .describe('Exact model id (e.g. "claude-opus-4-8-20260115", "gpt-5.2-codex"). Date suffixes are stripped automatically, and so are Codex relay route prefixes ("<route>--<model>").'),
+          .describe('Exact model id (e.g. "claude-opus-4-8-20260115", "gpt-5.2-codex"). Date suffixes are stripped automatically, and so are relay route prefixes ("<route>--<model>" or "<route>/<model>").'),
         input_tokens: z.number().int().min(0).default(0),
         output_tokens: z
           .number()
@@ -260,8 +260,7 @@ export function registerUsageTools(server: McpServer): void {
     },
     safeMcpHandler(async (args) => {
       const source = args.source;
-      const provider = getProvider(source);
-      const { pricing, matchType } = provider.resolvePricing(args.model);
+      const { pricing, matchType } = resolvePricing(args.model, source);
 
       const usage = {
         input_tokens: args.input_tokens ?? 0,
@@ -276,10 +275,7 @@ export function registerUsageTools(server: McpServer): void {
         source,
         model: args.model,
         pricing_match: matchType,
-        pricing_resolved:
-          matchType === 'exact' ||
-          matchType === 'date-stripped' ||
-          matchType === 'prefix-stripped',
+        pricing_resolved: isResolvedMatch(matchType),
         priced: pricing !== null,
         pricing,
         usage,

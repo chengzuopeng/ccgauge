@@ -233,6 +233,26 @@ Override / extend via environment variables:
 | `CCGAUGE_MCP_PRETTY=1` | Pretty-print MCP JSON payloads — easier to read while debugging a client |
 | `CCGAUGE_DEBUG` | Verbose indexer diagnostics on stderr |
 
+### Model prices
+
+Every call is priced from a built-in table (LiteLLM). A model that is not in it — usually one reached through a gateway or proxy — shows as **unpriced** and counts as $0. To fix that, or to use your own rates, create `~/.ccgauge/model-overrides.json` (in `CCGAUGE_STATE_DIR` if you set one):
+
+```json
+{
+  "prices": {
+    "deepseek-v4.1-flash": { "input": 0.3, "output": 1.2, "cacheRead": 0.03 }
+  },
+  "aliases": {
+    "codex-auto-review": "gpt-5.5"
+  }
+}
+```
+
+- `prices` — USD per 1M tokens. `input` and `output` are required; `cacheRead` defaults to 10% of `input`, and `cacheCreation5m` / `cacheCreation1h` to 0.
+- `aliases` — price a model as another one.
+- Names are case-insensitive, and a gateway route is ignored: `llm-claude/claude-sonnet-5-5` and `claude-sonnet-5-5` are the same model.
+- The file is re-read within a second of an edit, so there is nothing to restart. A bad file is reported once on stderr and ignored.
+
 ## Develop
 
 ```bash

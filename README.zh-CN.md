@@ -233,6 +233,26 @@ ccgauge 自动识别标准路径：
 | `CCGAUGE_MCP_PRETTY=1` | MCP 的 JSON 输出格式化，调客户端时好读 |
 | `CCGAUGE_DEBUG` | 索引器详细诊断输出到 stderr |
 
+### 模型价格
+
+每次调用都按内置价格表（来自 LiteLLM）计价。表里没有的模型——多数是经网关或代理接入的——会显示为「未定价」，按 $0 计入。想补上价格，或者使用自己的费率，就新建 `~/.ccgauge/model-overrides.json`（设置了 `CCGAUGE_STATE_DIR` 时放在那个目录里）：
+
+```json
+{
+  "prices": {
+    "deepseek-v4.1-flash": { "input": 0.3, "output": 1.2, "cacheRead": 0.03 }
+  },
+  "aliases": {
+    "codex-auto-review": "gpt-5.5"
+  }
+}
+```
+
+- `prices`：每 100 万 token 的美元价格。`input`、`output` 必填；`cacheRead` 默认取 `input` 的 10%，`cacheCreation5m` / `cacheCreation1h` 默认 0。
+- `aliases`：把一个模型按另一个模型计价。
+- 名字不区分大小写，网关前缀会被忽略：`llm-claude/claude-sonnet-5-5` 与 `claude-sonnet-5-5` 是同一个模型。
+- 文件改动后一秒内自动重新读取，无需重启；文件有问题时会在 stderr 提示一次并忽略。
+
 ## 本地开发
 
 ```bash

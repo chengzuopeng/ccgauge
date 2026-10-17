@@ -8,7 +8,7 @@ import type {
   UserRecord,
 } from '../types';
 import { costOfRecord, pricedCostOfRecord } from '../pricing/calculate';
-import { getProvider } from '../providers';
+import { isResolvedMatch, resolvePricing } from '../pricing/resolve';
 import { matchesModel } from '../providers/codex/model-route.js';
 import { projectNameFromCwd } from '../utils';
 import { resolveProjectLabel } from '../project-label';
@@ -147,7 +147,7 @@ export function aggregateByModel(
     if (!withinRangePrepared(rec, prepared)) continue;
     let s = map.get(rec.model);
     if (!s) {
-      const { pricing, matchType } = getProvider(rec.source).resolvePricing(rec.model);
+      const { pricing, matchType } = resolvePricing(rec.model, rec.source);
       s = {
         model: rec.model,
         source: rec.source,
@@ -160,7 +160,7 @@ export function aggregateByModel(
         cost: 0,
         saved: 0,
         pricing,
-        pricingResolved: matchType === 'exact' || matchType === 'date-stripped' || matchType === 'prefix-stripped',
+        pricingResolved: isResolvedMatch(matchType),
         priced: pricing !== null,
       };
       map.set(rec.model, s);

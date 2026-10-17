@@ -13,6 +13,7 @@ export type PricingMatchType =
   | 'date-stripped'
   | 'prefix-stripped'
   | 'family-fallback'
+  | 'override'
   | 'none';
 
 export interface PricingResolution {

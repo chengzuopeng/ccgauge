@@ -3,6 +3,7 @@ import type { PricingResolution } from '../types';
 // Relative + explicit .js so raw `node --experimental-strip-types` test runs resolve it.
 import { LITELLM_OPENAI_PRICING } from '../../pricing/litellm-pricing.generated.js';
 import { splitModelRoute } from './model-route.js';
+import { nearestKnownVersionKey } from '../../pricing/model-family.js';
 
 /**
  * Static OpenAI/Codex pricing base = hand-maintained gap models + the committed
@@ -18,7 +19,17 @@ import { splitModelRoute } from './model-route.js';
  * Hand layer covers models LiteLLM does NOT carry (currently none). LiteLLM wins
  * for shared keys (snapshot spread LAST). Refresh with `pnpm update-pricing`.
  */
-const HAND_OPENAI: Record<string, Pricing> = {};
+const ZERO_PRICING: Pricing = {
+  input: 0,
+  output: 0,
+  cacheCreation5m: 0,
+  cacheCreation1h: 0,
+  cacheRead: 0,
+};
+
+const HAND_OPENAI: Record<string, Pricing> = {
+  'codex-auto-review': ZERO_PRICING,
+};
 
 export const BUILTIN_PRICING_OPENAI: Record<string, Pricing> = {
   ...HAND_OPENAI,
@@ -94,6 +105,10 @@ export function resolveCodexPricing(model: string): PricingResolution {
       matchType: 'family-fallback',
       matchedKey: 'o-(latest)',
     };
+  }
+  const nearest = nearestKnownVersionKey(stripped, pricing);
+  if (nearest) {
+    return { pricing: pricing[nearest], matchType: 'family-fallback', matchedKey: nearest };
   }
   return { pricing: null, matchType: 'none', matchedKey: null };
 }
