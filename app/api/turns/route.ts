@@ -18,7 +18,7 @@ import {
 import { badRequest, withApiErrorHandling } from '@/lib/api/error-handler';
 import { parseTurnFilters, loadTurnScope } from '@/lib/api/turn-scope';
 import { detectCodexFastTier } from '@/lib/providers/codex/speed';
-import { joinModelRoute } from '@/lib/providers/codex/model-route.js';
+import { modelRouteIncludes } from '@/lib/providers/codex/model-route.js';
 import type { UsageTurnRow } from '@/lib/serialize';
 
 /**
@@ -44,7 +44,7 @@ function filterTurnsByQuery(turns: UsageTurnRow[], q: string): UsageTurnRow[] {
       t.sessionId.toLowerCase().includes(needle) ||
       t.models.some((m) => m.toLowerCase().includes(needle)) ||
       t.children.some(
-        (c) => !!c.modelRoute && joinModelRoute(c.model, c.modelRoute).toLowerCase().includes(needle),
+        (c) => !!c.modelRoute && modelRouteIncludes(c.model, c.modelRoute, needle),
       ) ||
       t.toolNames.some((tool) => tool.toLowerCase().includes(needle)),
   );

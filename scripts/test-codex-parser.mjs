@@ -1273,6 +1273,58 @@ assert.ok(rangeToDates('7d').from instanceof Date);
 }
 
 {
+  const dir = mkdtempSync(join(tmpdir(), 'ccgauge-codex-slash-route-'));
+  const tokens = (ts, input) =>
+    JSON.stringify({
+      timestamp: ts,
+      type: 'event_msg',
+      payload: {
+        type: 'token_count',
+        info: {
+          total_token_usage: {
+            input_tokens: input,
+            cached_input_tokens: 0,
+            output_tokens: 10,
+            reasoning_output_tokens: 0,
+          },
+        },
+      },
+    });
+  const cases = [
+    ['llm-claude/claude-sonnet-5-5', 'claude-sonnet-5-5', 'llm-claude'],
+    ['cursor-plugin/grok-4.7-fast', 'grok-4.7-fast', 'cursor-plugin'],
+    ['chengzp/gpt-6.1-sol', 'gpt-6.1-sol', 'chengzp'],
+    ['openai/gpt-5', 'gpt-5', undefined],
+    ['claude-opus-5-5[1M]', 'claude-opus-5-5', undefined],
+  ];
+  for (const [index, [raw, model, route]] of cases.entries()) {
+    const file = join(dir, `slash-${index}.jsonl`);
+    writeFileSync(
+      file,
+      [
+        JSON.stringify({
+          timestamp: '2026-10-15T10:00:00Z',
+          type: 'session_meta',
+          payload: { id: `slash-${index}`, cwd: '/tmp/proj', model_provider: 'custom' },
+        }),
+        JSON.stringify({
+          timestamp: '2026-10-15T10:00:01Z',
+          type: 'turn_context',
+          payload: { turn_id: `t-${index}`, cwd: '/tmp/proj', model: raw },
+        }),
+        tokens('2026-10-15T10:00:02Z', 1_000),
+      ].join('\n') + '\n',
+      'utf8',
+    );
+    const parsedRoute = await parseCodexJsonlFile(file);
+    assert.equal(parsedRoute.assistant[0].model, model, `${raw} parses to its model`);
+    assert.equal(parsedRoute.assistant[0].modelRoute, route, `${raw} keeps its route`);
+  }
+  rmSync(dir, { recursive: true, force: true });
+  console.log('✓ slash route prefixes and bracket suffixes split off the model');
+}
+
+{
   const dir = mkdtempSync(join(tmpdir(), 'ccgauge-codex-skip-'));
   try {
     const child = '019fe02e-db7c-7a70-aaea-89e83e9b03d1';

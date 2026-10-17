@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { splitModelRoute } from './providers/codex/model-route.js';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -128,7 +129,7 @@ const OPENAI_FAMILY_LABEL: Record<string, string> = {
 
 export function shortenModel(model: string): string {
   if (!model) return '(unknown)';
-  const noPrefix = model.replace(/^(vertex_ai|bedrock|anthropic|openai)\//, '');
+  const noPrefix = splitModelRoute(model).model.replace(/^(vertex_ai|bedrock|anthropic|openai)\//, '');
   const lower = noPrefix.toLowerCase();
   if (lower.startsWith('gpt-') || /^o\d/.test(lower)) {
     if (lower.startsWith('gpt-')) {

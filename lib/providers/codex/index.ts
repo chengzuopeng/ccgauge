@@ -48,7 +48,7 @@ export const codexAdapter: ProviderAdapter = {
   color: { fg: '#047857', bg: '#d1fae5' },
   logoSrc: '/codex-logo.webp',
 
-  parserVersion: 'codex-v17-request-timing',
+  parserVersion: 'codex-v18-slash-model-route',
   capabilities: {
     hasCacheCreation: false,
     hasReasoningTokens: true,

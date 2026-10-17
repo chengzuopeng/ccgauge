@@ -30,7 +30,7 @@ export function ModelBarChart({ models }: { models: ModelSummary[] }) {
       {models.map((m) => {
         const pct = totalCost > 0 ? m.cost / totalCost : 0;
         return (
-          <div key={m.model} className="space-y-1.5 group">
+          <div key={`${m.source}:${m.model}`} className="space-y-1.5 group">
             <div className="flex items-baseline justify-between gap-3 text-sm">
               <span className="font-medium text-text-primary truncate">{shortenModel(m.model)}</span>
               <span className="text-xs text-text-tertiary tabular-nums flex-1 text-right">
