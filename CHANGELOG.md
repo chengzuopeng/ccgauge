@@ -5,6 +5,54 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] — 2026-10-17
+
+### Added
+
+- **Model price overrides.** `~/.ccgauge/model-overrides.json` (in
+  `CCGAUGE_STATE_DIR` if you set one) sets a model's price in USD per 1M
+  tokens (`prices`), including a model the built-in table already knows, or
+  prices one model as another (`aliases`). It is re-read within a second of an
+  edit, so nothing needs restarting.
+- **Hover a gateway model to see its full name.** When a call went through a
+  route such as magpie's `zita/gpt-6.1-sol`, the model cell of the usage table
+  shows the full name, route included, in a tooltip, on turns and on calls.
+
+### Changed
+
+- **The Codex fast tier is decided per call, from the tier its thread
+  recorded.** A call bills at the fast-tier multiplier only when its thread
+  recorded the priority tier and its model is an OpenAI GPT, o-series or
+  `codex-*` model. `config.toml` no longer plays a part, so Claude, DeepSeek,
+  Grok and other models served through a gateway never get the multiplier or
+  the "fast" tag. A call with no recorded tier (`codex exec`, sub-agents, a
+  thread's first turn, Codex versions that never write one) bills at the
+  standard rate, so if you relied on `service_tier = "fast"` with such a
+  version, those calls now bill as standard. The tag is per call, and a turn
+  row's hint says how many of its calls were fast. Codex history is reparsed
+  once in the background after upgrading.
+
+### Fixed
+
+- **Codex calls on the standard tier are no longer billed at the fast-tier
+  multiplier.** `service_tier = "priority"` in `config.toml` used to apply to
+  every GPT call in your history, so a thread that ran on the standard tier
+  still showed the "fast" tag and cost 2× (2.5× for gpt-5.5).
+- **Models behind a `route/model` gateway name now price correctly.** Newer
+  magpie builds name a model `<route>/<model>` (`llm-claude/claude-sonnet-5-5`,
+  `chengzp/gpt-6.1-sol`, `cursor-plugin/grok-4.7-fast`). The route is now split
+  off like the older `<route>--<model>` form, so these calls show their real
+  model instead of "Llm claude/claude.sonnet.5.5", and a Claude model seen
+  through Codex is priced from the Claude table instead of counting as $0. A
+  model the price table has not heard of falls back to the nearest older
+  version of the same series (`deepseek-v4.1-flash` → `deepseek-v4-flash`) and
+  is marked as a fallback price.
+- **Search and the model filter accept either route spelling.** `llm-claude/claude`
+  and `llm-claude--claude` find the same calls.
+- **`codex-auto-review` calls no longer show as unpriced.** They are Codex's own
+  approval-review calls and now count as $0, instead of leaving an "unpriced"
+  badge on every turn that triggered one.
+
 ## [1.4.9] — 2026-10-15
 
 ### Added
