@@ -261,7 +261,9 @@ on 3737 by default.
     → `codex-v14-model-route-guard` (see below)
     → `codex-v15-user-fork-first-delta` (see below)
     → `codex-v16-guardian-review-lineage`
-    → `codex-v17-request-timing` (current).
+    → `codex-v17-request-timing`
+    → `codex-v18-slash-model-route` (see below)
+    → `codex-v19-service-tier` (current; see below).
 
     v12 is the one that is not a sub-agent problem at all. `codex review`
     run from inside a turn starts a separate TOP-LEVEL session, written as a
@@ -307,6 +309,49 @@ on 3737 by default.
     prefix is the parent's own counter at the fork's timestamp, an exact match
     in the parent's rollout. In the local rollouts, every non-fork file opens
     with a total equal to its first `last_token_usage`, so those parse as before.
+
+    v18 is the second route spelling. Newer magpie builds name a model
+    `<route>/<model>` (`llm-claude/claude-sonnet-5-5`, `chengzp/gpt-6.1-sol`,
+    `cursor-plugin/grok-4.7-fast`) where older ones wrote `<route>--<model>`, and
+    magpie itself cuts at the LAST `/` (its `affinity.json` records the two halves
+    as `rest` and `model`). v17 only knew `--`, so a slash id stayed whole: the
+    usage table printed "Llm claude/claude.sonnet.5.5", and the call was unpriced
+    because the Codex table has no route-qualified keys. `splitModelRoute` now
+    cuts at the last `/` first (a multi-level route such as `magpie/codex` stays
+    together), then at the last `--` with the v14 guard; a vendor namespace
+    (`openai/`, `anthropic/`, `bedrock/`, `vertex_ai/`) is dropped without a
+    route, and a trailing `[1M]` or `(llm-gateway)` is cut off the model. The `/`
+    rule has no look-alike guard — `gpt-5/eastus` is not a shape anyone writes.
+    Pricing and labels do not wait for the reparse: `resolvePricing` and
+    `shortenModel` split the id themselves, so a cache still holding
+    `llm-claude/claude-sonnet-5-5` prices and reads correctly while the
+    background reparse runs.
+
+    v19 records the service tier. Newer Codex writes a thread's tier as
+    `thread_settings.service_tier` (`default` or `priority`) in the
+    `thread_settings_applied` event that comes before each turn after a
+    thread's first, and the parser stamps the latest one it has seen onto every
+    call as `AssistantRecord.serviceTier`. The model has `turn_context` as its
+    authority and the settings event only as a fallback; the tier has no second
+    source, so the event is read even after `turn_context` has spoken. A
+    settings event without the key (the model or effort picker changing while
+    the thread is idle) leaves the previous value alone, any value other than
+    `priority` / `fast` counts as `default`, and a call that has seen no tier
+    carries no field at all: a thread's first turn, `codex exec`, a sub-agent.
+    Those bill at the standard rate and `config.toml` is no longer read for
+    billing. It was the only source before v19, and it cannot stand in for the
+    missing record: `service_tier` there is a toggle the Codex app rewrites, so
+    today's value was applied to all history (one `service_tier = "priority"`
+    line billed every GPT call at 2x, threads that ran on the standard tier
+    included), and `codex exec` takes its tier from that file plus
+    `-c service_tier=...` flags that never reach the rollout, so a script that
+    passes `-c service_tier='"default"'` on every run still looked fast whenever
+    the toggle was on. Cached records from v18 have no field either, so they bill
+    standard until the background reparse replaces them. The recorded value is
+    the tier the thread asked for, not proof of what the API charged: Codex's own
+    request log (`~/.codex/logs_2.sqlite`, `feedback_tags`) tags the same
+    requests `unset` for gateway models that have no fast mode, which is one more
+    reason the multiplier stays behind `isOpenAIPriorityModel`.
 
     Two of the earlier versions exist because a Codex rollout's shape varies
     **within one `cli_version`**, which is the thing to internalise before
@@ -359,6 +404,38 @@ on 3737 by default.
    `lib/pricing/litellm-transform.js`; merge/validation lives in `lib/pricing/merge.js`.
    Bump the committed base with `pnpm update-pricing` — never edit the generated
    file by hand.
+
+   `lib/pricing/resolve.ts#resolvePricing(model, source)` is the one place a
+   record gets its price (`calculate.ts`, the aggregator and the MCP tool all
+   call it): `model-overrides.json` first, then the record's own provider, then
+   the OTHER provider. So the table follows the model, not the transcript — a
+   `claude-*` model in a Codex rollout (served through a gateway such as
+   magpie) is priced from the Claude table, a `gpt-*` model in a Claude
+   transcript from the Codex one — and the second chance only fires for calls
+   that used to be unpriced. Inside the Codex table a model with no exact key
+   falls back to the `gpt` / `o` family price, then to the nearest lower
+   version of the same stem and flavor (`deepseek-v4.1-flash` →
+   `deepseek-v4-flash`, `lib/pricing/model-family.js#nearestKnownVersionKey`),
+   always reported as a fallback price. `codex-auto-review`, the pseudo-model
+   Codex uses for approval reviews, is a hand entry at $0 (`HAND_OPENAI`) so it
+   never shows as unpriced. The fast / priority-tier multiplier is OpenAI-only
+   and per call: `codexFastMultiplier(model, serviceTier)` returns 1 unless the
+   model is `gpt-*`, `o<digit>` or `codex-*` other than `codex-auto-review`
+   (`isOpenAIPriorityModel`). For those the tier the thread recorded decides
+   (`priority` bills 2x, gpt-5.5 2.5x; `default` bills 1x), and a call with no
+   recorded tier bills as `default`, whatever `config.toml` says.
+   `codexCallIsFast` is the same test as a boolean: `recordsToTurnRows` turns it
+   into `UsageTableRow.fast` and `UsageTurnRow.fastCallCount`, and the usage
+   table draws its "fast" tag from those, so no global flag crosses the API.
+
+   `$CCGAUGE_STATE_DIR/model-overrides.json` (default `~/.ccgauge/`) is the
+   user's escape hatch: `prices` maps a model to USD per 1M tokens (`input` and
+   `output` required, `cacheRead` defaults to 10% of input, cache writes to 0)
+   and beats every other source; `aliases` prices one model as another. It is
+   re-read at most once a second (`lib/pricing/overrides.js`) and resolved at
+   read time, so editing it needs neither a restart nor a reparse — do not bake
+   prices into the cache or bump `parserVersion` for it. A bad file or entry is
+   reported once on stderr and ignored.
 
 6. **Theme + locale never flash.**
    `components/no-flash-script.tsx` is an inline `<head>` script that reads
