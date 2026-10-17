@@ -9,7 +9,7 @@ export function pricedCostOfRecord(rec: AssistantRecord): { cost: CostBreakdown;
   const provider = getProvider(rec.source);
   const { pricing } = resolvePricing(rec.model, rec.source);
   return {
-    cost: provider.costFromUsage(rec.usage, pricing, rec.model),
+    cost: provider.costFromUsage(rec.usage, pricing, rec.model, rec.serviceTier),
     priced: pricing !== null,
   };
 }

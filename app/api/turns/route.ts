@@ -17,7 +17,6 @@ import {
 } from '@/lib/usage-query';
 import { badRequest, withApiErrorHandling } from '@/lib/api/error-handler';
 import { parseTurnFilters, loadTurnScope } from '@/lib/api/turn-scope';
-import { detectCodexFastTier } from '@/lib/providers/codex/speed';
 import { modelRouteIncludes } from '@/lib/providers/codex/model-route.js';
 import type { UsageTurnRow } from '@/lib/serialize';
 
@@ -133,9 +132,6 @@ export const GET = withApiErrorHandling(async (req: Request) => {
     projects,
     allModels,
     allProjects,
-    // Read fresh per request so the dashboard reflects live config.toml edits
-    // without a restart (the old module-level cache was the v1.2.0 staleness bug).
-    codexFastActive: detectCodexFastTier(),
     hasAnyRecords: allSourceRecords.length > 0,
   });
 });

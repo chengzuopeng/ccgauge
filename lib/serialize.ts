@@ -1,6 +1,7 @@
 import type { BlockProgressInfo } from './blocks/compute';
 import type { AssistantRecord, ProviderId, UserRecord } from './types';
 import { pricedCostOfRecord } from './pricing/calculate';
+import { codexCallIsFast } from './providers/codex/speed';
 import { buildTurnIndex } from './turns';
 import { resolveProjectLabel } from './project-label';
 import { generationStartOf, generationWindowMs, summarizeTimedCalls, tokensPerSecond } from './output-speed';
@@ -71,6 +72,7 @@ export interface UsageTableRow {
   costCacheRead: number;
   costCacheWrite: number;
   unpriced?: boolean;
+  fast?: boolean;
   toolNames: string[];
 
   effort?: string;
@@ -122,6 +124,7 @@ export interface UsageTurnRow {
    *  calls). 0 when none. */
   workflowSubagentCount: number;
   unpricedCallCount: number;
+  fastCallCount: number;
   generationMs: number | null;
   generationOutputTokens: number | null;
   outputSpeed: number | null;
@@ -185,6 +188,7 @@ export function recordsToTurnRows(
   for (const r of assistants) {
     const turnId = turnIndex.get(r.uuid) ?? r.uuid;
     const { cost: c, priced } = pricedCostOfRecord(r);
+    const fast = r.source === 'codex' && codexCallIsFast(r.model, r.serviceTier);
     const direct = resolveDirectPrompt(r.uuid);
     if (r.isWorkflowSubagent) {
       let set = workflowFilesByTurn.get(turnId);
@@ -221,6 +225,7 @@ export function recordsToTurnRows(
       costCacheRead: c.cacheRead,
       costCacheWrite: c.cacheCreation5m + c.cacheCreation1h,
       unpriced: priced ? undefined : true,
+      fast: fast ? true : undefined,
       toolNames: r.toolNames,
       effort: r.effort,
       isWorkflowSubagent: r.isWorkflowSubagent || undefined,
@@ -254,6 +259,7 @@ export function recordsToTurnRows(
     let costCacheRead = 0;
     let costCacheWrite = 0;
     let unpricedCallCount = 0;
+    let fastCallCount = 0;
     for (const c of children) {
       modelSet.add(c.model);
       for (const t of c.toolNames) toolSet.add(t);
@@ -269,6 +275,7 @@ export function recordsToTurnRows(
       costCacheRead += c.costCacheRead;
       costCacheWrite += c.costCacheWrite;
       if (c.unpriced) unpricedCallCount++;
+      if (c.fast) fastCallCount++;
     }
     const userRec = userMap.get(turnId);
     const startMs = new Date(first.timestamp).getTime();
@@ -302,6 +309,7 @@ export function recordsToTurnRows(
       hasWorkflowSubagents: (workflowFilesByTurn.get(turnId)?.size ?? 0) > 0,
       workflowSubagentCount: workflowFilesByTurn.get(turnId)?.size ?? 0,
       unpricedCallCount,
+      fastCallCount,
       ...summarizeTimedCalls(children),
       userText: userRec?.textPreview ?? '',
       children,

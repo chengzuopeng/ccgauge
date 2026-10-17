@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { Pricing } from '@/lib/types';
+import type { Pricing, ServiceTier } from '@/lib/types';
+import { isOpenAIPriorityModel } from '../../pricing/model-family.js';
+import { splitModelRoute } from './model-route.js';
 
 /**
  * Codex fast / priority service tier detection.
@@ -106,10 +108,17 @@ export function detectCodexFastTier(): boolean {
   return value;
 }
 
+export function codexCallIsFast(model: string, serviceTier?: ServiceTier): boolean {
+  return serviceTier === 'priority' && isOpenAIPriorityModel(model);
+}
+
 /** Per-model multiplier when fast tier is active, else 1. */
-export function codexFastMultiplier(model: string): number {
-  if (!detectCodexFastTier()) return 1;
-  return FAST_MULTIPLIER_OVERRIDES[normalizeCodexModelKey(model)] ?? DEFAULT_FAST_MULTIPLIER;
+export function codexFastMultiplier(model: string, serviceTier?: ServiceTier): number {
+  if (!codexCallIsFast(model, serviceTier)) return 1;
+  return (
+    FAST_MULTIPLIER_OVERRIDES[normalizeCodexModelKey(splitModelRoute(model).model)] ??
+    DEFAULT_FAST_MULTIPLIER
+  );
 }
 
 /** Scales every per-token rate by `m` so the whole Codex cost (and savings) scales uniformly. */

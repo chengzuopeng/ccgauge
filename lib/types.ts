@@ -92,6 +92,8 @@ export type RawRecord = z.infer<typeof RawRecordSchema>;
 
 export type ProviderId = 'claude' | 'codex';
 
+export type ServiceTier = 'default' | 'priority';
+
 export interface ToolUseRef {
   id: string;
   name: string;
@@ -130,6 +132,7 @@ export interface AssistantRecord {
   filePath: string;
 
   effort?: string;
+  serviceTier?: ServiceTier;
 
   isSidechain?: boolean;
   /** Lineage root this sub-agent transcript belongs to — see the UserRecord

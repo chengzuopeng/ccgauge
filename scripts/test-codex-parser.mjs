@@ -961,11 +961,11 @@ assert.ok(rangeToDates('7d').from instanceof Date);
   process.env.CODEX_HOME = codexDir;
   process.env.HOME = rootDir;
   try {
-    assert.equal(codexFastMultiplier('gpt-5.5'), 2.5, 'gpt-5.5 → 2.5');
-    assert.equal(codexFastMultiplier('gpt-5.4'), 2, 'gpt-5.4 → 2');
-    assert.equal(codexFastMultiplier('gpt-5.3-codex'), 2, 'gpt-5.3-codex → 2');
-    assert.equal(codexFastMultiplier('gpt-5'), 2, 'unlisted model → default 2');
-    assert.equal(codexFastMultiplier('openai/gpt-5.5-20260101'), 2.5, 'prefix/date normalized to gpt-5.5');
+    assert.equal(codexFastMultiplier('gpt-5.5', 'priority'), 2.5, 'gpt-5.5 → 2.5');
+    assert.equal(codexFastMultiplier('gpt-5.4', 'priority'), 2, 'gpt-5.4 → 2');
+    assert.equal(codexFastMultiplier('gpt-5.3-codex', 'priority'), 2, 'gpt-5.3-codex → 2');
+    assert.equal(codexFastMultiplier('gpt-5', 'priority'), 2, 'unlisted model → default 2');
+    assert.equal(codexFastMultiplier('openai/gpt-5.5-20260101', 'priority'), 2.5, 'prefix/date normalized to gpt-5.5');
     // 1M output × $30/M × 2.5 = $75
     const p55 = resolveCodexPricing('gpt-5.5').pricing;
     const fast55 = costFromUsage(
@@ -977,7 +977,7 @@ assert.ok(rangeToDates('7d').from instanceof Date);
         cache_creation_5m: 0,
         cache_creation_1h: 0,
       },
-      scaleCodexPricing(p55, codexFastMultiplier('gpt-5.5')),
+      scaleCodexPricing(p55, codexFastMultiplier('gpt-5.5', 'priority')),
     );
     assert.equal(fast55.total.toFixed(2), '75.00', 'gpt-5.5 fast: 1M output @ $30/M x2.5 = $75');
   } finally {
@@ -988,7 +988,7 @@ assert.ok(rangeToDates('7d').from instanceof Date);
     rmSync(rootDir, { recursive: true, force: true });
     invalidateCodexTierCache();
   }
-  console.log('✓ per-model fast multipliers gated by global service_tier=fast|priority');
+  console.log('✓ per-model fast multipliers apply to calls recorded on the priority tier');
 }
 
 {

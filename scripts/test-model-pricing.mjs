@@ -110,14 +110,24 @@ try {
   }
 
   {
+    const claudeViaCodex = m.pricedCostOfRecord(assistant('a1', 'codex', 'llm-claude/claude-sonnet-5-5', 'priority'));
+    const claudeNative = m.pricedCostOfRecord(assistant('a2', 'claude', 'claude-sonnet-5-5'));
+    assert.equal(claudeViaCodex.priced, true);
+    assert.equal(claudeViaCodex.cost.total, claudeNative.cost.total, 'a Claude model through Codex bills like the native one, with no fast multiplier');
+
     const gptPrice = m.resolvePricing('gpt-6.1-sol', 'codex').pricing;
     const gpt = m.pricedCostOfRecord(assistant('a3', 'codex', 'llm-gateway/gpt-6.1-sol', 'priority'));
     assert.ok(near(gpt.cost.total, 2 * baseCost(gptPrice)), 'a GPT model keeps the fast multiplier');
 
+    const deepseekPrice = m.resolvePricing('llm-gateway/deepseek-v4.1-flash', 'codex').pricing;
+    const deepseek = m.pricedCostOfRecord(assistant('a4', 'codex', 'llm-gateway/deepseek-v4.1-flash', 'priority'));
+    assert.equal(deepseek.priced, true, 'a DeepSeek version the table lacks is priced from its nearest version');
+    assert.ok(near(deepseek.cost.total, baseCost(deepseekPrice)), 'without the fast multiplier');
+
     const review = m.pricedCostOfRecord(assistant('a5', 'codex', 'codex-auto-review'));
     assert.equal(review.priced, true, 'auto-review is priced, not unpriced');
     assert.equal(review.cost.total, 0, 'at $0');
-    console.log('✓ pricedCostOfRecord: GPT multiplier, free auto-review');
+    console.log('✓ pricedCostOfRecord: Claude-through-Codex, GPT multiplier, nearest version, free auto-review');
   }
 
   {

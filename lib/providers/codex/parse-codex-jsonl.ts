@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs';
-import type { AssistantRecord, UserRecord } from '@/lib/types';
+import type { AssistantRecord, ServiceTier, UserRecord } from '@/lib/types';
 import type { ParsedFile, SpawnedSessionLink } from '../types';
 import { splitModelRoute } from './model-route.js';
 import { forEachLine } from '../../data-loader/read-lines.js';
@@ -77,6 +77,12 @@ function asString(v: unknown): string {
 function asNumber(v: unknown): number {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
+}
+
+function asServiceTier(v: unknown): ServiceTier | undefined {
+  const tier = asString(v).trim().toLowerCase();
+  if (!tier) return undefined;
+  return tier === 'priority' || tier === 'fast' ? 'priority' : 'default';
 }
 
 /**
@@ -161,6 +167,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
   // against the base branch …"), so none of them may root a turn.
   let reviewLauncher = false;
   let inheritsHistory = false;
+  let threadServiceTier: ServiceTier | undefined;
   let cliVersion: string | undefined;
   let defaultCwd = '';
   let userIdx = 0;
@@ -404,8 +411,10 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
       // real rollouts disagrees with the active turn 116 times out of 477,
       // which would bill e.g. a gpt-5.6-terra turn at gpt-5.6-sol's 2x rate.
       if (sub === 'thread_settings_applied') {
-        if (turn.modelFromTurnContext) return;
         const settings = payload.thread_settings as Record<string, unknown> | null | undefined;
+        const tier = settings ? asServiceTier(settings.service_tier) : undefined;
+        if (tier) threadServiceTier = tier;
+        if (turn.modelFromTurnContext) return;
         const m = settings ? asString(settings.model) : '';
         if (m) turn.model = m;
         return;
@@ -534,6 +543,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
           textPreview: turn.pendingTextPreview,
           filePath: file,
           effort: turn.effort,
+          ...(threadServiceTier ? { serviceTier: threadServiceTier } : {}),
           ...(subagentLineageRoot
             ? { isSidechain: true, parentSessionId: subagentLineageRoot }
             : {}),

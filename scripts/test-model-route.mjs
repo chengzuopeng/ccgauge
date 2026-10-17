@@ -25,6 +25,9 @@ const { parseModelOverrides, loadModelOverrides, invalidateModelOverridesCache, 
 const { resolveCodexPricing, BUILTIN_PRICING_OPENAI } = await import(
   join(root, 'lib/providers/codex/pricing.ts')
 );
+const { codexFastMultiplier, invalidateCodexTierCache } = await import(
+  join(root, 'lib/providers/codex/speed.ts')
+);
 
 const P = (input, output) => ({
   input,
@@ -186,6 +189,36 @@ const P = (input, output) => ({
   assert.equal(resolveCodexPricing('constructor').matchType, 'none');
   assert.equal(resolveCodexPricing('totally-unknown-model').pricing, null);
   console.log('✓ codex pricing: free auto-review, slash routes, same-family fallback');
+}
+
+{
+  const rootDir = mkdtempSync(join(tmpdir(), 'ccgauge-fast-gate-'));
+  const codexDir = join(rootDir, '.codex');
+  mkdirSync(codexDir);
+  writeFileSync(join(codexDir, 'config.toml'), 'service_tier = "priority"\n', 'utf8');
+  const prevCodexHome = process.env.CODEX_HOME;
+  const prevHome = process.env.HOME;
+  process.env.CODEX_HOME = codexDir;
+  process.env.HOME = rootDir;
+  try {
+    invalidateCodexTierCache();
+    assert.equal(codexFastMultiplier('gpt-5.5', 'priority'), 2.5);
+    assert.equal(codexFastMultiplier('llm-gateway/gpt-5.5', 'priority'), 2.5, 'a route does not hide the model');
+    assert.equal(codexFastMultiplier('gpt-6.1-sol', 'priority'), 2);
+    assert.equal(codexFastMultiplier('o3', 'priority'), 2);
+    assert.equal(codexFastMultiplier('codex-mini-latest', 'priority'), 2);
+    for (const model of ['claude-sonnet-5-5', 'llm-claude/claude-sonnet-5-5', 'grok-4.6', 'deepseek-v4.1-flash', 'codex-auto-review', 'constructor']) {
+      assert.equal(codexFastMultiplier(model, 'priority'), 1, `${model} has no priority tier`);
+    }
+  } finally {
+    if (prevCodexHome === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = prevCodexHome;
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+    rmSync(rootDir, { recursive: true, force: true });
+    invalidateCodexTierCache();
+  }
+  console.log('✓ the fast-tier multiplier only applies to OpenAI GPT-family models');
 }
 
 {

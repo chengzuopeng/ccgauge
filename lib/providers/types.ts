@@ -1,4 +1,4 @@
-import type { AssistantRecord, CostBreakdown, Pricing, UserRecord } from '../types';
+import type { AssistantRecord, CostBreakdown, Pricing, ServiceTier, UserRecord } from '../types';
 
 export type ProviderId = 'claude' | 'codex';
 
@@ -70,6 +70,7 @@ export interface ProviderAdapter {
     usage: AssistantRecord['usage'],
     pricing: Pricing | null,
     model?: string,
+    serviceTier?: ServiceTier,
   ): CostBreakdown;
 
   costFootnoteKey: string | null;

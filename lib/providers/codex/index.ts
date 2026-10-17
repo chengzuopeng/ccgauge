@@ -1,7 +1,7 @@
 import path from 'node:path';
 import os from 'node:os';
 import { costFromUsage } from '@/lib/pricing/cost-from-usage';
-import type { AssistantRecord, CostBreakdown, Pricing } from '@/lib/types';
+import type { AssistantRecord, CostBreakdown, Pricing, ServiceTier } from '@/lib/types';
 import { parseCodexJsonlFile } from './parse-codex-jsonl';
 import { resolveCodexPricing } from './pricing';
 import { shortenCodexModel } from './shorten-model';
@@ -35,9 +35,10 @@ function codexCostFromUsage(
   usage: AssistantRecord['usage'],
   pricing: Pricing | null,
   model?: string,
+  serviceTier?: ServiceTier,
 ): CostBreakdown {
   if (!pricing) return costFromUsage(usage, null);
-  const m = codexFastMultiplier(model ?? '');
+  const m = codexFastMultiplier(model ?? '', serviceTier);
   return costFromUsage(usage, m === 1 ? pricing : scaleCodexPricing(pricing, m));
 }
 
@@ -48,7 +49,7 @@ export const codexAdapter: ProviderAdapter = {
   color: { fg: '#047857', bg: '#d1fae5' },
   logoSrc: '/codex-logo.webp',
 
-  parserVersion: 'codex-v18-slash-model-route',
+  parserVersion: 'codex-v19-service-tier',
   capabilities: {
     hasCacheCreation: false,
     hasReasoningTokens: true,

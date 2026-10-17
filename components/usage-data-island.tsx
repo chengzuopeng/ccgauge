@@ -47,7 +47,6 @@ interface TurnsPayload {
   projects: string[];
   allModels: string[];
   allProjects: string[];
-  codexFastActive: boolean;
   hasAnyRecords: boolean;
   range: string;
   gran: string;
@@ -245,7 +244,6 @@ export function UsageDataIsland({ initial, costFootnote }: Props) {
           pageCount={data.pageCount}
           sort={data.sort}
           query={data.query}
-          codexFastActive={data.codexFastActive}
         />
       </Section>
     </div>
