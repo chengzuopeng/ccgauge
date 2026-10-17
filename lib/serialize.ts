@@ -2,6 +2,7 @@ import type { BlockProgressInfo } from './blocks/compute';
 import type { AssistantRecord, ProviderId, UserRecord } from './types';
 import { pricedCostOfRecord } from './pricing/calculate';
 import { codexCallIsFast } from './providers/codex/speed';
+import { fullModelId } from './providers/codex/model-route.js';
 import { buildTurnIndex } from './turns';
 import { resolveProjectLabel } from './project-label';
 import { generationStartOf, generationWindowMs, summarizeTimedCalls, tokensPerSecond } from './output-speed';
@@ -100,6 +101,7 @@ export interface UsageTurnRow {
   projectLabel: string;
   sessionId: string;
   models: string[];
+  modelIds: string[];
   callCount: number;
   inputTokens: number;
   outputTokens: number;
@@ -246,6 +248,7 @@ export function recordsToTurnRows(
     const first = children[0];
     const last = children[children.length - 1];
     const modelSet = new Set<string>();
+    const modelIdSet = new Set<string>();
     const toolSet = new Set<string>();
     const effortSet = new Set<string>();
     let inputTokens = 0;
@@ -262,6 +265,7 @@ export function recordsToTurnRows(
     let fastCallCount = 0;
     for (const c of children) {
       modelSet.add(c.model);
+      modelIdSet.add(fullModelId(c.model, c.modelRoute));
       for (const t of c.toolNames) toolSet.add(t);
       if (c.effort) effortSet.add(c.effort);
       inputTokens += c.inputTokens;
@@ -292,6 +296,7 @@ export function recordsToTurnRows(
       projectLabel: resolveProjectLabel(first.cwd),
       sessionId: first.sessionId,
       models: Array.from(modelSet),
+      modelIds: Array.from(modelIdSet),
       callCount: children.length,
       inputTokens,
       outputTokens,

@@ -22,6 +22,7 @@ import { UnpricedBadge } from '@/components/unpriced-badge';
 import { ScrollShadows } from '@/components/scroll-shadows';
 import type { SortKey } from '@/lib/usage-query';
 import { MIN_TIMED_OUTPUT_TOKENS } from '@/lib/output-speed';
+import { fullModelId, routedModelTitle } from '@/lib/providers/codex/model-route.js';
 import { usePendingNav } from '@/lib/use-pending-nav';
 
 type ColumnId =
@@ -635,15 +636,17 @@ function renderTurnCell(
       return (
         <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
           <span className="text-text-primary">
-            {modelLabel}
-            {turn.fastCallCount > 0 && (
-              <span
-                className="font-semibold text-warning"
-                title={t('usage.badge.fastHint', { count: turn.fastCallCount, total: turn.callCount })}
-              >
-                {`·${t('usage.badge.fast')}`}
-              </span>
-            )}
+            <RoutedModel ids={turn.modelIds}>
+              {modelLabel}
+              {turn.fastCallCount > 0 && (
+                <span
+                  className="font-semibold text-warning"
+                  title={t('usage.badge.fastHint', { count: turn.fastCallCount, total: turn.callCount })}
+                >
+                  {`·${t('usage.badge.fast')}`}
+                </span>
+              )}
+            </RoutedModel>
           </span>
           {turn.hasWorkflowSubagents && (
             <span
@@ -789,14 +792,16 @@ function renderChildCell(
     }
     case 'model':
       return (
-        <span className="whitespace-nowrap" title={r.modelRoute}>
-          {shortenModel(r.model)}
-          {r.effort ? ` · ${r.effort}` : ''}
-          {r.fast && (
-            <span className="font-semibold text-warning" title={t('usage.badge.fastCallHint')}>
-              {`·${t('usage.badge.fast')}`}
-            </span>
-          )}
+        <span className="whitespace-nowrap">
+          <RoutedModel ids={[fullModelId(r.model, r.modelRoute)]}>
+            {shortenModel(r.model)}
+            {r.effort ? ` · ${r.effort}` : ''}
+            {r.fast && (
+              <span className="font-semibold text-warning" title={t('usage.badge.fastCallHint')}>
+                {`·${t('usage.badge.fast')}`}
+              </span>
+            )}
+          </RoutedModel>
         </span>
       );
     case 'project':
@@ -859,6 +864,20 @@ function renderChildCell(
         </span>
       );
   }
+}
+
+function RoutedModel({ ids, children }: { ids: string[]; children: React.ReactNode }) {
+  const names = routedModelTitle(ids);
+  if (!names) return <>{children}</>;
+  return (
+    <HoverCard
+      delay={150}
+      panelClassName="px-2.5 py-1.5 text-xs text-text-primary"
+      content={<div className="num-mono whitespace-pre">{names}</div>}
+    >
+      {children}
+    </HoverCard>
+  );
 }
 
 function speedHint(

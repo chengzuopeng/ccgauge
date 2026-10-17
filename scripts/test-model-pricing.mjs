@@ -165,6 +165,39 @@ try {
   }
 
   {
+    const users = [
+      {
+        type: 'user',
+        source: 'codex',
+        uuid: 'u1',
+        parentUuid: null,
+        timestamp: '2026-10-15T10:00:00Z',
+        sessionId: 's1',
+        cwd: '/tmp/proj',
+        textPreview: 'hello',
+        filePath: '/tmp/proj/s1.jsonl',
+      },
+    ];
+    const routed = [
+      { ...assistant('a1', 'codex', 'claude-sonnet-5-5'), modelRoute: 'llm-claude' },
+      { ...assistant('a2', 'codex', 'claude-sonnet-5-5'), modelRoute: 'llm-claude' },
+      assistant('a3', 'codex', 'codex-auto-review'),
+      { ...assistant('a4', 'codex', 'gpt-6.1-sol'), modelRoute: 'zita' },
+    ];
+    const parentMap = { u1: null, a1: 'u1', a2: 'u1', a3: 'u1', a4: 'u1' };
+    const [turn] = m.recordsToTurnRows(routed, users, parentMap);
+    assert.deepEqual(turn.models, ['claude-sonnet-5-5', 'codex-auto-review', 'gpt-6.1-sol']);
+    assert.deepEqual(
+      turn.modelIds,
+      ['llm-claude/claude-sonnet-5-5', 'codex-auto-review', 'zita/gpt-6.1-sol'],
+      'a turn lists the full id of each model it used, route included',
+    );
+    const [plain] = m.recordsToTurnRows([assistant('a1', 'codex', 'gpt-5.5')], users, { u1: null, a1: 'u1' });
+    assert.deepEqual(plain.modelIds, ['gpt-5.5'], 'an unrouted model is its own full id');
+    console.log('✓ turn rows carry the full model ids for the hover tooltip');
+  }
+
+  {
     writeFileSync(
       m.overridesPath(),
       JSON.stringify({
