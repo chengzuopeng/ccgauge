@@ -5,6 +5,32 @@ All notable changes to **ccgauge** are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] — 2026-10-19
+
+### Added
+
+- **Codex runs started by scripts or agents are tagged.** A `codex exec` run
+  shows an "exec" tag in front of its prompt on the usage page, and a new
+  Initiator filter shows every run, only interactive ones, or only
+  `codex exec` runs. The choice is remembered, and the CSV export follows it.
+  Codex history is reparsed once in the background after upgrading.
+
+### Fixed
+
+- **Claude Code work you started no longer splits into rows you did not
+  start.** Work that went on after you interrupted a reply was titled
+  "[Request interrupted by user]" while your own message had no row; calls
+  after an automatic context compaction were titled "This session is being
+  continued…"; and a background sub-agent that compacted listed every later
+  wake-up ("[SYSTEM NOTIFICATION…]", final-report reminders, image notes) as
+  a row of its own. All of them now fold into the message that started the
+  work. Claude Code history is reparsed once in the background after
+  upgrading.
+- **Messages the Claude desktop app prefixes with a status note keep their
+  own row.** A typed message that arrived behind an injected
+  `<system-reminder>` block was merged into the previous turn. It now has its
+  own row, titled with what you typed.
+
 ## [1.5.0] — 2026-10-17
 
 ### Added
