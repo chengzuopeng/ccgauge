@@ -42,7 +42,7 @@ Release notes live in [CHANGELOG.md](https://github.com/chengzuopeng/ccgauge/blo
 
 ### Dashboard (browser)
 - **Overview** — 6 KPI cards (tokens today / cost / cache hit / top model / active sessions / live 5h block) with day-over-day delta on each.
-- **Usage** — turn-grouped table with expandable tool calls, CSV export, **Tokens / Conversations** chart toggle. Filters: range (incl. **custom date**), granularity, model + project multi-select.
+- **Usage** — turn-grouped table with expandable tool calls, CSV export, **Tokens / Conversations** chart toggle. Filters: range (incl. **custom date**), granularity, model + project multi-select, and initiator (all / interactive / `codex exec` runs, which carry an "exec" tag).
 - **Sessions** — per-conversation list with model / tokens / cost / duration; click in for the message-level timeline.
 - **Projects** — per-`cwd` aggregation with sparkline and spend share; worktrees auto-collapsed.
 - **Models** — side-by-side cost share, token share, cache hit, official per-1M pricing.

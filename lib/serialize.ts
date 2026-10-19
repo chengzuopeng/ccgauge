@@ -74,6 +74,7 @@ export interface UsageTableRow {
   costCacheWrite: number;
   unpriced?: boolean;
   fast?: boolean;
+  launch?: 'exec';
   toolNames: string[];
 
   effort?: string;
@@ -127,6 +128,7 @@ export interface UsageTurnRow {
   workflowSubagentCount: number;
   unpricedCallCount: number;
   fastCallCount: number;
+  launch?: 'exec';
   generationMs: number | null;
   generationOutputTokens: number | null;
   outputSpeed: number | null;
@@ -228,6 +230,7 @@ export function recordsToTurnRows(
       costCacheWrite: c.cacheCreation5m + c.cacheCreation1h,
       unpriced: priced ? undefined : true,
       fast: fast ? true : undefined,
+      launch: r.launch,
       toolNames: r.toolNames,
       effort: r.effort,
       isWorkflowSubagent: r.isWorkflowSubagent || undefined,
@@ -263,6 +266,7 @@ export function recordsToTurnRows(
     let costCacheWrite = 0;
     let unpricedCallCount = 0;
     let fastCallCount = 0;
+    let execLaunch = false;
     for (const c of children) {
       modelSet.add(c.model);
       modelIdSet.add(fullModelId(c.model, c.modelRoute));
@@ -280,6 +284,7 @@ export function recordsToTurnRows(
       costCacheWrite += c.costCacheWrite;
       if (c.unpriced) unpricedCallCount++;
       if (c.fast) fastCallCount++;
+      if (c.launch === 'exec') execLaunch = true;
     }
     const userRec = userMap.get(turnId);
     const startMs = new Date(first.timestamp).getTime();
@@ -315,6 +320,7 @@ export function recordsToTurnRows(
       workflowSubagentCount: workflowFilesByTurn.get(turnId)?.size ?? 0,
       unpricedCallCount,
       fastCallCount,
+      ...(execLaunch ? { launch: 'exec' as const } : {}),
       ...summarizeTimedCalls(children),
       userText: userRec?.textPreview ?? '',
       children,

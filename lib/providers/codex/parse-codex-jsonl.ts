@@ -168,6 +168,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
   let reviewLauncher = false;
   let inheritsHistory = false;
   let threadServiceTier: ServiceTier | undefined;
+  let execLaunch = false;
   let cliVersion: string | undefined;
   let defaultCwd = '';
   let userIdx = 0;
@@ -326,6 +327,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
       }
       defaultCwd = asString(payload.cwd);
       cliVersion = asString(payload.cli_version) || undefined;
+      execLaunch = asString(payload.originator) === 'codex_exec';
 
       const metaTs = asString(payload.timestamp);
       if (metaTs) lastValidTs = metaTs;
@@ -544,6 +546,7 @@ export async function parseCodexJsonlFile(file: string): Promise<ParsedFile> {
           filePath: file,
           effort: turn.effort,
           ...(threadServiceTier ? { serviceTier: threadServiceTier } : {}),
+          ...(execLaunch ? { launch: 'exec' as const } : {}),
           ...(subagentLineageRoot
             ? { isSidechain: true, parentSessionId: subagentLineageRoot }
             : {}),

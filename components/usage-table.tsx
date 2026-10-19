@@ -627,9 +627,23 @@ function renderTurnCell(
         <HoverCard
           maxWidth={460}
           panelClassName="p-3 text-sm text-text-secondary leading-relaxed"
-          content={<div className="whitespace-pre-wrap break-words">{userText}</div>}
+          content={
+            <div className="whitespace-pre-wrap break-words">
+              {turn.launch === 'exec' && (
+                <div className="mb-1.5 text-xs text-text-tertiary">{t('usage.badge.execHint')}</div>
+              )}
+              {userText}
+            </div>
+          }
         >
-          <span className="block text-text-secondary truncate max-w-[280px]">{userText}</span>
+          <span className="block text-text-secondary truncate max-w-[280px]">
+            {turn.launch === 'exec' && (
+              <span className="mr-1.5 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold leading-none align-[1px] bg-bg-surface-hi text-text-tertiary border border-border">
+                {t('usage.badge.exec')}
+              </span>
+            )}
+            {userText}
+          </span>
         </HoverCard>
       );
     case 'model':

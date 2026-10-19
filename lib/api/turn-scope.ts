@@ -4,6 +4,8 @@ import { isUsageRange, rangeToDates, parseCustomRange, type UsageRange } from '@
 import { resolveSource, filterBySource } from '@/lib/source';
 import { resolveCanonicalCwd } from '@/lib/project-label';
 import { matchesModel } from '@/lib/providers/codex/model-route.js';
+import { matchesLaunch, type LaunchFilter } from '@/lib/launch';
+import { resolveLaunch } from '@/lib/launch-server';
 import { badRequest } from '@/lib/api/error-handler';
 import type { AssistantRecord, UserRecord } from '@/lib/types';
 import type { EffectiveSource } from '@/lib/source';
@@ -24,6 +26,7 @@ export interface TurnFilters {
   dates: { from?: Date; to?: Date };
   models: string[];
   projects: string[];
+  launch: LaunchFilter;
   fromIso: string;
   toIso: string;
   /** LRU key for `recordsToTurnRowsCached`. */
@@ -68,6 +71,7 @@ export async function parseTurnFilters(
 
   const models = sp.get('models')?.split(',').filter(Boolean) ?? [];
   const projects = sp.get('projects')?.split(',').filter(Boolean) ?? [];
+  const launch = await resolveLaunch(sp.get('launch'));
   const fromIso = dates.from ? dates.from.toISOString() : '';
   const toIso = dates.to ? dates.to.toISOString() : '';
 
@@ -82,9 +86,10 @@ export async function parseTurnFilters(
     customStamp,
     models.slice().sort().join(','),
     projects.slice().sort().join(','),
+    launch,
   ].join('|');
 
-  return { filters: { source, range, dates, models, projects, fromIso, toIso, filterKey } };
+  return { filters: { source, range, dates, models, projects, launch, fromIso, toIso, filterKey } };
 }
 
 export async function loadTurnScope(f: TurnFilters): Promise<TurnScope> {
@@ -94,9 +99,11 @@ export async function loadTurnScope(f: TurnFilters): Promise<TurnScope> {
 
   const projectsSet = new Set(f.projects);
   const modelsSet = new Set(f.models);
+  const launchRecords =
+    f.launch === 'all' ? allSourceRecords : allSourceRecords.filter((r) => matchesLaunch(r, f.launch));
   const projectFilteredRecords = f.projects.length
-    ? allSourceRecords.filter((r) => projectsSet.has(resolveCanonicalCwd(r.cwd)))
-    : allSourceRecords;
+    ? launchRecords.filter((r) => projectsSet.has(resolveCanonicalCwd(r.cwd)))
+    : launchRecords;
 
   const filteredRecords = projectFilteredRecords.filter((r) => {
     if (f.dates.from && r.timestamp < f.fromIso) return false;

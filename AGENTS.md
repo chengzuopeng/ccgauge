@@ -284,7 +284,8 @@ on 3737 by default.
     → `codex-v16-guardian-review-lineage`
     → `codex-v17-request-timing`
     → `codex-v18-slash-model-route` (see below)
-    → `codex-v19-service-tier` (current; see below).
+    → `codex-v19-service-tier` (see below)
+    → `codex-v20-exec-launch` (current; see below).
 
     v12 is the one that is not a sub-agent problem at all. `codex review`
     run from inside a turn starts a separate TOP-LEVEL session, written as a
@@ -373,6 +374,17 @@ on 3737 by default.
     request log (`~/.codex/logs_2.sqlite`, `feedback_tags`) tags the same
     requests `unset` for gateway models that have no fast mode, which is one more
     reason the multiplier stays behind `isOpenAIPriorityModel`.
+
+    v20 marks non-interactive runs. Every `codex exec` rollout has
+    `session_meta.originator: codex_exec`, and the parser stamps
+    `launch: 'exec'` on each of its calls. Nothing ties such a run to whatever
+    started it: a Claude Code turn that launches `codex exec` from a background
+    Bash or a script records no Codex session id, and matching on project and
+    start time paired only 28 of 202 runs. So the usage page tags these runs
+    ("exec") and offers an Initiator filter instead of folding them into a
+    turn: `launch=all|interactive|exec`, remembered in the `ccgauge_launch`
+    cookie (`lib/launch-server.ts#resolveLaunch`), applied to totals, trend and
+    table in `lib/api/turn-scope.ts` and to the CSV export.
 
     Two of the earlier versions exist because a Codex rollout's shape varies
     **within one `cli_version`**, which is the thing to internalise before

@@ -10,6 +10,8 @@ import { getProvider } from '@/lib/providers';
 import { projectNameFromCwd } from '@/lib/utils';
 import { resolveCanonicalCwd } from '@/lib/project-label';
 import { matchesModel, modelRouteIncludes } from '@/lib/providers/codex/model-route.js';
+import { matchesLaunch } from '@/lib/launch';
+import { resolveLaunch } from '@/lib/launch-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -129,6 +131,7 @@ export const GET = withApiErrorHandling(async (req: Request) => {
   const level: Level = levelRaw === 'turn' ? 'turn' : 'call';
   const models = url.searchParams.get('models')?.split(',').filter(Boolean) ?? [];
   const projects = url.searchParams.get('projects')?.split(',').filter(Boolean) ?? [];
+  const launch = await resolveLaunch(url.searchParams.get('launch'));
   const query = (url.searchParams.get('q') || '').trim();
   const sortRaw = url.searchParams.get('sort');
   const sortKey: SortKey = sortRaw && isSortKey(sortRaw) ? sortRaw : 'timestamp';
@@ -162,6 +165,7 @@ export const GET = withApiErrorHandling(async (req: Request) => {
     if (dates.to && r.timestamp > dates.to.toISOString()) return false;
     if (models.length && !matchesModel(modelsSet, r.model, r.modelRoute)) return false;
     if (projects.length && !projects.includes(resolveCanonicalCwd(r.cwd))) return false;
+    if (!matchesLaunch(r, launch)) return false;
     return true;
   });
 

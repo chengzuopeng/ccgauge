@@ -5,6 +5,8 @@ import { RangePicker } from '@/components/range-picker';
 import { normalizeUsageRange, parseCustomRange } from '@/lib/range';
 import { ModelFilter } from '@/components/model-filter';
 import { ProjectFilter } from '@/components/project-filter';
+import { LaunchFilter } from '@/components/launch-filter';
+import { resolveLaunch } from '@/lib/launch-server';
 import { getServerT } from '@/lib/i18n/server';
 import { resolveSource, filterBySource } from '@/lib/source';
 import { getProvider } from '@/lib/providers';
@@ -28,6 +30,7 @@ export default async function UsagePage({
     gran?: string;
     models?: string;
     projects?: string;
+    launch?: string;
     q?: string;
     sort?: string;
     dir?: string;
@@ -51,6 +54,7 @@ export default async function UsagePage({
   const source = await resolveSource(sp.source);
   const models = sp.models ? sp.models.split(',').filter(Boolean) : [];
   const projects = sp.projects ? sp.projects.split(',').filter(Boolean) : [];
+  const launch = await resolveLaunch(sp.launch);
 
   const t = await getServerT();
 
@@ -62,6 +66,7 @@ export default async function UsagePage({
   const allModels = getAllModels(allSourceRecords); // WeakMap-cached
   const allProjects = getAllProjects(allSourceRecords); // WeakMap-cached
   const totalRecords = allSourceRecords.length;
+  const showLaunchFilter = launch !== 'all' || allSourceRecords.some((r) => r.launch === 'exec');
 
   const costFootnote =
     source === 'all'
@@ -79,6 +84,7 @@ export default async function UsagePage({
           <OverviewToggle />
           <ModelFilter all={allModels} selected={models} />
           <ProjectFilter all={allProjects} selected={projects} />
+          {showLaunchFilter && <LaunchFilter initial={launch} />}
           <RangePicker defaultValue="7d" />
         </div>
       }

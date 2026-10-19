@@ -137,6 +137,7 @@ export interface AssistantRecord {
 
   effort?: string;
   serviceTier?: ServiceTier;
+  launch?: 'exec';
 
   isSidechain?: boolean;
   /** Lineage root this sub-agent transcript belongs to — see the UserRecord

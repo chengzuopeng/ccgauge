@@ -49,7 +49,7 @@ export const codexAdapter: ProviderAdapter = {
   color: { fg: '#047857', bg: '#d1fae5' },
   logoSrc: '/codex-logo.webp',
 
-  parserVersion: 'codex-v19-service-tier',
+  parserVersion: 'codex-v20-exec-launch',
   capabilities: {
     hasCacheCreation: false,
     hasReasoningTokens: true,

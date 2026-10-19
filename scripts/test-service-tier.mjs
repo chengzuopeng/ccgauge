@@ -294,7 +294,8 @@ try {
   }
 
   {
-    assert.equal(m.codexAdapter.parserVersion, 'codex-v19-service-tier');
+    const version = Number(/^codex-v(\d+)-/.exec(m.codexAdapter.parserVersion)?.[1]);
+    assert.ok(version >= 19, `${m.codexAdapter.parserVersion} is at or past the tier change`);
     console.log('✓ the Codex parser version records the tier change');
   }
 } finally {
