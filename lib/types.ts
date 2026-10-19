@@ -85,6 +85,10 @@ export const RawRecordSchema = z
      *  it is declared so the parser can read it without a cast. */
     isMeta: z.boolean().optional(),
     permissionMode: z.string().optional(),
+    subtype: z.string().optional(),
+    logicalParentUuid: z.string().nullable().optional(),
+    isCompactSummary: z.boolean().optional(),
+    origin: z.object({ kind: z.string().optional() }).passthrough().nullable().optional(),
   })
   .passthrough();
 

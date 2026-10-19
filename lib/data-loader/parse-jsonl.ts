@@ -107,6 +107,32 @@ function extractUserText(content: unknown): string {
   return '';
 }
 
+const LEADING_SYSTEM_REMINDERS = /^(?:\s*<system-reminder>[\s\S]*?<\/system-reminder>)+\s*/;
+
+function extractOwnText(content: unknown): string {
+  const texts =
+    typeof content === 'string'
+      ? [content]
+      : Array.isArray(content)
+        ? (content as Array<Record<string, unknown>>)
+            .filter((c) => c.type === 'text' && typeof c.text === 'string')
+            .map((c) => c.text as string)
+        : [];
+  for (const text of texts) {
+    const own = text.replace(LEADING_SYSTEM_REMINDERS, '');
+    if (own.trim()) return own;
+  }
+  return '';
+}
+
+function parentOf(raw: RawRecord): string | null {
+  if (raw.parentUuid) return raw.parentUuid;
+  if (raw.type === 'system' && raw.subtype === 'compact_boundary' && raw.logicalParentUuid) {
+    return raw.logicalParentUuid;
+  }
+  return null;
+}
+
 // A slash command is recorded as an XML envelope, not as the line the user
 // typed: `<command-name>/goal</command-name>` plus a `<command-args>` payload.
 // Left raw, the usage row is titled with the markup and the actual request is
@@ -168,7 +194,7 @@ export async function parseJsonlFile(
       parsedBytes = end;
       if (!raw || typeof raw !== 'object') return;
 
-      if (raw.uuid) parentLinks.push([raw.uuid, raw.parentUuid ?? null]);
+      if (raw.uuid) parentLinks.push([raw.uuid, parentOf(raw)]);
 
       if (raw.type === 'assistant') {
         const a = parseAssistant(raw, file);
@@ -249,7 +275,9 @@ function parseUser(raw: RawRecord, file: string): UserRecord | null {
   const msg = raw.message as Record<string, unknown> | undefined;
   const content = msg?.content;
   const fullText = extractUserText(content);
-  const textPreview = (renderSlashCommand(fullText) ?? fullText).slice(0, TEXT_PREVIEW_MAX);
+  const originKind = typeof raw.origin?.kind === 'string' ? raw.origin.kind : undefined;
+  const promptText = originKind === 'human' ? extractOwnText(content) : fullText;
+  const textPreview = (renderSlashCommand(promptText) ?? promptText).slice(0, TEXT_PREVIEW_MAX);
 
   let toolResults: Array<{ toolUseId: string; chars: number }> | undefined;
   if (Array.isArray(content)) {
@@ -278,7 +306,12 @@ function parseUser(raw: RawRecord, file: string): UserRecord | null {
   // carry no `isMeta` at all (175 of 175 checked), so the prefix list below
   // still does the work the marker doesn't.
   const isSynthetic =
-    isSidechain || raw.isMeta === true || (!!textPreview && isSyntheticUserText(textPreview));
+    isSidechain ||
+    (originKind !== undefined
+      ? originKind !== 'human'
+      : raw.isMeta === true ||
+        raw.isCompactSummary === true ||
+        (!!textPreview && isSyntheticUserText(textPreview)));
 
   return {
     type: 'user',
@@ -324,5 +357,9 @@ export function isSyntheticUserText(text: string): boolean {
   // echoing what the command printed. Only the echo is synthetic — skipping it
   // roots the turn on the invocation instead of on "Goal set: …".
   if (t.startsWith('<local-command-stdout>')) return true;
+
+  if (t.startsWith('[SYSTEM NOTIFICATION - NOT USER INPUT]')) return true;
+
+  if (t.startsWith('[Request interrupted by user')) return true;
   return false;
 }

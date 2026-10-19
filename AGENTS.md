@@ -233,10 +233,31 @@ on 3737 by default.
     `claude-v3-synthetic-flag` → `claude-v4-sidechain-merge` →
     `claude-v5-task-notification-synthetic` → `claude-v6-tool-result-sizes`
     → `claude-v7-meta-injected-synthetic` → `claude-v8-request-end-timestamp`
-    (current). Touch this path? Bump `parserVersion` again — stale-cache
-    entries are invisible failures, and `scripts/check-parser-versions.mjs`
-    (run by `pnpm test`) fails when the code version drifts from
-    `scripts/parser-versions.json`.
+    → `claude-v9-origin-and-compaction` (current; see below). Touch this
+    path? Bump `parserVersion` again — stale-cache entries are invisible
+    failures, and `scripts/check-parser-versions.mjs` (run by `pnpm test`)
+    fails when the code version drifts from `scripts/parser-versions.json`.
+
+    v9 decides which user records count as prompts. Claude Code (2.1.12x and
+    later) stamps `origin.kind` on user records: `human` for a typed prompt,
+    `task-notification`, `peer` or `coordinator` for what the harness or
+    another agent injected. When it is present it decides alone: a `human`
+    record roots a turn even when the desktop app put a `<system-reminder>`
+    block ("Linked sessions now…", a fork notice) in front of the typed text,
+    and the preview skips those blocks so the row reads as typed; every other
+    kind is synthetic. Records without `origin` (older builds, and lines the
+    harness still writes without it) keep the `isMeta` + prefix rules, which
+    now also cover `isCompactSummary`, "[Request interrupted by user…]" and
+    "[SYSTEM NOTIFICATION - NOT USER INPUT]". The interruption marker was the
+    expensive miss: the work an interrupted prompt went on to do (resumed by a
+    task notification) was titled "[Request interrupted by user]", and the
+    prompt itself lost its row. v9 also bridges compaction. A
+    `compact_boundary` record has `parentUuid: null` and keeps its real
+    predecessor in `logicalParentUuid`, so the parser links it there. Before,
+    calls after an auto-compaction rooted on the summary ("This session is
+    being continued…"), and inside a sub-agent the chain never reached the
+    anchored seed again, so every later wake-up fell back to its nearest
+    injected message and became a row of its own.
 
     Codex sub-agents work differently and cost more versions:
     `codex-v6-output-excludes-readded-reasoning` →
