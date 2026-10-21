@@ -6,6 +6,7 @@ import { costFromUsage } from '@/lib/pricing/cost-from-usage';
 import { shortenClaudeModel } from './shorten-model';
 import type { Pricing } from '@/lib/types';
 import type { ProviderAdapter, PricingResolution } from '../types';
+import { windowsHome } from '../wsl';
 
 const dateSuffix = /-\d{8}$/;
 const prefixRe = /^(vertex_ai|bedrock|anthropic)\//;
@@ -75,6 +76,10 @@ function getDirs(): string[] {
   if (process.env.CLAUDE_CONFIG_DIR) {
     candidates.push(path.join(process.env.CLAUDE_CONFIG_DIR, 'projects'));
   }
+  // Last, so a session the desktop app mirrors here from WSL (`ssh-<id>/`)
+  // dedups onto the WSL copy, which is scanned first.
+  const winHome = windowsHome();
+  if (winHome) candidates.push(path.join(winHome, '.claude', 'projects'));
   return Array.from(new Set(candidates));
 }
 

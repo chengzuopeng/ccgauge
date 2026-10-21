@@ -7,6 +7,7 @@ import { resolveCodexPricing } from './pricing';
 import { shortenCodexModel } from './shorten-model';
 import { codexFastMultiplier, scaleCodexPricing } from './speed';
 import type { ProviderAdapter } from '../types';
+import { windowsHome } from '../wsl';
 
 function getDirs(): string[] {
   const home = os.homedir();
@@ -20,6 +21,11 @@ function getDirs(): string[] {
   if (process.env.CODEX_HOME) {
     candidates.push(path.join(process.env.CODEX_HOME, 'sessions'));
     candidates.push(path.join(process.env.CODEX_HOME, 'archived_sessions'));
+  }
+  const winHome = windowsHome();
+  if (winHome) {
+    candidates.push(path.join(winHome, '.codex', 'sessions'));
+    candidates.push(path.join(winHome, '.codex', 'archived_sessions'));
   }
   return Array.from(new Set(candidates));
 }

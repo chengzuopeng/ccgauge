@@ -216,6 +216,8 @@ ccgauge auto-detects standard locations:
 | Claude Code | `~/.claude/projects`, `~/.config/claude/projects` |
 | OpenAI Codex CLI | `~/.codex/sessions`, `~/.codex/archived_sessions` |
 
+Under WSL, the same Claude and Codex locations in the Windows profile (`/mnt/c/Users/<your Linux username>/…`) are scanned too, so sessions from the Claude and Codex desktop apps show up. Sessions present in both places are counted once.
+
 Override / extend via environment variables:
 
 | Variable | Effect |

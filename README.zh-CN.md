@@ -216,6 +216,8 @@ ccgauge 自动识别标准路径：
 | Claude Code | `~/.claude/projects`、`~/.config/claude/projects` |
 | OpenAI Codex CLI | `~/.codex/sessions`、`~/.codex/archived_sessions` |
 
+在 WSL 中还会扫描 Windows 用户目录（`/mnt/c/Users/<与 Linux 同名的用户>/…`）下的同名路径，从而包含 Claude 和 Codex 桌面应用的会话。两处都存在的会话只计一次。
+
 通过环境变量自定义：
 
 | 变量 | 作用 |
